@@ -1,6 +1,6 @@
-![Logo](admin/3d-home.svg)
+![Logo](admin/home3d.svg)
 
-# ioBroker.3d-home
+# ioBroker.home3d
 
 3D-Grundrisseditor und Live-Visualisierung für ioBroker. Die Oberfläche läuft komplett im **web-Adapter**, wie vis-2:
 kein eigener Server, kein eigener Port, kein eigener Zugangsschlüssel.
@@ -16,8 +16,8 @@ Nach der Installation:
 
 | | Adresse |
 | --- | --- |
-| Oberfläche (3D-Ansicht und Editor) | `http://<server>:8082/3d-home/index.html` |
-| Tabletansicht (z. B. als iframe in vis) | `http://<server>:8082/3d-home/index.html?view=card` |
+| Oberfläche (3D-Ansicht und Editor) | `http://<server>:8082/home3d/index.html` |
+| Tabletansicht (z. B. als iframe in vis) | `http://<server>:8082/home3d/index.html?view=card` |
 
 Beide Adressen stehen auch als Verweis im Reiter **Instanzen**. Die Instanz hat keine Einstellungen.
 
@@ -36,7 +36,7 @@ Beide Adressen stehen auch als Verweis im Reiter **Instanzen**. Die Instanz hat 
 - **Schalten** schreibt mit `ack: false` direkt über den Socket. Typ, Bereich (`min`/`max`) und Schreibrecht werden
   vorher geprüft.
 - **Speichern**: Grundrisse, Wiederherstellungspunkte, Bilder und Gerätezuordnungen liegen als Dateien im
-  ioBroker-Dateispeicher der Instanz `3d-home.0`:
+  ioBroker-Dateispeicher der Instanz `home3d.0`:
   - `data.json`: Grundrisse, Zuordnungen, Reihenfolge
   - `history/<grundriss>.json`: bis zu 30 Wiederherstellungspunkte je Grundriss
   - `images/<bild>.<png|jpg|webp|gif>`: Hintergrundbilder
@@ -48,12 +48,16 @@ Beide Adressen stehen auch als Verweis im Reiter **Instanzen**. Die Instanz hat 
 Der angemeldete Benutzer braucht Leserechte auf Objekte und States der zugeordneten Datenpunkte, Schreibrechte auf
 States zum Schalten und Schreibrechte auf Dateien zum Speichern von Grundrissen.
 
-### Update von 0.4.0
+### Wechsel vom Adapter 3d-home (0.4.0)
 
-0.4.0 hatte einen eigenen Webserver (Port 8097) und speicherte alles im State `3d-home.0.storage`. Beim ersten Öffnen
-der neuen Oberfläche wird dieser Inhalt einmalig nach `data.json`, `history/` und `images/` übernommen. Der alte
-State bleibt unverändert als Sicherung stehen und kann danach gelöscht werden, ebenso `3d-home.0.info.connection`.
-Port und Zugangsschlüssel entfallen.
+Bis 0.4.0 hieß der Adapter `3d-home`, hatte einen eigenen Webserver (Port 8097) und speicherte alles im State
+`3d-home.0.storage`. Weil ioBroker-Adapternamen mit einem Buchstaben beginnen müssen, heißt er jetzt `home3d`. Das ist
+für ioBroker ein neuer Adapter:
+
+1. `home3d` installieren, die alte Instanz `3d-home.0` vorerst **nicht** löschen.
+2. `/home3d/index.html` einmal öffnen. Dabei wird der Inhalt von `3d-home.0.storage` einmalig nach `data.json`,
+   `history/` und `images/` von `home3d.0` übernommen.
+3. Danach den Adapter `3d-home` deinstallieren. Port und Zugangsschlüssel entfallen.
 
 ## Entwicklung
 
@@ -64,7 +68,7 @@ npm run check          # TypeScript-Prüfung (Browser-Code, Build-Tasks, Tests)
 npm run lint           # @iobroker/eslint-config
 npm test               # Unit-Tests (node:test) und Paketdateien (@iobroker/testing)
 npm run test:pack      # npm pack und Prüfung des Tarballs
-npm run demo           # lokale Demo ohne ioBroker: http://127.0.0.1:8099/3d-home/index.html
+npm run demo           # lokale Demo ohne ioBroker: http://127.0.0.1:8099/home3d/index.html
 ```
 
 Die Demo liefert `www/` wie der web-Adapter aus und ersetzt `/lib/js/socket.io.js` durch einen simulierten Socket mit
@@ -82,10 +86,12 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 -->
 ### **WORK IN PROGRESS**
 
-- (bluefox) **Breaking:** Die Oberfläche läuft jetzt im web-Adapter unter `/3d-home/`. Eigener Webserver, Port 8097
+- (bluefox) **Breaking:** Der Adapter heißt jetzt `home3d` (Adapternamen müssen mit einem Buchstaben beginnen).
+  Übernahme der Daten siehe „Wechsel vom Adapter 3d-home“
+- (bluefox) **Breaking:** Die Oberfläche läuft jetzt im web-Adapter unter `/home3d/`. Eigener Webserver, Port 8097
   und Zugangsschlüssel entfallen; Anmeldung und Rechte kommen von web. Voraussetzung: web ≥ 7.0.0
 - (bluefox) Werte werden per Push nur für zugeordnete Datenpunkte abonniert statt alle zwei Sekunden komplett abgefragt
-- (bluefox) Speicherung als Dateien in `3d-home.0` (`data.json`, `history/`, `images/`); einmalige Übernahme aus
+- (bluefox) Speicherung als Dateien in `home3d.0` (`data.json`, `history/`, `images/`); einmalige Übernahme aus
   `3d-home.0.storage`
 - (bluefox) Sicherungsdateien aus älteren Versionen haben eine andere Formatkennung und lassen sich nicht direkt
   importieren

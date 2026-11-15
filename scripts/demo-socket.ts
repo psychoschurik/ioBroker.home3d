@@ -23,7 +23,7 @@ interface Demo {
 }
 declare const __DEMO__: Demo;
 
-const KEY = '3d-home-demo';
+const KEY = 'home3d-demo';
 const MIME: Record<string, string> = {
     json: 'application/json',
     png: 'image/png',

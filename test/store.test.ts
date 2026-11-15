@@ -23,7 +23,7 @@ const mapping = {
         turn_off: [{ id: 'lamp.power', value: false }],
     },
 };
-/** File storage of 3d-home.0 in memory, like the socket of the web adapter offers it. */
+/** File storage of home3d.0 in memory, like the socket of the web adapter offers it. */
 function memoryFiles(fail?: () => void): FileAccess & { files: Map<string, Uint8Array> } {
     const files = new Map<string, Uint8Array>();
     return {

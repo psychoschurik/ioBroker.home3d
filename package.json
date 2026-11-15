@@ -1,12 +1,12 @@
 {
-  "name": "iobroker.3d-home",
+  "name": "iobroker.home3d",
   "version": "0.4.0",
   "description": "3D floor plan editor and live visualization for ioBroker, served by the web adapter",
-  "author": "ioBroker.3d-home contributors",
+  "author": "ioBroker.home3d contributors",
   "license": "MIT",
   "keywords": [
     "ioBroker",
-    "3d-home",
+    "home3d",
     "visualization",
     "floorplan",
     "smart-home",
@@ -14,12 +14,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/psychoschurik/ioBroker.3d-home.git"
+    "url": "git+https://github.com/psychoschurik/ioBroker.home3d.git"
   },
   "bugs": {
-    "url": "https://github.com/psychoschurik/ioBroker.3d-home/issues"
+    "url": "https://github.com/psychoschurik/ioBroker.home3d/issues"
   },
-  "homepage": "https://github.com/psychoschurik/ioBroker.3d-home#readme",
+  "homepage": "https://github.com/psychoschurik/ioBroker.home3d#readme",
   "engines": {
     "node": ">=22.19.0"
   },

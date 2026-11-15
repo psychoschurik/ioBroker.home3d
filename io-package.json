@@ -1,6 +1,6 @@
 {
     "common": {
-        "name": "3d-home",
+        "name": "home3d",
         "version": "0.4.0",
         "titleLang": {
             "en": "3D Home",
@@ -30,16 +30,16 @@
             }
         },
         "authors": [
-            "ioBroker.3d-home contributors"
+            "ioBroker.home3d contributors"
         ],
         "licenseInformation": {
             "type": "free",
             "license": "MIT"
         },
         "platform": "Javascript/Node.js",
-        "icon": "3d-home.svg",
-        "extIcon": "https://raw.githubusercontent.com/psychoschurik/ioBroker.3d-home/main/admin/3d-home.svg",
-        "readme": "https://github.com/psychoschurik/ioBroker.3d-home/blob/main/README.md",
+        "icon": "home3d.svg",
+        "extIcon": "https://raw.githubusercontent.com/psychoschurik/ioBroker.home3d/main/admin/home3d.svg",
+        "readme": "https://github.com/psychoschurik/ioBroker.home3d/blob/main/README.md",
         "keywords": [
             "3d",
             "floorplan",
@@ -62,14 +62,14 @@
         },
         "localLinks": {
             "_default": {
-                "link": "%web_protocol%://%web_bind%:%web_port%/3d-home/index.html",
+                "link": "%web_protocol%://%web_bind%:%web_port%/home3d/index.html",
                 "name": {
                     "en": "3D Home",
                     "de": "3D Home"
                 }
             },
             "card": {
-                "link": "%web_protocol%://%web_bind%:%web_port%/3d-home/index.html?view=card",
+                "link": "%web_protocol%://%web_bind%:%web_port%/home3d/index.html?view=card",
                 "name": {
                     "en": "Tablet view",
                     "de": "Tabletansicht"

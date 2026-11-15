@@ -63,7 +63,7 @@ export interface IoAccess {
     getState(id: string): Promise<StateValue | null | undefined>;
     setState(id: string, value: any): Promise<unknown>;
 }
-/** Files of the instance (`3d-home.0`) in the file storage of ioBroker. */
+/** Files of the instance (`home3d.0`) in the file storage of ioBroker. */
 export interface FileAccess {
     readText(name: string): Promise<string | null>;
     writeText(name: string, text: string): Promise<void>;
@@ -110,7 +110,7 @@ export interface StorageData {
     mappings: Mapping[];
     locate_plan: string;
 }
-/** Format of 0.4.0, which kept everything (also the images as data URLs) in the state `3d-home.0.storage`. */
+/** Format of 0.4.0, which kept everything (also the images as data URLs) in the state `home3d.0.storage`. */
 export interface LegacyStorageData {
     plans: Record<string, Plan & { snapshots?: Snapshot[] }>;
     images?: Record<string, string>;

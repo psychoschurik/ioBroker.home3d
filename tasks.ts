@@ -1,5 +1,5 @@
 /*!
- * ioBroker build tasks of 3d-home.
+ * ioBroker build tasks of home3d.
  *
  * The adapter has no backend: everything runs in the browser and is served by the web adapter from www/.
  *   npm run build          builds everything
@@ -24,7 +24,7 @@ function replaceRequired(text: string, pattern: string | RegExp, replacement: st
     return next;
 }
 
-/** Links of the upstream project lead to the local help page. Relative, because web serves the page under /3d-home/. */
+/** Links of the upstream project lead to the local help page. Relative, because web serves the page under /home3d/. */
 const localLinks = (text: string): string =>
     text
         .replace(/https?:\/\/(?:[a-z0-9-]+\.)*mastershort\.de/gi, 'help.html#guide')

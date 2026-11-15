@@ -1,5 +1,5 @@
 // Plans, history, images and device mappings of 3D Home, kept as files of the instance in the file storage of
-// ioBroker (`3d-home.0`). Runs in the browser; the web adapter only transports the socket commands.
+// ioBroker (`home3d.0`). Runs in the browser; the web adapter only transports the socket commands.
 import type {
     Building,
     Plan,

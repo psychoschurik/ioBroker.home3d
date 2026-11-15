@@ -1,4 +1,4 @@
-// Local demo without ioBroker: serves www/ like the web adapter under /3d-home/ and a simulated socket with demo
+// Local demo without ioBroker: serves www/ like the web adapter under /home3d/ and a simulated socket with demo
 // devices as /lib/js/socket.io.js. Usage: `npm run demo` or `npm run demo -- artifacts/demo-house-0.2.0.json`.
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
@@ -98,10 +98,10 @@ async function demoData(file?: string): Promise<string> {
         objects: {
             ...house.objects,
             'system.config': { type: 'config', common: { language: 'de' }, native: {} },
-            '3d-home.0': { type: 'meta', common: { name: '3D Home', type: 'meta.user' }, native: {} },
+            'home3d.0': { type: 'meta', common: { name: '3D Home', type: 'meta.user' }, native: {} },
         },
         states: Object.fromEntries(Object.entries(house.values).map(([id, val]) => [id, { val }])),
-        files: { '3d-home.0/data.json': Buffer.from(JSON.stringify(data)).toString('base64') },
+        files: { 'home3d.0/data.json': Buffer.from(JSON.stringify(data)).toString('base64') },
     });
 }
 
@@ -118,20 +118,20 @@ async function main(): Promise<void> {
     createServer((req, res) => {
         void (async () => {
             const url = new URL(req.url || '/', 'http://localhost');
-            if (url.pathname === '/' || url.pathname === '/3d-home' || url.pathname === '/3d-home/') {
-                res.writeHead(302, { Location: '/3d-home/index.html' }).end();
+            if (url.pathname === '/' || url.pathname === '/home3d' || url.pathname === '/home3d/') {
+                res.writeHead(302, { Location: '/home3d/index.html' }).end();
                 return;
             }
             if (url.pathname === '/lib/js/socket.io.js') {
                 res.writeHead(200, { 'Content-Type': MIME['.js'] }).end(socketJs);
                 return;
             }
-            if (url.pathname === '/3d-home/_socket/info.js') {
+            if (url.pathname === '/home3d/_socket/info.js') {
                 res.writeHead(200, { 'Content-Type': MIME['.js'] }).end('var socketUrl = ""; var socketSession = ""; var sysLang = "de";');
                 return;
             }
-            const file = resolve(www, `.${decodeURIComponent(url.pathname.replace(/^\/3d-home/, ''))}`);
-            if (!url.pathname.startsWith('/3d-home/') || !file.startsWith(www + sep)) {
+            const file = resolve(www, `.${decodeURIComponent(url.pathname.replace(/^\/home3d/, ''))}`);
+            if (!url.pathname.startsWith('/home3d/') || !file.startsWith(www + sep)) {
                 res.writeHead(404).end();
                 return;
             }
@@ -144,7 +144,7 @@ async function main(): Promise<void> {
             }
         })();
     }).listen(PORT, '127.0.0.1', () =>
-        console.log(`Demo (simulated devices only): http://127.0.0.1:${PORT}/3d-home/index.html`),
+        console.log(`Demo (simulated devices only): http://127.0.0.1:${PORT}/home3d/index.html`),
     );
 }
 main().catch(e => {

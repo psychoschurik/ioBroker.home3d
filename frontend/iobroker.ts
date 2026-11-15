@@ -2,7 +2,9 @@
 import { Connection } from '@iobroker/socket-client';
 import type { IoAccess, FileAccess, StateObject, StateValue, RoomObject } from './model.js';
 
-export const NAMESPACE = '3d-home.0';
+export const NAMESPACE = 'home3d.0';
+/** State of 0.4.0, when the adapter was still called 3d-home and had its own server */
+export const LEGACY_STATE = '3d-home.0.storage';
 
 function fromBase64(base64: string): string {
     const raw = atob(base64);
@@ -21,10 +23,10 @@ export class IoBroker implements IoAccess, FileAccess {
 
     constructor() {
         this.conn = new Connection({
-            name: '3d-home',
+            name: 'home3d',
             doNotLoadAllObjects: true,
             doNotLoadACL: true,
-            onError: e => console.error('[3d-home]', e),
+            onError: e => console.error('[home3d]', e),
         });
     }
     async ready(): Promise<void> {
@@ -89,7 +91,7 @@ export class IoBroker implements IoAccess, FileAccess {
     setState(id: string, value: any): Promise<void> {
         return this.conn.setState(id, value, false);
     }
-    // Files of 3d-home.0
+    // Files of home3d.0
     async readText(name: string): Promise<string | null> {
         try {
             const r = await this.conn.readFile(NAMESPACE, name, true);
@@ -125,7 +127,7 @@ export class IoBroker implements IoAccess, FileAccess {
     }
     /** Content of the state of 0.4.0, which stored everything in `3d-home.0.storage`. */
     async legacy(): Promise<string | null> {
-        const s = await this.conn.getState(`${NAMESPACE}.storage`);
+        const s = await this.conn.getState(LEGACY_STATE);
         return typeof s?.val === 'string' ? s.val : null;
     }
 }

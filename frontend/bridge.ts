@@ -159,7 +159,7 @@ async function start(): Promise<void> {
             clearTimeout(pending);
             pending = setTimeout(() => void store.sync().catch(() => {}), 300);
         })
-        .catch(e => console.warn('[3d-home] subscribeFiles', e));
+        .catch(e => console.warn('[home3d] subscribeFiles', e));
     render();
 }
 setupDeviceDialog({

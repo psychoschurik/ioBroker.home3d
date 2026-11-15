@@ -8,7 +8,7 @@ import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..');
 const metadata = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const filename = `${metadata.name}-${metadata.version}.tgz`;
-const temporary = await mkdtemp(path.join(tmpdir(), '3d-home-package-'));
+const temporary = await mkdtemp(path.join(tmpdir(), 'home3d-package-'));
 try {
     // GNU tar (Git for Windows) reads "C:\..." as a remote host unless --force-local is given; bsdtar does not know it.
     // Extract with cwd instead of -C, GNU tar on Windows does not understand -C with a drive letter.
@@ -28,7 +28,7 @@ try {
     }
     const html = await readFile(path.join(unpacked, 'www/index.html'), 'utf8');
     assert.match(html, /src="\.\.\/lib\/js\/socket\.io\.js"/, 'socket of the web adapter');
-    assert.doesNotMatch(html, /(?:href|src)="\//, 'only relative links, web serves the page under /3d-home/');
+    assert.doesNotMatch(html, /(?:href|src)="\//, 'only relative links, web serves the page under /home3d/');
     const bridge = await readFile(path.join(unpacked, 'www/bridge.js'), 'utf8');
     assert.match(bridge, /\.\/vendor\/home3d\.js/);
     console.log(`Verified ${filename}: web files, no backend.`);

@@ -128,6 +128,7 @@ function discover(
                 o.type === 'state' &&
                 o.common?.read !== false &&
                 !o._id.startsWith('system.') &&
+                // the large JSON state of 0.4.0 (then still called 3d-home) is no device
                 !/^3d-home\.\d+\.storage$/.test(o._id),
         )
         .map(o => {
