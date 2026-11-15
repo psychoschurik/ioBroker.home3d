@@ -1,4 +1,9 @@
-Based on 3D Home by Mastershort, MIT license.
-Upstream commit: c11bd614d38a68d3aec251a940e31a1101b7429b
-Frontend rebuilt with ioBroker theme, local help links and an object-tree selector. ioBroker backend and bridge are independent additions.
-Not an official Mastershort release. Commercial packs are not included.
+The 3D frontend in vendor-src/home3d/src (and the bundles in www/vendor/ built from it) is derived from
+an MIT licensed project by Mastershort (upstream version 3.1.2, commit c11bd614d38a68d3aec251a940e31a1101b7429b).
+Copyright (c) 2026 Mastershort - see LICENSE. This copyright notice must be retained.
+
+Changes for ioBroker: ioBroker theme, local help links, object-tree selector and the connection to ioBroker
+over the socket of the web adapter (frontend/). Not an official Mastershort release. Commercial packs are not included.
+
+Bundled third-party libraries: three.js (MIT, www/licenses/three-MIT.txt), Lit (BSD-3-Clause,
+www/licenses/lit-BSD.txt), @iobroker/socket-client (MIT), fonts Figtree and Bricolage Grotesque (OFL, www/vendor/fonts/).

@@ -1,1 +1,1 @@
-declare module "*vendor/home3d.js";
+declare module '*vendor/home3d.js';

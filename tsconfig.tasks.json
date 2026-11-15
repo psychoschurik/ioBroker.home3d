@@ -1,0 +1,17 @@
+// Type check of the build tasks, the demo and the tests (Node.js)
+{
+    "compilerOptions": {
+        "target": "es2022",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "useUnknownInCatchVariables": false,
+        "noEmit": true,
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "types": ["node", "@iobroker/types"]
+    },
+    "include": ["tasks.ts", "scripts/**/*.ts", "scripts/**/*.mts", "test/**/*.ts"],
+    "exclude": ["node_modules/**", "www/**", "vendor-src/**"]
+}

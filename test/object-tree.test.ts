@@ -1,8 +1,8 @@
-import type { StateObject } from "../src/lib/types.js";
+import type { StateObject } from "../frontend/model";
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import { discover } from "../src/lib/entities.js";
+import { discover } from "../frontend/entities";
 test("object tree preserves channels, stable IDs and same-prefix siblings", async () => {
   const { makeTree, visibleNodes } = await import("../frontend/object-tree.js");
   const items = [
@@ -54,7 +54,7 @@ test("discovery exposes object metadata but masks secret previews", () => {
     {
       "device.0.token": obj("device.0.token", "text", "string"),
       "device.0.temp": obj("device.0.temp", "value.temperature", "number"),
-      "home3d.0.storage": obj("home3d.0.storage", "json", "string"),
+      "3d-home.0.storage": obj("3d-home.0.storage", "json", "string"),
     },
     {},
     { "device.0.token": { val: "private" }, "device.0.temp": { val: 22 } },

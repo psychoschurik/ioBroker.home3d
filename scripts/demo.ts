@@ -1,132 +1,153 @@
-import type {
-  IoAccess,
-  StateObject,
-  StateValue,
-  RoomObject,
-} from "../src/lib/types.js";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
-import { Backend, empty } from "../src/lib/backend.js";
-import { createServer } from "../src/lib/server.js";
-async function main() {
-  const dir = path.resolve(__dirname, "../.demo-data");
-  await fs.mkdir(dir, { recursive: true });
-  const file = path.join(dir, "data.json");
-  let stored;
-  try {
-    stored = JSON.parse(await fs.readFile(file, "utf8"));
-  } catch (e) {
-    if (e.code !== "ENOENT") throw e;
-  }
-  const objects: Record<string, StateObject> = {
-    "demo.light": {
-      _id: "demo.light",
-      type: "state",
-      common: {
-        name: "Wohnzimmer Licht",
-        type: "boolean",
-        role: "switch.light",
-        read: true,
-        write: true,
-      },
-    },
-    "demo.temperature": {
-      _id: "demo.temperature",
-      type: "state",
-      common: {
-        name: "Wohnzimmer Temperatur",
-        type: "number",
-        role: "value.temperature",
-        unit: "°C",
-        read: true,
-        write: false,
-      },
-    },
-  };
-  const states: Record<string, StateValue> = {
-    "demo.light": { val: true, ts: Date.now() },
-    "demo.temperature": { val: 21.6, ts: Date.now() },
-  };
-  const rooms: Record<string, RoomObject> = {
-    "enum.rooms.living": {
-      _id: "enum.rooms.living",
-      common: {
-        name: "Wohnzimmer",
-        members: ["demo.light", "demo.temperature"],
-      },
-    },
-  };
-  const io: IoAccess = {
-    objects: async () => objects,
-    rooms: async () => rooms,
-    states: async () => states,
-    getObject: async (id) => objects[id],
-    getState: async (id) => states[id],
-    setState: async (id, val) => {
-      states[id] = { val, ts: Date.now() };
-    },
-  };
-  const backend = new Backend(io, stored, async (data) => {
-    await fs.writeFile(file + ".tmp", JSON.stringify(data));
-    await fs.rename(file + ".tmp", file);
-  });
-  if (!stored) {
+// Local demo without ioBroker: serves www/ like the web adapter under /3d-home/ and a simulated socket with demo
+// devices as /lib/js/socket.io.js. Usage: `npm run demo` or `npm run demo -- artifacts/demo-house-0.2.0.json`.
+import { build } from 'esbuild';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { extname, join, resolve, sep } from 'node:path';
+import type { Building, Mapping, RoomObject, StateObject } from '../frontend/model';
+import type { DemoHouse } from './demo-types';
+import { discover } from '../frontend/entities';
+import { empty } from '../frontend/store';
+
+const root = resolve(__dirname, '..');
+const www = join(root, 'www');
+const PORT = Number(process.env.DEMO_PORT) || 8099;
+const MIME: Record<string, string> = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.css': 'text/css',
+    '.json': 'application/json',
+    '.svg': 'image/svg+xml',
+    '.woff2': 'font/woff2',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+};
+
+function smallHouse(): { objects: Record<string, StateObject>; building: Building; mappings: Mapping[]; values: Record<string, unknown> } {
+    const objects: Record<string, StateObject> = {
+        '0_userdata.0.demo.light': {
+            _id: '0_userdata.0.demo.light',
+            type: 'state',
+            common: { name: 'Wohnzimmer Licht', type: 'boolean', role: 'switch.light', read: true, write: true },
+        },
+        '0_userdata.0.demo.temperature': {
+            _id: '0_userdata.0.demo.temperature',
+            type: 'state',
+            common: { name: 'Wohnzimmer Temperatur', type: 'number', role: 'value.temperature', unit: '°C', read: true, write: false },
+        },
+    };
+    const rooms: Record<string, RoomObject> = {
+        'enum.rooms.living': {
+            _id: 'enum.rooms.living',
+            common: { name: 'Wohnzimmer', members: Object.keys(objects) },
+        },
+    };
     const building = empty();
     building.floors = [
-      {
-        id: "eg",
-        name: "Erdgeschoss",
-        elevation: 0,
-        height: 2.6,
-        cut_height: 1.2,
-        rooms: [
-          {
-            id: "living",
-            name: "Wohnzimmer",
-            area_id: "enum.rooms.living",
-            points: [
-              [0, 0],
-              [6, 0],
-              [6, 4],
-              [0, 4],
+        {
+            id: 'eg',
+            name: 'Erdgeschoss',
+            elevation: 0,
+            height: 2.6,
+            cut_height: 1.2,
+            rooms: [
+                { id: 'living', name: 'Wohnzimmer', area_id: 'enum.rooms.living', points: [[0, 0], [6, 0], [6, 4], [0, 4]], floor_material: 'wood' },
+                { id: 'kitchen', name: 'Küche', area_id: null, points: [[6, 0], [10, 0], [10, 4], [6, 4]], floor_material: 'tiles' },
             ],
-            floor_material: "wood",
-          },
-          {
-            id: "kitchen",
-            name: "Küche",
-            area_id: null,
-            points: [
-              [6, 0],
-              [10, 0],
-              [10, 4],
-              [6, 4],
-            ],
-            floor_material: "tiles",
-          },
-        ],
-        openings: [],
-        furniture: [],
-        placements: [],
-        background: null,
-        outdoor: [],
-        walls: [],
-        ha_floor: null,
-      },
+            openings: [],
+            furniture: [],
+            placements: [],
+            background: null,
+            outdoor: [],
+            walls: [],
+            ha_floor: null,
+        },
     ];
-    await backend.call({ type: "home3d/building/save", building });
-    await backend.call({
-      type: "iobroker/mappings/set",
-      mappings: await backend.call({ type: "iobroker/discover" }),
-    });
-  }
-  const token = process.env.HOME3D_DEMO_TOKEN || "home3d-demo-local";
-  const server = createServer(backend, token);
-  server.listen(8097, "127.0.0.1", () =>
-    console.log("Local demo: http://127.0.0.1:8097 (simulated devices only)"),
-  );
+    const mappings = discover(objects, rooms).map(({ _meta, ...m }) => m);
+    return {
+        objects: { ...objects, ...rooms } as Record<string, StateObject>,
+        building,
+        mappings,
+        values: { '0_userdata.0.demo.light': true, '0_userdata.0.demo.temperature': 21.6 },
+    };
 }
-main().catch((e) => {
-  console.error(e);
-  process.exitCode = 1;
+
+async function demoData(file?: string): Promise<string> {
+    let house = smallHouse();
+    if (file) {
+        const demo = JSON.parse(await readFile(resolve(file), 'utf8')) as DemoHouse;
+        house = {
+            objects: Object.fromEntries(
+                demo.definitions.map(({ id, def, ...common }) => [id, { _id: id, type: 'state', common }]),
+            ) as Record<string, StateObject>,
+            building: demo.building,
+            mappings: demo.mappings,
+            values: Object.fromEntries(demo.definitions.map(d => [d.id, d.def])),
+        };
+    }
+    const data = {
+        version: 2,
+        plans: {
+            main: { id: 'main', name: 'Demo', icon: null, site: null, created: Date.now() / 1000, revision: 1, building: house.building },
+        },
+        images: {},
+        mappings: house.mappings,
+        locate_plan: 'main',
+    };
+    return JSON.stringify({
+        objects: {
+            ...house.objects,
+            'system.config': { type: 'config', common: { language: 'de' }, native: {} },
+            '3d-home.0': { type: 'meta', common: { name: '3D Home', type: 'meta.user' }, native: {} },
+        },
+        states: Object.fromEntries(Object.entries(house.values).map(([id, val]) => [id, { val }])),
+        files: { '3d-home.0/data.json': Buffer.from(JSON.stringify(data)).toString('base64') },
+    });
+}
+
+async function main(): Promise<void> {
+    const socket = await build({
+        entryPoints: [join(__dirname, 'demo-socket.ts')],
+        bundle: true,
+        write: false,
+        format: 'iife',
+        target: ['chrome94', 'safari15'],
+        define: { __DEMO__: await demoData(process.argv[2]) },
+    });
+    const socketJs = socket.outputFiles[0].text;
+    createServer((req, res) => {
+        void (async () => {
+            const url = new URL(req.url || '/', 'http://localhost');
+            if (url.pathname === '/' || url.pathname === '/3d-home' || url.pathname === '/3d-home/') {
+                res.writeHead(302, { Location: '/3d-home/index.html' }).end();
+                return;
+            }
+            if (url.pathname === '/lib/js/socket.io.js') {
+                res.writeHead(200, { 'Content-Type': MIME['.js'] }).end(socketJs);
+                return;
+            }
+            if (url.pathname === '/3d-home/_socket/info.js') {
+                res.writeHead(200, { 'Content-Type': MIME['.js'] }).end('var socketUrl = ""; var socketSession = ""; var sysLang = "de";');
+                return;
+            }
+            const file = resolve(www, `.${decodeURIComponent(url.pathname.replace(/^\/3d-home/, ''))}`);
+            if (!url.pathname.startsWith('/3d-home/') || !file.startsWith(www + sep)) {
+                res.writeHead(404).end();
+                return;
+            }
+            try {
+                const content = await readFile(file);
+                res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+                res.end(content);
+            } catch {
+                res.writeHead(404).end();
+            }
+        })();
+    }).listen(PORT, '127.0.0.1', () =>
+        console.log(`Demo (simulated devices only): http://127.0.0.1:${PORT}/3d-home/index.html`),
+    );
+}
+main().catch(e => {
+    console.error(e);
+    process.exitCode = 1;
 });

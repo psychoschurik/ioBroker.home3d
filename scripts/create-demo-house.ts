@@ -1,7 +1,7 @@
-import type { Mapping, Floor, ProtocolRecord } from "../src/lib/types.js";
-import type { DemoDefinition } from "./demo-types.js";
+import type { Mapping, Floor, ProtocolRecord } from "../frontend/model";
+import type { DemoDefinition } from "./demo-types";
 import * as fs from "node:fs";
-import { empty } from "../src/lib/backend.js";
+import { empty } from "../frontend/store";
 const prefix = "0_userdata.0.home3d_demo_v020";
 const definitions: DemoDefinition[] = [],
   mappings: Mapping[] = [];

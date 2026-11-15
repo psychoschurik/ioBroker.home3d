@@ -1,4 +1,4 @@
-import type { Building, Mapping } from "../src/lib/types.js";
+import type { Building, Mapping } from "../frontend/model";
 export interface DemoDefinition {
   id: string;
   name: string;

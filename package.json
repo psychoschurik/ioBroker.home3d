@@ -1,56 +1,16 @@
 {
   "name": "iobroker.3d-home",
   "version": "0.4.0",
-  "description": "Local 3D home visualization and floor plan editor for ioBroker",
-  "main": "build/main.js",
-  "license": "MIT",
-  "engines": {
-    "node": ">=22"
-  },
-  "scripts": {
-    "build": "tsx scripts/build.mts",
-    "build:frontend": "tsx scripts/build-frontend.mts",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.frontend.json && tsc -p tsconfig.tools.json",
-    "check": "npm run typecheck",
-    "test": "tsx --test test/*.test.ts",
-    "start:demo": "tsx scripts/demo.ts",
-    "demo:house": "tsx scripts/create-demo-house.ts",
-    "demo:preview": "tsx scripts/preview-house.ts",
-    "vendor": "npm run build:frontend",
-    "prepack": "npm run check && npm run build:all",
-    "test:package": "npm pack && tsx scripts/verify-package.mts",
-    "build:all": "npm run build:frontend && npm run build"
-  },
-  "dependencies": {
-    "@iobroker/adapter-core": "^3.3.2"
-  },
-  "files": [
-    "build/",
-    "lib/upstream.json",
-    "www/",
-    "admin/",
-    "io-package.json",
-    "LICENSE",
-    "NOTICE",
-    "README.md",
-    "CHANGELOG.md"
-  ],
-  "devDependencies": {
-    "@types/node": "^22.20.5",
-    "esbuild": "^0.28.2",
-    "lit": "^3.3.3",
-    "prettier": "^3.10.1",
-    "three": "^0.186.1",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
-  },
+  "description": "3D floor plan editor and live visualization for ioBroker, served by the web adapter",
   "author": "ioBroker.3d-home contributors",
+  "license": "MIT",
   "keywords": [
     "ioBroker",
     "3d-home",
     "visualization",
     "floorplan",
-    "smart-home"
+    "smart-home",
+    "web"
   ],
   "repository": {
     "type": "git",
@@ -59,5 +19,50 @@
   "bugs": {
     "url": "https://github.com/psychoschurik/ioBroker.3d-home/issues"
   },
-  "homepage": "https://github.com/psychoschurik/ioBroker.3d-home#readme"
+  "homepage": "https://github.com/psychoschurik/ioBroker.3d-home#readme",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "files": [
+    "www/",
+    "admin/",
+    "io-package.json",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsx tasks.ts",
+    "build-vendor": "tsx tasks.ts --vendor",
+    "build-bridge": "tsx tasks.ts --bridge",
+    "check": "tsc -p tsconfig.json && tsc -p tsconfig.tasks.json",
+    "lint": "eslint -c eslint.config.mjs",
+    "test": "npm run test:unit && npm run test:package",
+    "test:unit": "tsx --test test/*.test.ts",
+    "test:package": "mocha test/packageFiles.js --exit",
+    "test:integration": "tsx --test test/*.test.ts",
+    "test:pack": "npm pack && tsx scripts/verify-package.mts",
+    "demo": "tsx scripts/demo.ts",
+    "demo:house": "tsx scripts/create-demo-house.ts",
+    "release": "release-script",
+    "release-patch": "release-script patch --yes",
+    "release-minor": "release-script minor --yes",
+    "release-major": "release-script major --yes",
+    "update-packages": "npx npm-check-updates --upgrade"
+  },
+  "devDependencies": {
+    "@alcalzone/release-script": "^5.2.1",
+    "@alcalzone/release-script-plugin-iobroker": "^5.2.0",
+    "@alcalzone/release-script-plugin-license": "^5.2.2",
+    "@iobroker/eslint-config": "^2.3.4",
+    "@iobroker/socket-client": "^5.6.1",
+    "@iobroker/testing": "^5.3.0",
+    "@iobroker/types": "^7.2.5",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "lit": "^3.3.3",
+    "mocha": "^12.0.3",
+    "three": "^0.186.1",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3"
+  }
 }

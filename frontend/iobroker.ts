@@ -1,0 +1,131 @@
+// Connection to ioBroker over the socket of the web adapter (like vis-2). Login and access rights are those of web.
+import { Connection } from '@iobroker/socket-client';
+import type { IoAccess, FileAccess, StateObject, StateValue, RoomObject } from './model.js';
+
+export const NAMESPACE = '3d-home.0';
+
+function fromBase64(base64: string): string {
+    const raw = atob(base64);
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) {
+        bytes[i] = raw.charCodeAt(i);
+    }
+    return new TextDecoder().decode(bytes);
+}
+const notFound = (e: unknown): boolean => /not exist|not found|ENOENT/i.test(String(e));
+
+export class IoBroker implements IoAccess, FileAccess {
+    conn: Connection;
+    private objects = new Map<string, StateObject | null>();
+    private roomCache?: Promise<Record<string, RoomObject>>;
+
+    constructor() {
+        this.conn = new Connection({
+            name: '3d-home',
+            doNotLoadAllObjects: true,
+            doNotLoadACL: true,
+            onError: e => console.error('[3d-home]', e),
+        });
+    }
+    async ready(): Promise<void> {
+        await this.conn.waitForFirstConnection();
+    }
+    async language(): Promise<string> {
+        try {
+            return (await this.conn.getSystemConfig()).common.language || 'de';
+        } catch {
+            return navigator.language.slice(0, 2) || 'de';
+        }
+    }
+    async getObjects(ids: string[]): Promise<Record<string, StateObject>> {
+        const missing = ids.filter(id => !this.objects.has(id));
+        await Promise.all(
+            missing.map(async id => {
+                try {
+                    const o = (await this.conn.getObject(id)) as StateObject | null;
+                    this.objects.set(id, o?.type ? { ...o, _id: id } : null);
+                } catch {
+                    this.objects.set(id, null);
+                }
+            }),
+        );
+        const out: Record<string, StateObject> = {};
+        for (const id of ids) {
+            const o = this.objects.get(id);
+            if (o) {
+                out[id] = o;
+            }
+        }
+        return out;
+    }
+    async stateObjects(): Promise<Record<string, StateObject>> {
+        const all = (await this.conn.getObjectViewSystem('state', '', '香')) as unknown as Record<string, StateObject>;
+        for (const [id, o] of Object.entries(all)) {
+            this.objects.set(id, { ...o, _id: id });
+        }
+        return all;
+    }
+    rooms(): Promise<Record<string, RoomObject>> {
+        this.roomCache ??= this.conn
+            .getObjectViewSystem('enum', 'enum.rooms.', 'enum.rooms.香')
+            .then(r => r as unknown as Record<string, RoomObject>)
+            .catch(() => ({}));
+        return this.roomCache;
+    }
+    /** Forgets cached objects and rooms, e.g. when the device dialog loads the object tree again. */
+    forget(): void {
+        this.objects.clear();
+        this.roomCache = undefined;
+    }
+    getState(id: string): Promise<StateValue | null | undefined> {
+        return this.conn.getState(id);
+    }
+    async getStates(ids: string[]): Promise<Record<string, StateValue>> {
+        if (!ids.length) {
+            return {};
+        }
+        return (await this.conn.getStates(ids)) || {};
+    }
+    setState(id: string, value: any): Promise<void> {
+        return this.conn.setState(id, value, false);
+    }
+    // Files of 3d-home.0
+    async readText(name: string): Promise<string | null> {
+        try {
+            const r = await this.conn.readFile(NAMESPACE, name, true);
+            return r?.file ? fromBase64(r.file) : null;
+        } catch (e) {
+            if (notFound(e)) {
+                return null;
+            }
+            throw e;
+        }
+    }
+    writeText(name: string, text: string): Promise<void> {
+        const bytes = new TextEncoder().encode(text);
+        return this.writeBinary(name, bytes);
+    }
+    async readDataUrl(name: string): Promise<string | null> {
+        try {
+            const r = await this.conn.readFile(NAMESPACE, name, true);
+            return r?.file ? `data:${r.mimeType || 'application/octet-stream'};base64,${r.file}` : null;
+        } catch (e) {
+            if (notFound(e)) {
+                return null;
+            }
+            throw e;
+        }
+    }
+    writeBinary(name: string, bytes: Uint8Array): Promise<void> {
+        // Only an ArrayBuffer goes out as `writeFile64`; a string would use the deprecated text command `writeFile`.
+        return this.conn.writeFile64(NAMESPACE, name, bytes.slice().buffer);
+    }
+    async remove(name: string): Promise<void> {
+        await this.conn.deleteFile(NAMESPACE, name);
+    }
+    /** Content of the state of 0.4.0, which stored everything in `3d-home.0.storage`. */
+    async legacy(): Promise<string | null> {
+        const s = await this.conn.getState(`${NAMESPACE}.storage`);
+        return typeof s?.val === 'string' ? s.val : null;
+    }
+}
