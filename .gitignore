@@ -1,0 +1,12 @@
+node_modules/
+.npm-cache/
+upstream/
+artifacts/
+.demo-data/
+*.tgz
+
+build/
+www/bridge.js*
+www/device-dialog.js*
+www/object-tree.js*
+www/dom.js*

@@ -1,0 +1,69 @@
+{
+  "common": {
+    "name": "3d-home",
+    "version": "0.4.0",
+    "titleLang": {
+      "en": "3D Home for ioBroker",
+      "de": "3D Home für ioBroker"
+    },
+    "desc": {
+      "en": "3D floor plan editor and live visualization",
+      "de": "3D-Grundrisseditor und Live-Visualisierung"
+    },
+    "authors": ["ioBroker.3d-home contributors"],
+    "license": "MIT",
+    "platform": "Javascript/Node.js",
+    "mode": "daemon",
+    "enabled": false,
+    "icon": "3d-home.svg",
+    "readme": "README.md",
+    "loglevel": "info",
+    "type": "visualization",
+    "connectionType": "local",
+    "dataSource": "push",
+    "compact": true,
+    "adminUI": {
+      "config": "json"
+    },
+    "localLink": "http://%ip%:%port%/",
+    "dependencies": [
+      {
+        "js-controller": ">=6.0.0"
+      }
+    ],
+    "main": "build/main.js",
+    "tier": 3,
+    "news": {
+      "0.3.0": {
+        "en": "Standalone 3d-home adapter with ioBroker object selection, 3D editor and local visualization.",
+        "de": "Eigenständiger Adapter 3d-home mit ioBroker-Objektauswahl, 3D-Editor und lokaler Visualisierung."
+      },
+      "0.4.0": {
+        "en": "TypeScript adapter, browser integration, scripts and tests with checked build outputs.",
+        "de": "Adapter, Browser-Anbindung, Skripte und Tests auf TypeScript umgestellt."
+      }
+    }
+  },
+  "native": {
+    "bind": "0.0.0.0",
+    "port": 8097,
+    "accessToken": "",
+    "language": "de"
+  },
+  "encryptedNative": ["accessToken"],
+  "protectedNative": ["accessToken"],
+  "instanceObjects": [
+    {
+      "_id": "info.connection",
+      "type": "state",
+      "common": {
+        "name": "Server running",
+        "type": "boolean",
+        "role": "indicator.connected",
+        "read": true,
+        "write": false
+      },
+      "native": {}
+    }
+  ]
+}
