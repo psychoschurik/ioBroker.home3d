@@ -91,6 +91,7 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) **Breaking:** Die Oberfläche läuft jetzt im web-Adapter unter `/home3d/`. Eigener Webserver, Port 8097
   und Zugangsschlüssel entfallen; Anmeldung und Rechte kommen von web. Voraussetzung: web ≥ 7.0.0
 - (bluefox) Werte werden per Push nur für zugeordnete Datenpunkte abonniert statt alle zwei Sekunden komplett abgefragt
+- (bluefox) Behoben: „Unexpected token '%' … is not valid JSON“ beim Laden – web liefert JSON-Dateien URL-kodiert
 - (bluefox) Speicherung als Dateien in `home3d.0` (`data.json`, `history/`, `images/`); einmalige Übernahme aus
   `3d-home.0.storage`
 - (bluefox) Sicherungsdateien aus älteren Versionen haben eine andere Formatkennung und lassen sich nicht direkt

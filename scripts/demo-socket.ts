@@ -32,6 +32,11 @@ const MIME: Record<string, string> = {
     gif: 'image/gif',
 };
 const now = Date.now();
+/** Like `readFile64` of the web socket (socket-classes): JSON goes out as base64 of `encodeURIComponent(text)`. */
+function jsonAsServer(base64: string): string {
+    const text = new TextDecoder().decode(Uint8Array.from(atob(base64), c => c.charCodeAt(0)));
+    return btoa(encodeURIComponent(text));
+}
 let saved: { states?: Record<string, DemoState>; files?: Record<string, string> } = {};
 try {
     saved = JSON.parse(localStorage.getItem(KEY) || '{}');
@@ -141,7 +146,8 @@ function connect(): unknown {
             if (files[key] === undefined) {
                 cb('Not exists');
             } else {
-                cb(null, files[key], MIME[name.split('.').pop() || ''] || 'application/octet-stream');
+                const type = MIME[name.split('.').pop() || ''] || 'application/octet-stream';
+                cb(null, type === 'application/json' ? jsonAsServer(files[key]) : files[key], type);
             }
         },
         writeFile64: (namespace: string, name: string, data: string, options?: unknown, cb?: Callback) => {

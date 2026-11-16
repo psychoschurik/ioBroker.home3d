@@ -1,19 +1,12 @@
 // Connection to ioBroker over the socket of the web adapter (like vis-2). Login and access rights are those of web.
 import { Connection } from '@iobroker/socket-client';
 import type { IoAccess, FileAccess, StateObject, StateValue, RoomObject } from './model.js';
+import { fileText } from './file-text.js';
 
 export const NAMESPACE = 'home3d.0';
 /** State of 0.4.0, when the adapter was still called 3d-home and had its own server */
 export const LEGACY_STATE = '3d-home.0.storage';
 
-function fromBase64(base64: string): string {
-    const raw = atob(base64);
-    const bytes = new Uint8Array(raw.length);
-    for (let i = 0; i < raw.length; i++) {
-        bytes[i] = raw.charCodeAt(i);
-    }
-    return new TextDecoder().decode(bytes);
-}
 const notFound = (e: unknown): boolean => /not exist|not found|ENOENT/i.test(String(e));
 
 export class IoBroker implements IoAccess, FileAccess {
@@ -95,7 +88,7 @@ export class IoBroker implements IoAccess, FileAccess {
     async readText(name: string): Promise<string | null> {
         try {
             const r = await this.conn.readFile(NAMESPACE, name, true);
-            return r?.file ? fromBase64(r.file) : null;
+            return r?.file ? fileText(r.file, r.mimeType) : null;
         } catch (e) {
             if (notFound(e)) {
                 return null;
