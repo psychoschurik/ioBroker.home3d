@@ -38,6 +38,65 @@ const localLinks = (text: string): string =>
         .replace(/https?:\/\/discord\.gg\/SSdVVFsev7/gi, 'help.html#help');
 
 /**
+ * A button of a Pro add-on is shown only when the add-on is unlocked: in ioBroker there is no pack that unlocks it,
+ * and the backend parts behind it (camera pictures, weather, history for the time travel) are not there either, so a
+ * locked button (🔒) would only lead nowhere. `anchor` is a unique text inside the button, `lock` the lock part of
+ * its label, `open` what stays of it.
+ */
+function gateButton(code: string, anchor: string, lock: string, open: string, condition: string): string {
+    const at = code.indexOf(anchor);
+    if (at < 0 || code.indexOf(anchor, at + 1) >= 0) {
+        throw new Error(`Upstream patch no longer matches: pro button ${anchor}`);
+    }
+    const start = code.lastIndexOf('<button', at);
+    const end = code.indexOf('</button>', at) + '</button>'.length;
+    const button = code.slice(start, end);
+    if (start < 0 || end < at || !button.includes(lock)) {
+        throw new Error(`Upstream patch no longer matches: lock of ${anchor}`);
+    }
+    return `${code.slice(0, start)}\${${condition} ? html\`${button.replace(lock, open)}\` : nothing}${code.slice(end)}`;
+}
+
+/** Buttons of Pro add-ons that are not unlocked go (see gateButton). */
+function proButtons(name: string, code: string): string {
+    const camera = 'hasFeature("camera_cockpit")';
+    if (name === 'panel.ts') {
+        code = gateButton(code, 'aria-pressed=${this._trail}', `\${${camera} ? "" : "🔒 "}`, '', camera);
+        code = gateButton(code, 'aria-pressed=${this._cameraWall}', `\${${camera} ? "" : "🔒 "}`, '', camera);
+        code = gateButton(
+            code,
+            'aria-pressed=${this._weather}',
+            '${hasFeature("weather") ? "" : "🔒 "}',
+            '',
+            'hasFeature("weather")',
+        );
+        code = gateButton(
+            code,
+            'class="fp3d-chip fp3d-tt-chip"',
+            '${hasFeature("time_travel") ? "⏪" : "🔒"}',
+            '⏪',
+            'hasFeature("time_travel")',
+        );
+    }
+    if (name === 'card.ts') {
+        code = gateButton(
+            code,
+            'class="fp3d-chip fp3d-tt-chip"',
+            '${hasFeature("time_travel") ? "⏪" : "🔒"}',
+            '⏪',
+            'hasFeature("time_travel")',
+        );
+    }
+    if (name === 'components/room-panel.ts') {
+        code = gateButton(code, 'class="fp3d-rp-look"', `\${${camera} ? "" : "🔒 "}`, '', camera);
+    }
+    if (name === 'components/quick-menu.ts') {
+        code = gateButton(code, 'class="qm-details qm-look"', '${this.pro ? "" : "🔒 "}', '', 'this.pro');
+    }
+    return code;
+}
+
+/**
  * Own styles of the 3D view: "Puppenhaus" (see-through walls in their own colour), "Comic" (hard light steps, inked
  * outlines) and "Gouache" (painted). The screen-space part is frontend/vendor-ext/post.ts.
  */
@@ -307,6 +366,7 @@ const patches: Plugin = {
             );
         }
         code = looks(name, code);
+        code = proButtons(name, code);
         // Only human-readable names are changed, never protocol IDs.
         code = localLinks(code).replaceAll('Home Assistant', 'ioBroker');
         if (name === 'i18n.ts') {
