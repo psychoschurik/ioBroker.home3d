@@ -168,7 +168,18 @@ setupDeviceDialog({
     getHass: () => hass,
     getStates: ids => io.getStates(ids),
     reload: () => io.forget(),
+    socket: io.conn,
+    getLanguage: () => language,
 });
+// Projekte: export and import of floor plans with pictures and devices (React, loaded on demand)
+$('project-open').onclick = async () => {
+    try {
+        const { openProjects } = await import('./react/index.js');
+        await openProjects({ callWS, socket: io.conn, language, namespace: NAMESPACE });
+    } catch (e) {
+        setStatus(`Fehler · ${(e as Error).message}`);
+    }
+};
 // The icon component of the original host is not available here. Use local accessible symbols as fallback.
 if (!customElements.get('ha-icon')) {
     customElements.define(

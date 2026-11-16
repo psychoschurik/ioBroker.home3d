@@ -243,3 +243,89 @@ test('malformed backup leaves existing plans unchanged', async () => {
     );
     assert.equal(store.data.plans.main.revision, 0);
 });
+
+/** A plan with a lamp of `light.living` and a background picture `bg`, and the mapping of the lamp. */
+async function projectFixture() {
+    const f = await fixture();
+    const b = empty();
+    b.floors.push({
+        id: 'eg',
+        name: 'EG',
+        rooms: [],
+        furniture: [{ id: 'lamp', type: 'lamp_ceiling', entity: 'light.living' }],
+        background: { image_id: 'bg', x: 0, z: 0, width: 10, opacity: 0.5 },
+    });
+    await f.store.call({ type: 'home3d/building/save', building: b });
+    await f.store.call({ type: 'home3d/image/set', image_id: 'bg', data: 'data:image/png;base64,cG5n' });
+    await f.store.call({ type: 'iobroker/mappings/set', mappings: [mapping, { ...mapping, entity_id: 'light.unused' }] });
+    return f;
+}
+test('a project carries its building, its pictures and only the mappings it uses', async () => {
+    const { store } = await projectFixture();
+    const file = await store.call({ type: 'home3d/project/export' });
+    assert.equal(file.format, 'home3d');
+    assert.deepEqual(Object.keys(file.iobroker.images), ['bg']);
+    assert.deepEqual(
+        file.iobroker.mappings.map((m: { entity_id: string }) => m.entity_id),
+        ['light.living'],
+    );
+    // into an empty installation: a new plan with picture and device
+    const other = (await fixture()).store;
+    const res = await other.call({ type: 'home3d/project/import', project: JSON.stringify(file), name: 'Haus' });
+    assert.equal(other.data.plans[res.plan].name, 'Haus');
+    assert.equal(other.data.plans.main.building.floors.length, 0, 'the open plan is not replaced');
+    assert.equal(res.images, 1);
+    assert.equal(res.devices, 1);
+    assert.deepEqual(res.skipped, []);
+    assert.equal((await other.call({ type: 'home3d/image/get', image_id: 'bg' })).data, 'data:image/png;base64,cG5n');
+    assert.deepEqual(
+        other.data.mappings.map(m => m.entity_id),
+        ['light.living'],
+    );
+});
+test('a project import renames what is taken and skips datapoints missing here', async () => {
+    const { store } = await projectFixture();
+    const file = await store.call({ type: 'home3d/project/export' });
+    // the same project again: equal mapping is reused, the taken picture gets a new ID
+    const again = await store.call({ type: 'home3d/project/import', project: file });
+    const copy = store.data.plans[again.plan].building;
+    assert.equal(again.devices, 1);
+    assert.deepEqual(again.renamed, []);
+    assert.notEqual(copy.floors[0].background.image_id, 'bg');
+    assert.ok(store.data.images[copy.floors[0].background.image_id]);
+    assert.equal(store.data.plans.main.building.floors[0].background.image_id, 'bg');
+    // another device under the same entity_id: renamed in the mapping and in the building
+    file.iobroker.mappings[0] = { ...mapping, actions: { turn_on: [{ id: 'lamp.power', value: true }] } };
+    const renamed = await store.call({ type: 'home3d/project/import', project: file });
+    assert.deepEqual(renamed.renamed, [{ from: 'light.living', to: 'light.living_2' }]);
+    assert.equal(store.data.plans[renamed.plan].building.floors[0].furniture[0].entity, 'light.living_2');
+    assert.ok(store.data.mappings.some(m => m.entity_id === 'light.living_2'));
+    // a datapoint that is missing here: the device is skipped, the plan still comes
+    file.iobroker.mappings[0] = { ...mapping, state: 'missing.state' };
+    const missing = await store.call({ type: 'home3d/project/import', project: file });
+    assert.match(missing.skipped[0].reason, /Datenpunkt fehlt/);
+    assert.ok(store.data.plans[missing.plan]);
+    await assert.rejects(store.call({ type: 'home3d/project/import', project: '{"x":1}' }), /Grundriss/);
+});
+test('a full backup keeps the mappings of the devices', async () => {
+    const { store } = await projectFixture();
+    const backup = await store.call({ type: 'home3d/backup/export' });
+    assert.equal(backup.mappings.length, 2);
+    const other = (await fixture()).store;
+    const res = await other.call({
+        type: 'home3d/backup/import',
+        ...backup,
+        mappings: [...backup.mappings, { ...mapping, entity_id: 'light.gone', state: 'missing.state' }],
+    });
+    assert.deepEqual(
+        other.data.mappings.map(m => m.entity_id),
+        ['light.living', 'light.unused'],
+    );
+    assert.deepEqual(
+        res.skipped.map((s: { id: string }) => s.id),
+        ['light.gone'],
+    );
+    // an older backup without mappings keeps the current ones
+    await other.call({ type: 'home3d/backup/import', building: empty() });
+    assert.equal(other.data.mappings.length, 2);
+});

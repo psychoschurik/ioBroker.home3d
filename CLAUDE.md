@@ -8,17 +8,20 @@ with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
 
 | Path | Content |
 | --- | --- |
-| `frontend/` | Own browser code (TypeScript), bundled into `www/bridge.js` |
+| `frontend/` | Own browser code (TypeScript, React), built by Vite (`vite.config.ts`) into `www/` |
+| `frontend/index.html`, `frontend/public/` | The page; static files (`help.html`, `style.css`, `assets/`, `licenses/`, `vendor/lang`, `vendor/fonts`) copied to `www/` |
 | `frontend/bridge.ts` | Entry: connection, live states, provides the `hass`-like object the 3D frontend expects |
 | `frontend/iobroker.ts` | `IoBroker`: socket-client wrapper, implements `IoAccess` (objects/states) and `FileAccess` (files of `home3d.0`) |
 | `frontend/store.ts` | `Store`: plans, history, images, mappings; handles every `callWS` message of the 3D frontend |
 | `frontend/entities.ts` | Mapping ioBroker datapoints ↔ devices of the 3D frontend, validation, actions (`execute`) |
 | `frontend/device-dialog.ts`, `object-tree.ts`, `entity-picker.ts` | "Geräte verbinden" dialog with object tree |
+| `frontend/project.ts` | Project files (one plan + its images + the mappings it uses): format, reading, naming |
+| `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
 | `frontend/model.ts` | Types |
 | `vendor-src/home3d/src/` | Upstream 3D frontend (MIT), unchanged except names; patched at build time in `tasks.ts` |
-| `www/` | Served by web: `index.html`, `help.html`, `style.css`, `assets/`, `vendor/lang`, `vendor/fonts`; generated: `bridge.js`, `vendor/home3d*.js` |
-| `tasks.ts` | Build (esbuild): `--vendor` (3D frontend), `--bridge` (frontend/) |
-| `scripts/demo.ts`, `scripts/demo-socket.ts` | Local demo with a simulated socket; not part of the package |
+| `www/` | Served by web; completely generated and gitignored: `index.html`, `bridge.js`, `chunks/`, `vendor/home3d*.js`, the public files, `licenses/page-licenses.md` |
+| `tasks.ts` | Build with the Vite API: `--app` (frontend/ via `vite.config.ts`), `--vendor` (3D frontend, 8 separate bundles, patches as a `load` plugin) |
+| `scripts/demo.ts`, `scripts/dev.ts`, `scripts/demo-data.ts`, `scripts/demo-socket.ts` | Local demo (built `www/`) and Vite dev server, both with a simulated socket; not part of the package |
 | `test/*.test.ts` | Unit tests (`node:test`, `node:assert`) against an in-memory file storage |
 | `test/packageFiles.js` | `@iobroker/testing` package checks |
 
@@ -40,11 +43,14 @@ with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
 - `crypto.randomUUID`/`crypto.subtle` are not available on plain http; use `uuid()` / the FNV hash in `entities.ts`.
 - All page links are relative (web serves the page under `/home3d/`, possibly behind a proxy).
 - Do not mention the former upstream project name anywhere; keep the MIT copyright in LICENSE/NOTICE.
+- React/MUI only in `frontend/react/`, imported with `import()`: the 3D view starts without React. A native modal
+  `<dialog>` is always above React dialogs: close it while one is open (see the object browser in `device-dialog.ts`).
 
 ## Commands
 
 ```bash
-npm run build     # tsx tasks.ts
+npm run build     # tsx tasks.ts (empties www/, then page + 3D frontend)
+npm run dev       # Vite dev server with hot reload and simulated devices: http://127.0.0.1:8099/index.html
 npm run check     # tsc for frontend/ and for tasks/scripts/tests
 npm run lint      # eslint -c eslint.config.mjs (only `--fix` for formatting, no separate prettier)
 npm test          # unit tests + package files

@@ -2,7 +2,15 @@ import { element as $ } from './dom.js';
 import type { DeviceDialogOptions, Mapping } from './types.js';
 import type { TreeItem } from './object-tree.js';
 import { ObjectTree } from './object-tree.js';
-export function setupDeviceDialog({ callWS, refresh, getHass, getStates, reload }: DeviceDialogOptions): void {
+export function setupDeviceDialog({
+    callWS,
+    refresh,
+    getHass,
+    getStates,
+    reload,
+    socket,
+    getLanguage,
+}: DeviceDialogOptions): void {
     const dialog = $('mapping-dialog');
     let candidates: Mapping[] = [],
         mappings: Mapping[] = [],
@@ -129,6 +137,7 @@ export function setupDeviceDialog({ callWS, refresh, getHass, getStates, reload 
         $('mapping-advanced').hidden = isSingle;
         $('configured').hidden = isSingle;
         $('discover').hidden = isSingle;
+        $('object-browser').hidden = isSingle;
         $('fixed-options').replaceChildren();
         $('mapping-result').textContent = '';
         $('mapping-description').textContent = isSingle
@@ -160,6 +169,42 @@ export function setupDeviceDialog({ callWS, refresh, getHass, getStates, reload 
             requested.clear();
             candidates = await callWS({ type: 'iobroker/discover' });
             tree.setItems(mappingItems(), selected);
+        } catch (e) {
+            $('mapping-result').textContent = e.message;
+        }
+    };
+    // The object browser of ioBroker (@iobroker/gui-components, loaded on demand): the chosen datapoints are selected
+    // here like in the tree and connected with "Übernehmen".
+    $('object-browser').onclick = async () => {
+        try {
+            const { selectObjects } = await import('./react/index.js');
+            const known = new Map(candidates.map(c => [c.state, c.entity_id]));
+            // a modal <dialog> is always on top of the page: hide it while the object browser is open
+            dialog.close();
+            let ids: string[] | null;
+            try {
+                ids = await selectObjects({
+                    socket,
+                    language: getLanguage(),
+                    selected: candidates.filter(c => selected.has(c.entity_id)).map(c => c.state),
+                });
+            } finally {
+                dialog.showModal();
+            }
+            if (!ids) {
+                return;
+            }
+            const missing = ids.filter(id => !known.has(id));
+            for (const id of ids) {
+                const entity = known.get(id);
+                if (entity) {
+                    selected.add(entity);
+                }
+            }
+            tree.setItems(mappingItems(), selected);
+            $('mapping-result').textContent = `${selected.size} neue Datenpunkte ausgewählt.${
+                missing.length ? ` Ohne passende Geräteart übersprungen: ${missing.join(', ')}` : ''
+            }`;
         } catch (e) {
             $('mapping-result').textContent = e.message;
         }

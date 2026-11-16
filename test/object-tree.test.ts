@@ -65,9 +65,9 @@ test("discovery exposes object metadata but masks secret previews", () => {
   assert.equal(result[1]._meta!.value, 22);
 });
 test("distributed frontend contains no original developer web destinations", () => {
-  for (const file of fs
-    .readdirSync("www/vendor")
-    .filter((f) => f.endsWith(".js"))) {
+  const bundles = fs.readdirSync("www/vendor").filter((f) => f.endsWith(".js"));
+  assert.ok(bundles.length, "no bundles in www/vendor: run `npm run build` first");
+  for (const file of bundles) {
     const text = fs.readFileSync(`www/vendor/${file}`, "utf8");
     assert.doesNotMatch(
       text,
@@ -80,5 +80,6 @@ test("distributed frontend contains no original developer web destinations", () 
 
 test("rebuilt locating bundle retains custom element registration", () => {
   const bundle = fs.readFileSync("www/vendor/home3d-locate.js", "utf8");
-  assert.match(bundle, /customElements\.define\("fp3d-locate-setup"/);
+  // the minifier may write the name with "…" or `…`
+  assert.match(bundle, /customElements\.define\(["'`]fp3d-locate-setup["'`]/);
 });

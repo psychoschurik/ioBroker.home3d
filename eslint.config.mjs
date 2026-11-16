@@ -1,12 +1,13 @@
-import config from '@iobroker/eslint-config';
+import config, { reactConfig } from '@iobroker/eslint-config';
 
 export default [
     ...config,
+    ...reactConfig,
     {
         languageOptions: {
             parserOptions: {
                 projectService: {
-                    allowDefaultProject: ['*.mjs', 'tasks.ts', 'test/*.js'],
+                    allowDefaultProject: ['*.mjs', 'tasks.ts', 'vite.config.ts', 'test/*.js'],
                 },
                 tsconfigRootDir: import.meta.dirname,
             },
@@ -31,6 +32,9 @@ export default [
             'jsdoc/require-jsdoc': 'off',
             'jsdoc/require-param': 'off',
             '@typescript-eslint/no-require-imports': 'off',
+            // JSX transform of React 17+ (tsconfig "jsx": "react-jsx"): no React import needed
+            'react/react-in-jsx-scope': 'off',
+            'react/jsx-uses-react': 'off',
         },
     },
 ];

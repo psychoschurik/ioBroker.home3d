@@ -1,4 +1,4 @@
-// Type check of the browser code in frontend/. It is bundled by esbuild (tasks.ts), tsc only checks.
+// Type check of the browser code in frontend/. It is bundled by Vite (vite.config.ts), tsc only checks.
 {
     "compilerOptions": {
         "target": "es2022",
@@ -10,8 +10,9 @@
         "module": "ESNext",
         "moduleResolution": "Bundler",
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "jsx": "react-jsx",
         "types": ["@iobroker/types"]
     },
-    "include": ["frontend/**/*.ts"],
-    "exclude": ["node_modules/**", "www/**", "vendor-src/**"]
+    "include": ["frontend/**/*.ts", "frontend/**/*.tsx"],
+    "exclude": ["node_modules/**", "www/**", "vendor-src/**", "frontend/public/**"]
 }

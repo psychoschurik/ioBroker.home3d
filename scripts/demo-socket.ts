@@ -167,6 +167,28 @@ function connect(): unknown {
             cb?.(null);
         },
         fileExists: (namespace: string, name: string, cb: Callback) => cb(null, fileKey(namespace, name) in files),
+        // the file browser of @iobroker/gui-components (dialog "Projekte")
+        readDir: (namespace: string, path: string, cb: Callback) => {
+            const folder = path.replace(/^\/+|\/+$/g, '');
+            const prefix = folder ? `${namespace}/${folder}/` : `${namespace}/`;
+            const entries = new Map<string, { file: string; isDir: boolean; stats: { size: number }; modifiedAt: number }>();
+            for (const [key, data] of Object.entries(files)) {
+                if (key.startsWith(prefix)) {
+                    const [name, ...rest] = key.slice(prefix.length).split('/');
+                    entries.set(name, {
+                        file: name,
+                        isDir: rest.length > 0,
+                        stats: { size: rest.length ? 0 : Math.floor((data.length * 3) / 4) },
+                        modifiedAt: Date.now(),
+                    });
+                }
+            }
+            if (folder && !entries.size) {
+                cb('Not exists');
+            } else {
+                cb(null, [...entries.values()]);
+            }
+        },
     };
     const socket = {
         connected: true,

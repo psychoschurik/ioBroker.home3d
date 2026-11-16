@@ -13,6 +13,7 @@ import type {
     ProtocolRecord,
 } from './model.js';
 import { validateMappings, discover, execute, nameOf } from './entities.js';
+import { freeEntityId, plainMapping, projectFile, readProject, renamed, usedBy } from './project.js';
 
 declare const __HOME3D_VERSION__: string | undefined;
 const version = typeof __HOME3D_VERSION__ === 'string' ? __HOME3D_VERSION__ : 'dev';
@@ -31,6 +32,7 @@ const MUTATING = new Set([
     'history/snapshot',
     'history/restore',
     'backup/import',
+    'project/import',
 ]);
 const IMAGE_TYPES: Record<string, string> = {
     'image/png': 'png',
@@ -309,6 +311,35 @@ export class Store {
         }
         return url;
     }
+    /**
+     * Mappings from a file (backup, project) that work on this system: the others name datapoints that are missing
+     * here or are not writable, and are left out with the reason.
+     */
+    private async importable(
+        list: unknown,
+    ): Promise<{ ok: Mapping[]; skipped: { entity_id: string; reason: string }[] }> {
+        const candidates = (Array.isArray(list) ? list : []).filter(
+            (m): m is Mapping => !!m && typeof m === 'object' && typeof m.entity_id === 'string',
+        );
+        const objects = await this.io.getObjects(mappedIds(candidates));
+        const ok: Mapping[] = [];
+        const skipped: { entity_id: string; reason: string }[] = [];
+        const seen = new Set<string>();
+        for (const m of candidates) {
+            const plain = plainMapping(m);
+            try {
+                if (seen.has(plain.entity_id)) {
+                    error('duplicate', 'Doppelte entity_id.');
+                }
+                validateMappings([plain], objects);
+                seen.add(plain.entity_id);
+                ok.push(plain);
+            } catch (e) {
+                skipped.push({ entity_id: plain.entity_id, reason: (e as Error).message });
+            }
+        }
+        return { ok, skipped };
+    }
     /** One request of the 3D frontend. Changes are serialized; a failed save restores the previous data. */
     call(m: ProtocolMessage): Promise<any> {
         return this.serialize(async () => {
@@ -492,6 +523,8 @@ export class Store {
                     plans: Object.values(this.data.plans).filter(p => p.id !== 'main' && !p.deleted_at),
                     packs: [],
                     images,
+                    // the datapoints of the devices (not part of the backup format of the 3D frontend)
+                    mappings: this.data.mappings.map(plainMapping),
                 };
             }
             case 'backup/import': {
@@ -526,16 +559,101 @@ export class Store {
                         await this.writeImage(key, url);
                     }
                 }
+                // backups without mappings (before 0.5.0) keep the current ones
+                const devices = Array.isArray(m.mappings) ? await this.importable(m.mappings) : null;
+                if (devices) {
+                    this.data.mappings = devices.ok;
+                    this.emit('iobroker/mappings', this.data.mappings);
+                }
                 changed(main);
                 plansChanged();
                 return save({
                     revision: main.revision,
                     building: main.building,
                     packs: 0,
-                    skipped: (m.packs || []).map((p: { id: string }) => ({
-                        id: p.id,
-                        reason: 'Shop-Pakete werden in ioBroker nicht unterstützt.',
-                    })),
+                    skipped: [
+                        ...(m.packs || []).map((p: { id: string }) => ({
+                            id: p.id,
+                            reason: 'Shop-Pakete werden in ioBroker nicht unterstützt.',
+                        })),
+                        ...(devices?.skipped || []).map(d => ({ id: d.entity_id, reason: d.reason })),
+                    ],
+                });
+            }
+            case 'project/export': {
+                const target = active();
+                const used = usedBy(target.building, this.data.images, this.data.mappings);
+                const images: Record<string, string> = {};
+                for (const key of used.images) {
+                    const url = await this.readImage(key).catch(() => '');
+                    if (url) {
+                        images[key] = url;
+                    }
+                }
+                return projectFile(target, images, used.mappings);
+            }
+            case 'project/import': {
+                const project = readProject(m.project);
+                const building = checkBuilding(project.building);
+                const rename = new Map<string, string>();
+                // a picture ID that is taken here gets a new one, so no picture of another plan is replaced
+                const pictures: [string, string][] = Object.entries(project.images).map(([key, url]) => {
+                    const target = Object.hasOwn(this.data.images, key) ? `img_${uuid()}` : key;
+                    if (target !== key) {
+                        rename.set(key, target);
+                    }
+                    return [target, url];
+                });
+                // devices: an equal mapping is used again, another one with the same entity_id is renamed
+                const devices = await this.importable(project.mappings);
+                const existing = new Map(this.data.mappings.map(x => [x.entity_id, x]));
+                const taken = new Set(existing.keys());
+                const added: Mapping[] = [];
+                const renamedDevices: { from: string; to: string }[] = [];
+                let reused = 0;
+                for (const d of devices.ok) {
+                    const same = existing.get(d.entity_id);
+                    if (same && JSON.stringify(plainMapping(same)) === JSON.stringify(d)) {
+                        reused++;
+                        continue;
+                    }
+                    const entityId = taken.has(d.entity_id) ? freeEntityId(d.entity_id, taken) : d.entity_id;
+                    if (entityId !== d.entity_id) {
+                        rename.set(d.entity_id, entityId);
+                        renamedDevices.push({ from: d.entity_id, to: entityId });
+                    }
+                    taken.add(entityId);
+                    added.push({ ...d, entity_id: entityId });
+                }
+                let images = 0;
+                const brokenImages: string[] = [];
+                for (const [key, url] of pictures) {
+                    try {
+                        await this.writeImage(key, url);
+                        images++;
+                    } catch {
+                        brokenImages.push(key);
+                    }
+                }
+                const n = plan(renamed(building, rename), String(m.name || project.name || 'Importierter Grundriss'));
+                n.icon = project.icon;
+                n.site = project.site ?? null;
+                this.data.plans[n.id] = n;
+                if (added.length) {
+                    this.data.mappings = [...this.data.mappings, ...added];
+                    this.emit('iobroker/mappings', this.data.mappings);
+                }
+                plansChanged();
+                return save({
+                    plan: n.id,
+                    name: n.name,
+                    images,
+                    devices: added.length + reused,
+                    renamed: renamedDevices,
+                    skipped: [
+                        ...devices.skipped.map(d => ({ id: d.entity_id, reason: d.reason })),
+                        ...brokenImages.map(id => ({ id, reason: 'Bild nicht lesbar.' })),
+                    ],
                 });
             }
             case 'packs/list':

@@ -19,6 +19,8 @@ interface Elements {
     'mapping-description': HTMLElement;
     'mapping-open': HTMLElement;
     'mapping-close': HTMLElement;
+    'project-open': HTMLButtonElement;
+    'object-browser': HTMLButtonElement;
 }
 export function element<K extends keyof Elements>(id: K): Elements[K] {
     const node = document.getElementById(id);

@@ -6,4 +6,6 @@ Changes for ioBroker: ioBroker theme, local help links, object-tree selector and
 over the socket of the web adapter (frontend/). Not an official Mastershort release. Commercial packs are not included.
 
 Bundled third-party libraries: three.js (MIT, www/licenses/three-MIT.txt), Lit (BSD-3-Clause,
-www/licenses/lit-BSD.txt), @iobroker/socket-client (MIT), fonts Figtree and Bricolage Grotesque (OFL, www/vendor/fonts/).
+www/licenses/lit-BSD.txt), fonts Figtree and Bricolage Grotesque (OFL, www/vendor/fonts/). The dialogs of the page
+bundle React, MUI, Emotion, @iobroker/gui-components and @iobroker/socket-client (MIT and others): the build lists
+every bundled package with its license in www/licenses/page-licenses.md.

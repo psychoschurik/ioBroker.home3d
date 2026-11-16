@@ -12,6 +12,6 @@
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
         "types": ["node", "@iobroker/types"]
     },
-    "include": ["tasks.ts", "scripts/**/*.ts", "scripts/**/*.mts", "test/**/*.ts"],
+    "include": ["tasks.ts", "vite.config.ts", "scripts/**/*.ts", "scripts/**/*.mts", "test/**/*.ts"],
     "exclude": ["node_modules/**", "www/**", "vendor-src/**"]
 }

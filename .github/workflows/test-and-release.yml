@@ -26,7 +26,8 @@ jobs:
                   node-version: 24.x
                   type-checking: true
                   lint: true
-                  test-command: 'npm test'
+                  # the tests check the generated bundles (gitignored, nogit), so build them first
+                  test-command: 'npm run build && npm test'
 
     # Build of the browser bundles on all platforms. There is no instance to start (onlyWWW).
     adapter-tests:

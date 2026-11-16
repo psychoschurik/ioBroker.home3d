@@ -31,6 +31,13 @@ try {
     assert.doesNotMatch(html, /(?:href|src)="\//, 'only relative links, web serves the page under /home3d/');
     const bridge = await readFile(path.join(unpacked, 'www/bridge.js'), 'utf8');
     assert.match(bridge, /\.\/vendor\/home3d\.js/);
+    // the React dialogs are loaded on demand from www/chunks
+    const chunks = [...bridge.matchAll(/\.\/(chunks\/[\w.-]+\.js)/g)].map(m => m[1]);
+    assert.ok(chunks.length, 'bridge.js loads the dialogs from ./chunks/');
+    for (const chunk of new Set(chunks)) {
+        await access(path.join(unpacked, 'www', chunk));
+    }
+    await access(path.join(unpacked, 'www/licenses/page-licenses.md'));
     console.log(`Verified ${filename}: web files, no backend.`);
 } finally {
     // Only remove the unique directory returned by mkdtemp, never a supplied path.

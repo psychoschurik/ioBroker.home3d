@@ -1,3 +1,4 @@
+import type { Connection } from '@iobroker/socket-client';
 import type { ProtocolMessage, ProtocolRecord, Mapping, StateObject, StateValue } from './model.js';
 export type CallWS = (message: ProtocolMessage) => Promise<any>;
 export interface Hass extends ProtocolRecord {
@@ -24,5 +25,8 @@ export interface DeviceDialogOptions {
     getStates: (ids: string[]) => Promise<Record<string, StateValue>>;
     /** Forget cached objects, so that the object tree is read again. */
     reload: () => void;
+    /** The socket connection, for the dialogs of `@iobroker/gui-components`. */
+    socket: Connection;
+    getLanguage: () => string;
 }
 export type { Mapping, ProtocolRecord, ProtocolMessage, StateObject, StateValue };

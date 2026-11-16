@@ -98,6 +98,13 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   importieren
 - (bluefox) Modernisiert: Build über `tasks.ts`, `@iobroker/eslint-config`, `@iobroker/testing`, ioBroker-Actions in
   der CI, release-script
+- (bluefox) Neu: „Projekte“ – einen Grundriss mit Bildern und verbundenen Datenpunkten als Datei exportieren
+  (Download oder in den ioBroker-Dateispeicher unter `home3d.0/projects/`) und als neuen Grundriss importieren.
+  Fehlende Datenpunkte werden übersprungen, gleichnamige Bilder und Geräte umbenannt. Die Gesamtsicherung enthält
+  jetzt auch die Gerätezuordnungen
+- (bluefox) Neu: „Geräte verbinden“ hat den Objekt-Browser von ioBroker (`@iobroker/gui-components`)
+- (bluefox) Build mit Vite statt esbuild; `npm run dev` startet einen Entwicklungsserver mit Hot Reload und
+  simulierten Geräten
 
 ### 0.4.0 (2026-11-15)
 
