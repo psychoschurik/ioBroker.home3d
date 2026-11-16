@@ -57,6 +57,44 @@ function gateButton(code: string, anchor: string, lock: string, open: string, co
     return `${code.slice(0, start)}\${${condition} ? html\`${button.replace(lock, open)}\` : nothing}${code.slice(end)}`;
 }
 
+/**
+ * The undo history of the editor survives the switch to the 3D view and back: the panel creates a new editor element
+ * each time, so the history is kept per plan in frontend/vendor-ext/undo.ts.
+ */
+function keepUndoHistory(name: string, code: string): string {
+    if (name !== 'components/editor.ts') {
+        return code;
+    }
+    code = `import { keepUndo, takeUndo } from "${root}/frontend/vendor-ext/undo.ts";\n${code}`;
+    code = replaceRequired(
+        code,
+        '  connectedCallback(): void {\n    super.connectedCallback();',
+        '  connectedCallback(): void {\n    super.connectedCallback();\n    ({ past: this.past, future: this.future } = takeUndo(this.planId));\n    this._canUndo = this.past.length > 0;\n    this._canRedo = this.future.length > 0;',
+        'take undo on entering',
+    );
+    code = replaceRequired(
+        code,
+        '  disconnectedCallback(): void {\n    super.disconnectedCallback();',
+        '  disconnectedCallback(): void {\n    super.disconnectedCallback();\n    keepUndo(this.planId, { past: this.past, future: this.future });',
+        'keep undo on leaving',
+    );
+    return replaceRequired(
+        code,
+        /( {4})\/\/ another floor plan: its own undo, its first floor, nothing selected\n {4}if \(changed\.has\("planId"\) && changed\.get\("planId"\) !== undefined\) \{\n {6}this\.past = \[\];\n {6}this\.future = \[\];\n {6}this\._canUndo = false;\n {6}this\._canRedo = false;\n/,
+        `$1// another floor plan: its own undo (kept while the other plan or the 3D view is shown), its first floor, nothing selected
+$1if (changed.has("planId")) {
+$1  const before = changed.get("planId");
+$1  if (before !== undefined) keepUndo(before, { past: this.past, future: this.future });
+$1  ({ past: this.past, future: this.future } = takeUndo(this.planId));
+$1  this._canUndo = this.past.length > 0;
+$1  this._canRedo = this.future.length > 0;
+$1}
+$1if (changed.has("planId") && changed.get("planId") !== undefined) {
+`,
+        'undo per plan',
+    );
+}
+
 /** Buttons of Pro add-ons that are not unlocked go (see gateButton). */
 function proButtons(name: string, code: string): string {
     const camera = 'hasFeature("camera_cockpit")';
@@ -367,6 +405,7 @@ const patches: Plugin = {
         }
         code = looks(name, code);
         code = proButtons(name, code);
+        code = keepUndoHistory(name, code);
         // Only human-readable names are changed, never protocol IDs.
         code = localLinks(code).replaceAll('Home Assistant', 'ioBroker');
         if (name === 'i18n.ts') {

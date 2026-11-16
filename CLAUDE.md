@@ -17,7 +17,7 @@ with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
 | `frontend/device-dialog.ts`, `object-tree.ts`, `entity-picker.ts` | "Geräte verbinden" dialog with object tree |
 | `frontend/project.ts` | Project files (one plan + its images + the mappings it uses): format, reading, naming |
 | `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
-| `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache) |
+| `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D) |
 | `frontend/model.ts` | Types |
 | `vendor-src/home3d/src/` | Upstream 3D frontend (MIT), unchanged except names; patched at build time in `tasks.ts` |
 | `www/` | Served by web; completely generated and gitignored: `index.html`, `bridge.js`, `chunks/`, `vendor/home3d*.js`, the public files, `licenses/page-licenses.md` |

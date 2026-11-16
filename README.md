@@ -107,6 +107,7 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   ihrer Farbe), „Comic“ (harte Lichtstufen, gezeichnete Umrisse) und „Gouache“ (gemalt, mit Pinselrändern und Papier)
 - (bluefox) Knöpfe von Pro-Erweiterungen, die in ioBroker nicht freigeschaltet sind (Spur, Kameras, Wetter, Zeitreise,
   „Durch die Kamera“), werden nicht mehr mit Schloss angezeigt, sondern ausgeblendet
+- (bluefox) Rückgängig (Strg+Z) im Editor behält seinen Verlauf beim Wechsel in die 3D-Ansicht und zurück
 - (bluefox) Build mit Vite statt esbuild; `npm run dev` startet einen Entwicklungsserver mit Hot Reload und
   simulierten Geräten
 
