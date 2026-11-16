@@ -37,6 +37,192 @@ const localLinks = (text: string): string =>
         .replace(/https?:\/\/github\.com\/mastershort\/home3d/gi, 'help.html#project')
         .replace(/https?:\/\/discord\.gg\/SSdVVFsev7/gi, 'help.html#help');
 
+/**
+ * Own styles of the 3D view: "Puppenhaus" (see-through walls in their own colour), "Comic" (hard light steps, inked
+ * outlines) and "Gouache" (painted). The screen-space part is frontend/vendor-ext/post.ts.
+ */
+function looks(name: string, code: string): string {
+    if (name === 'looks.ts') {
+        code = replaceRequired(
+            code,
+            '  /** The menu group. */',
+            `  /** All walls see-through in their own colour, this opaque (0–1): a dollhouse. */
+  glassWalls?: number;
+  /** The light in this many hard steps instead of a soft fall-off (comic, natural materials). */
+  toon?: number;
+  /** More colour (negative: less), natural materials. */
+  saturate?: number;
+  /** The colour of the edges, natural materials. */
+  line?: string;
+  /** A look over the whole picture: inked outlines or painted. */
+  post?: "toon" | "gouache";
+  /** The menu group. */`,
+            'style fields',
+        );
+        code = replaceRequired(
+            code,
+            '    aliases: ["warm", "holz", "papier", "holz und papier", "wood", "paper"],\n  },\n];',
+            `    aliases: ["warm", "holz", "papier", "holz und papier", "wood", "paper"],
+  },
+  { id: "dollhouse", base: "day", group: "homely", natural: true, signal: true, shadows: true, floors: 1, sun: 0.5, ao: 0.5, glassWalls: 0.38, saturate: 0.12, bg: ["#f6efe6", "#ddd0bf"], aliases: ["puppenhaus", "puppenstube", "dollhouse", "glaswände", "durchsichtig"] },
+  { id: "comic", base: "day", group: "designed", natural: true, signal: true, shadows: true, floors: 0.35, cutDark: true, sun: 0.6, ao: 0.25, toon: 3, saturate: 0.45, line: "#2a2420", post: "toon", bg: ["#fff8e6", "#ffe1b8"], aliases: ["comic", "zeichentrick", "trickfilm", "cartoon", "toon"] },
+  { id: "gouache", base: "day", group: "designed", natural: true, signal: true, shadows: true, floors: 0.5, sun: 0.45, ao: 0.35, saturate: 0.3, line: "#8a6f58", post: "gouache", bg: ["#bfe3f2", "#f6e7cf"], aliases: ["gouache", "gemalt", "malerei", "aquarell", "painted", "watercolor"] },
+];`,
+            'own styles',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  style_warm: "Warm / Holz & Papier",',
+            '  style_warm: "Warm / Holz & Papier",\n  style_dollhouse: "Puppenhaus",\n  style_comic: "Comic",\n  style_gouache: "Gouache",',
+            'style names de',
+        );
+        code = replaceRequired(
+            code,
+            '  style_warm: "Warm / Wood & paper",',
+            '  style_warm: "Warm / Wood & paper",\n  style_dollhouse: "Dollhouse",\n  style_comic: "Comic",\n  style_gouache: "Gouache",',
+            'style names en',
+        );
+    }
+    if (name === 'viewer/theme.ts') {
+        code = replaceRequired(
+            code,
+            '    uStFloors: { value: 0 },',
+            '    uStFloors: { value: 0 },\n    uStToon: { value: 0 },\n    uStSat: { value: 0 },',
+            'style uniforms',
+        );
+        code = replaceRequired(
+            code,
+            'u.uStLine.value.set(...hex3(s.base === "neon" ? "#4a4e56" : "#a3a7ad"));',
+            'u.uStLine.value.set(...hex3(s.line ?? (s.base === "neon" ? "#4a4e56" : "#a3a7ad")));',
+            'style line colour',
+        );
+        code = replaceRequired(
+            code,
+            '  u.uStFloors.value = s.natural ? (s.floors ?? 0) : 0;',
+            '  u.uStFloors.value = s.natural ? (s.floors ?? 0) : 0;\n  u.uStToon.value = s.natural ? (s.toon ?? 0) : 0;\n  u.uStSat.value = s.natural ? (s.saturate ?? 0) : 0;',
+            'style toon values',
+        );
+        code = replaceRequired(
+            code,
+            'uniform float uStFloors;',
+            'uniform float uStFloors;\nuniform float uStToon;\nuniform float uStSat;',
+            'style toon uniforms',
+        );
+        code = replaceRequired(
+            code,
+            '      cc *= fp3dStyleLight(n) * fp3dStyleFloor(cc, n);',
+            `      if (uStSat != 0.0) cc = max(mix(vec3(dot(cc, vec3(0.299, 0.587, 0.114))), cc, 1.0 + uStSat), 0.0);
+      float fp3dK = fp3dStyleLight(n);
+      // comic: the light in a few hard steps
+      if (uStToon > 0.5) fp3dK = 0.55 + 0.45 * floor(clamp((fp3dK - 0.55) / 0.45, 0.0, 1.0) * uStToon + 0.5) / uStToon;
+      cc *= fp3dK * fp3dStyleFloor(cc, n);`,
+            'style toon light',
+        );
+    }
+    if (name === 'viewer/fold.ts') {
+        code = replaceRequired(
+            code,
+            'export interface FoldMasks {\n  standing: FoldMask;\n  glass: FoldMask;\n}',
+            `/** How glass walls look: tinted glass (own 0) or the wall's own colour, this opaque (own 1). */
+export interface GlassLook {
+  alpha: { value: number };
+  own: { value: number };
+}
+const GLASS: GlassLook = { alpha: { value: 0.2 }, own: { value: 0 } };
+
+export interface FoldMasks {
+  standing: FoldMask;
+  glass: FoldMask;
+  look?: GlassLook;
+}`,
+            'glass look',
+        );
+        code = replaceRequired(
+            code,
+            '    shader.uniforms.uGlass = masks.glass;',
+            '    shader.uniforms.uGlass = masks.glass;\n    shader.uniforms.uGlassAlpha = (masks.look ?? GLASS).alpha;\n    shader.uniforms.uGlassOwn = (masks.look ?? GLASS).own;',
+            'glass uniforms',
+        );
+        code = replaceRequired(
+            code,
+            /shader\.fragmentShader = shader\.fragmentShader\.replace\(\s*"#include <color_fragment>",\s*`#include <color_fragment>\s*diffuseColor\.rgb = diffuseColor\.rgb \* 1\.7 \+ vec3\(0\.015, 0\.05, 0\.075\);\s*diffuseColor\.a \*= 0\.2;`,\s*\);/,
+            `shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\\nuniform float uGlassAlpha;\\nuniform int uGlassOwn;")
+        .replace(
+          "#include <color_fragment>",
+          \`#include <color_fragment>
+        if (uGlassOwn == 1) {
+          diffuseColor.rgb *= 0.94;
+          diffuseColor.a *= uGlassAlpha;
+        } else {
+          diffuseColor.rgb = diffuseColor.rgb * 1.7 + vec3(0.015, 0.05, 0.075);
+          diffuseColor.a *= 0.2;
+        }\`,
+        );`,
+            'glass colour',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { PostFx } from "${root}/frontend/vendor-ext/post.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  private style: StyleDef = styleById("neon")!;',
+            '  private style: StyleDef = styleById("neon")!;\n  /** Inked outlines or the painted look over the whole picture (styles with `post`). */\n  private postFx = new PostFx();\n  /** Glass walls of this view: tinted, or see-through in their own colour (a dollhouse). */\n  private glassLook = { alpha: { value: 0.2 }, own: { value: 0 } };',
+            'post and glass fields',
+        );
+        code = replaceRequired(
+            code,
+            'const mask: FoldMasks = { standing: { value: 0xffff }, glass: { value: 0 } };',
+            'const mask: FoldMasks = { standing: { value: 0xffff }, glass: { value: 0 }, look: this.glassLook };',
+            'glass look per view',
+        );
+        code = replaceRequired(
+            code,
+            '    applyStyleUniforms(style, this.themeUniform.style);',
+            '    applyStyleUniforms(style, this.themeUniform.style);\n    this.glassLook.own.value = style.glassWalls ? 1 : 0;\n    this.glassLook.alpha.value = style.glassWalls ?? 0.2;',
+            'glass look of the style',
+        );
+        code = replaceRequired(
+            code,
+            '        if (!cut && facing) glass |= 1 << b;',
+            '        if ((!cut && facing) || this.style.glassWalls) glass |= 1 << b;',
+            'glass walls of the style',
+        );
+        code = replaceRequired(
+            code,
+            '    this.renderer.render(this.scene, this.camera);\n    this.disposeRetired();',
+            '    if (!this.postFx.render(this.renderer, this.scene, this.camera, this.style.post, this.lowQuality)) this.renderer.render(this.scene, this.camera);\n    this.disposeRetired();',
+            'post render',
+        );
+        code = replaceRequired(
+            code,
+            '  dispose(): void {\n    this.projections.dispose();',
+            '  dispose(): void {\n    this.projections.dispose();\n    this.postFx.dispose();',
+            'post dispose',
+        );
+    }
+    if (name === 'panel.ts') {
+        // the looks right in the menu "Anzeige", not only behind ⚙
+        code = replaceRequired(
+            code,
+            '          <div class="fp3d-seg" title=${this.t("plain_hint")}>',
+            `          <div class="fp3d-seg" role="group" aria-label=\${this.t("style")}>
+            \${["neon", "cozy", "dollhouse", "comic", "gouache"].map(
+              (id) => html\`<button aria-pressed=\${this._theme === id} @click=\${() => {
+                this._theme = id;
+                prefs.set("theme", id);
+              }}>\${this.t(\`style_\${id}\` as I18nKey)}</button>\`,
+            )}
+          </div>
+          <div class="fp3d-seg" title=\${this.t("plain_hint")}>`,
+            'looks in the menu',
+        );
+    }
+    return code;
+}
+
 /** Applies the ioBroker theme and removes the shop, help and community parts of the upstream frontend. */
 const patches: Plugin = {
     name: 'iobroker-ui',
@@ -120,6 +306,7 @@ const patches: Plugin = {
                 'shop picture',
             );
         }
+        code = looks(name, code);
         // Only human-readable names are changed, never protocol IDs.
         code = localLinks(code).replaceAll('Home Assistant', 'ioBroker');
         if (name === 'i18n.ts') {

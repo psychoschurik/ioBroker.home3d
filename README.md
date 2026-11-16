@@ -103,6 +103,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Fehlende Datenpunkte werden übersprungen, gleichnamige Bilder und Geräte umbenannt. Die Gesamtsicherung enthält
   jetzt auch die Gerätezuordnungen
 - (bluefox) Neu: „Geräte verbinden“ hat den Objekt-Browser von ioBroker (`@iobroker/gui-components`)
+- (bluefox) Neue Stile der 3D-Ansicht, direkt im Menü „Anzeige“ wählbar: „Puppenhaus“ (alle Wände durchscheinend in
+  ihrer Farbe), „Comic“ (harte Lichtstufen, gezeichnete Umrisse) und „Gouache“ (gemalt, mit Pinselrändern und Papier)
 - (bluefox) Build mit Vite statt esbuild; `npm run dev` startet einen Entwicklungsserver mit Hot Reload und
   simulierten Geräten
 
