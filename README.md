@@ -142,6 +142,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Position für den Sonnenstand aus einem Datenpunkt (z. B. GPS von serial-gps) statt aus den Systemeinstellungen
 - (bluefox) Build mit Vite statt esbuild; `npm run dev` startet einen Entwicklungsserver mit Hot Reload und
   simulierten Geräten
+- (bluefox) Neu: `index.html?kiosk` für Wandtablets – die 3D-Ansicht ohne die beiden oberen Leisten; Editor, „Projekte“
+  und „Geräte verbinden“ sind dort nicht erreichbar
 
 ### 0.4.0 (2026-11-15)
 

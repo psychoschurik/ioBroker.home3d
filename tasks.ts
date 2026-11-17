@@ -342,6 +342,34 @@ function gpsPosition(name: string, code: string): string {
 }
 
 /**
+ * `index.html?kiosk` for a wall tablet: without the header of the panel (plan, 3D/editor switch, ⚙), and the view
+ * stays in 3D. The ioBroker header of the page goes by CSS (`.kiosk` in frontend/index.html and style.css).
+ */
+function kioskMode(name: string, code: string): string {
+    if (name === 'panel.ts') {
+        code = replaceRequired(
+            code,
+            '  private declare _clean: boolean;\n',
+            '  private declare _clean: boolean;\n  /** `?kiosk` in the address: a wall tablet, without the header and without the editor. */\n  private readonly kiosk = new URLSearchParams(location.search).has("kiosk");\n',
+            'kiosk flag',
+        );
+        code = replaceRequired(
+            code,
+            '${this._clean && this._mode === "view" ? nothing : html`<header class="fp3d-header">',
+            '${(this._clean && this._mode === "view") || this.kiosk ? nothing : html`<header class="fp3d-header">',
+            'kiosk header',
+        );
+        code = replaceRequired(
+            code,
+            '  private setMode(mode: Mode): void {\n',
+            '  private setMode(mode: Mode): void {\n    // the switch is gone with the header; buttons of the view that lead to the editor do nothing\n    if (this.kiosk && mode !== "view") return;\n',
+            'kiosk stays in 3D',
+        );
+    }
+    return code;
+}
+
+/**
  * A boat turns: the heading of a compass sensor (`settings.north_entity`) turns the plan under the sky, so that sun,
  * shadow, sun patches and the compass ring follow it; `settings.north` stays a correction for the compass.
  */
@@ -929,6 +957,7 @@ const patches: Plugin = {
         code = deviceDatapoint(name, code);
         code = boatHeading(name, code);
         code = gpsPosition(name, code);
+        code = kioskMode(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
