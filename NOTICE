@@ -1,4 +1,4 @@
-The 3D frontend in vendor-src/home3d/src (and the bundles in www/vendor/ built from it) is derived from
+The 3D frontend in src-www/src (and the bundles in www/vendor/ built from it) is derived from
 an MIT licensed project by Mastershort (upstream version 3.1.2, commit c11bd614d38a68d3aec251a940e31a1101b7429b).
 Copyright (c) 2026 Mastershort - see LICENSE. This copyright notice must be retained.
 

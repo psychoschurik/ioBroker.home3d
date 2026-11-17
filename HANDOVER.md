@@ -46,7 +46,7 @@ Die Erinnerungen von Claude Code (`~/.claude/projects/…/memory/`) ziehen ebenf
   `- (bluefox) `.
 - Vor jeder Installation: `npm run build`, `npm run check`, `npm run lint` (formatieren nur mit `eslint --fix`),
   `npm test`.
-- `vendor-src/` bleibt unverändert. Patches am 3D-Frontend sind Funktionen in `tasks.ts` mit
+- `src-www/` bleibt unverändert. Patches am 3D-Frontend sind Funktionen in `tasks.ts` mit
   `replaceRequired(code, alt, neu, label)`, aufgerufen im `load`-Hook. Passt ein Patch nicht mehr, bricht der Build ab,
   und das ist gewollt.
 - Neuer Code gehört nach `frontend/vendor-ext/` oder `frontend/`; React nur in `frontend/react/`, geladen mit `import()`.

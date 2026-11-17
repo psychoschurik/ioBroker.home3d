@@ -64,7 +64,7 @@ für ioBroker ein neuer Adapter:
 
 ```bash
 npm ci
-npm run build          # tasks.ts: 3D-Frontend (vendor-src/home3d/src → www/vendor/) und Anbindung (frontend/ → www/bridge.js)
+npm run build          # tasks.ts: 3D-Frontend (src-www/src → www/vendor/) und Anbindung (frontend/ → www/bridge.js)
 npm run check          # TypeScript-Prüfung (Browser-Code, Build-Tasks, Tests)
 npm run lint           # @iobroker/eslint-config
 npm test               # Unit-Tests (node:test) und Paketdateien (@iobroker/testing)
@@ -150,6 +150,7 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   `?view=card` (3D-Karte als iframe in VIS) füllt jetzt die ganze Höhe statt 420 px und zeigt keine Kopfzeile mehr
 - (bluefox) Boote: „Meer um das Boot“ in den Hauseinstellungen – Wasser an der Wasserlinie mit Wellen aus einem
   Wellenhöhe- und einem Wellenlänge-Sensor (Länge in m oder Periode in s); die Wellen kommen von vorn
+- (bluefox) Die Quellen des 3D-Frontends liegen jetzt in `src-www/` statt in `vendor-src/home3d/`
 
 ### 0.4.0 (2026-11-15)
 

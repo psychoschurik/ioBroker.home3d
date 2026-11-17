@@ -5,7 +5,7 @@
  * generated completely:
  *   npm run build          builds everything
  *   npm run build-app      only our page from frontend/ (vite.config.ts)   -> www/index.html, www/bridge.js, www/chunks/
- *   npm run build-vendor   only the 3D frontend from vendor-src/home3d/src  -> www/vendor/home3d*.js
+ *   npm run build-vendor   only the 3D frontend from src-www/src  -> www/vendor/home3d*.js
  */
 import { readFileSync } from 'node:fs';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -17,7 +17,7 @@ process.env.VITE_CONFIG_NATIVE_IGNORE_WARNING = 'true';
 
 const posix = (p: string): string => p.replaceAll('\\', '/');
 const root = posix(__dirname);
-const src = `${root}/vendor-src/home3d/src`;
+const src = `${root}/src-www/src`;
 const www = `${root}/www`;
 const version: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 export const TARGET = ['safari15', 'chrome94'];

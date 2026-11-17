@@ -23,7 +23,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 | `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
 | `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D), `sensor-look.ts` (sensor symbols and texts, also in the editor's floor plan), `mdi-paths.ts` (the symbols drawn at once, without the whole @mdi/js set), `solar-text.ts` (the power written on the solar modules), `sea.ts` (the sea with waves around a boat) |
 | `frontend/model.ts` | Types |
-| `vendor-src/home3d/src/` | Upstream 3D frontend (MIT), unchanged except names; patched at build time in `tasks.ts` |
+| `src-www/src/` | Upstream 3D frontend (MIT), unchanged except names; patched at build time in `tasks.ts` |
 | `www/` | Served by web; completely generated and gitignored: `index.html`, `bridge.js`, `chunks/`, `vendor/home3d*.js`, the public files, `licenses/page-licenses.md` |
 | `tasks.ts` | Build with the Vite API: `--app` (frontend/ via `vite.config.ts`), `--vendor` (3D frontend, 8 separate bundles, patches as a `load` plugin) |
 | `scripts/demo.ts`, `scripts/dev.ts`, `scripts/demo-data.ts`, `scripts/demo-socket.ts` | Local demo (built `www/`) and Vite dev server, both with a simulated socket; not part of the package |
@@ -55,7 +55,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
   buttons of the others are removed (`proButtons`).
 - Do not mention the former upstream project name anywhere; keep the MIT copyright in LICENSE/NOTICE.
 - Own 3D styles: `looks()` in `tasks.ts` patches `looks.ts`, `theme.ts`, `fold.ts`, `viewer3d.ts`, `panel.ts` and `i18n.ts`;
-  code that is new goes to `frontend/vendor-ext/` and is imported by the patch, not into `vendor-src/`.
+  code that is new goes to `frontend/vendor-ext/` and is imported by the patch, not into `src-www/`.
 - React/MUI only in `frontend/react/`, imported with `import()`: the 3D view starts without React. A native modal
   `<dialog>` is always above React dialogs: close it while one is open (see the object browser in `device-dialog.ts`).
 

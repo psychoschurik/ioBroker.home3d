@@ -14,5 +14,5 @@
         "types": ["@iobroker/types"]
     },
     "include": ["frontend/**/*.ts", "frontend/**/*.tsx"],
-    "exclude": ["node_modules/**", "www/**", "vendor-src/**", "frontend/public/**"]
+    "exclude": ["node_modules/**", "www/**", "src-www/**", "frontend/public/**"]
 }

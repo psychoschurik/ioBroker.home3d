@@ -16,7 +16,7 @@ export default [
     {
         ignores: [
             // unchanged upstream sources and their bundles
-            'vendor-src/**/*',
+            'src-www/**/*',
             'www/**/*',
             'admin/**/*',
             'node_modules/**/*',
