@@ -28,5 +28,7 @@ export interface DeviceDialogOptions {
     /** The socket connection, for the dialogs of `@iobroker/gui-components`. */
     socket: Connection;
     getLanguage: () => string;
+    /** Another datapoint for a device, chosen in the object browser (null: cancelled). */
+    pickDatapoint: (m: Mapping) => Promise<Mapping | null>;
 }
 export type { Mapping, ProtocolRecord, ProtocolMessage, StateObject, StateValue };

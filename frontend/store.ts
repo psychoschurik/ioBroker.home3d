@@ -21,6 +21,7 @@ const version = typeof __HOME3D_VERSION__ === 'string' ? __HOME3D_VERSION__ : 'd
 export const DATA_FILE = 'data.json';
 const MUTATING = new Set([
     'iobroker/mappings/set',
+    'iobroker/position/set',
     'building/save',
     'plans/create',
     'plans/update',
@@ -192,6 +193,7 @@ export class Store {
             images: d.images || {},
             mappings: Array.isArray(d.mappings) ? d.mappings : [],
             locate_plan: d.locate_plan || 'main',
+            ...(typeof d.position_id === 'string' && d.position_id ? { position_id: d.position_id } : {}),
         };
     }
     private async persist(): Promise<void> {
@@ -402,6 +404,9 @@ export class Store {
                 this.emit('iobroker/mappings', this.data.mappings);
                 return save({ saved: this.data.mappings.length });
             }
+            case 'iobroker/position/set':
+                this.data.position_id = typeof m.id === 'string' && m.id ? m.id : null;
+                return save({});
             case 'iobroker/service':
                 return execute(this.data.mappings, m.domain, m.service, m.data || {}, this.io);
             case 'building/get': {

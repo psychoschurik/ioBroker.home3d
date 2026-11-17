@@ -126,6 +126,8 @@ export interface StorageData {
     images: Record<string, string>;
     mappings: Mapping[];
     locate_plan: string;
+    /** A datapoint with the position (GPS, e.g. on a boat) instead of the one of the system settings. */
+    position_id?: string | null;
 }
 /** Format of 0.4.0, which kept everything (also the images as data URLs) in the state `home3d.0.storage`. */
 export interface LegacyStorageData {

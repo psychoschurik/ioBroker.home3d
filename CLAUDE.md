@@ -16,6 +16,7 @@ with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
 | `frontend/entities.ts` | Mapping ioBroker datapoints ↔ devices of the 3D frontend, validation, actions (`execute`) |
 | `frontend/history.ts`, `sun.ts`, `more-info.ts`, `mdi-icon.ts` | `history/history_during_period`, `home3d/timetravel/history` and `recorder/statistics_during_period` (energy) from the history adapters (beside `Store.call()`); `sun.sun` from the system position; detail dialog with history curve; `<ha-icon>` drawn with `@mdi/js` (full set loaded on demand) |
 | `frontend/device-dialog.ts`, `object-tree.ts`, `entity-picker.ts` | "Geräte verbinden" dialog with object tree |
+| `frontend/datapoint.ts` | Datapoints chosen at the device in the editor (events `iobroker-datapoint`, `iobroker-add-devices` from the patched editor): object browser, change or add mappings |
 | `frontend/project.ts` | Project files (one plan + its images + the mappings it uses): format, reading, naming |
 | `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
 | `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D), `sensor-look.ts` (sensor symbols and texts, also in the editor's floor plan), `mdi-paths.ts` (the symbols drawn at once, without the whole @mdi/js set), `solar-text.ts` (the power written on the solar modules) |
@@ -29,7 +30,8 @@ with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
 
 ## Storage (files of `home3d.0`, meta object from `instanceObjects`)
 
-- `data.json`: `{ version: 2, plans, images: {id → file}, mappings, locate_plan }` — written on every change
+- `data.json`: `{ version: 2, plans, images: {id → file}, mappings, locate_plan, position_id? }` — written on every change;
+  `position_id`: a datapoint with the position (GPS on a boat) for `sun.sun` instead of the system settings
 - `history/<plan>.json`: snapshots (max 30)
 - `images/<id>.<ext>`: binary images
 - IDs that are not `[A-Za-z0-9_-]{1,80}` become `x<hex>` file names (`fileKey`)

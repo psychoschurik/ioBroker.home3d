@@ -83,3 +83,35 @@ export function sunState(
         last_updated: now,
     };
 }
+
+/**
+ * A position from a datapoint: "lon;lat" (serial-gps, role value.gps), "lat,lon", or {lat, lon} / {latitude, longitude}
+ * (also as JSON); null when there is none.
+ */
+export function parsePosition(v: unknown): { lat: number; lon: number } | null {
+    let lat: unknown, lon: unknown;
+    if (typeof v === 'string') {
+        const t = v.trim();
+        if (t.startsWith('{')) {
+            try {
+                return parsePosition(JSON.parse(t));
+            } catch {
+                return null;
+            }
+        }
+        if (t.includes(';')) {
+            [lon, lat] = t.split(';');
+        } else if (t.includes(',')) {
+            [lat, lon] = t.split(',');
+        }
+    } else if (v && typeof v === 'object') {
+        const o = v as Record<string, unknown>;
+        lat = o.lat ?? o.latitude;
+        lon = o.lon ?? o.lng ?? o.longitude;
+    }
+    const la = typeof lat === 'string' || typeof lat === 'number' ? Number(lat) : NaN;
+    const lo = typeof lon === 'string' || typeof lon === 'number' ? Number(lon) : NaN;
+    const valid = Number.isFinite(la) && Number.isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180;
+    // 0;0 is what a GPS without a fix reports
+    return valid && (la !== 0 || lo !== 0) ? { lat: la, lon: lo } : null;
+}

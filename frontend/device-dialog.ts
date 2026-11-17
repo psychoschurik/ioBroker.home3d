@@ -10,6 +10,7 @@ export function setupDeviceDialog({
     reload,
     socket,
     getLanguage,
+    pickDatapoint,
 }: DeviceDialogOptions): void {
     const dialog = $('mapping-dialog');
     let candidates: Mapping[] = [],
@@ -121,7 +122,28 @@ export function setupDeviceDialog({
                 selectedList();
                 tree.setItems(mappingItems(), selected);
             };
-            row.append(text, remove);
+            const change = document.createElement('button');
+            change.textContent = 'Ändern';
+            change.setAttribute('aria-label', `Datenpunkt von ${m.name || m.state} ändern`);
+            change.onclick = async () => {
+                // a modal <dialog> is always on top of the page: hide it while the object browser is open
+                dialog.close();
+                try {
+                    const next = await pickDatapoint(m);
+                    if (next) {
+                        mappings = mappings.map(x => (x.entity_id === m.entity_id ? next : x));
+                        selectedList();
+                        tree.setItems(mappingItems(), selected);
+                        $('mapping-result').textContent =
+                            `${m.name || m.state}: ${next.state} – mit Übernehmen speichern.`;
+                    }
+                } catch (e) {
+                    $('mapping-result').textContent = (e as Error).message;
+                } finally {
+                    dialog.showModal();
+                }
+            };
+            row.append(text, change, remove);
             $('configured-list').append(row);
         }
         $('mapping-json').value = JSON.stringify(mappings, null, 2);

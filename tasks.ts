@@ -312,6 +312,333 @@ function proButtons(name: string, code: string): string {
 }
 
 /**
+ * The position for the sun from a datapoint (GPS on a boat; frontend/datapoint.ts and bridge.ts): chosen in the
+ * editor's house settings, shown from `hass.config.position_id`.
+ */
+function gpsPosition(name: string, code: string): string {
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '        <p class="fp3d-sub fp3d-wide">${this.t("north_entity_hint")}</p>\n',
+            '        <p class="fp3d-sub fp3d-wide">${this.t("north_entity_hint")}</p>\n        <div class="fp3d-field fp3d-wide">\n          ${this.t("position_id")}\n          <p class="fp3d-sub fp3d-datapoint">\n            <code>${(this.hass?.config as { position_id?: string | null } | undefined)?.position_id || this.t("position_system")}</code>\n            <button class="fp3d-btn" ?disabled=${!this.isAdmin} @click=${() => window.dispatchEvent(new CustomEvent("iobroker-position", { detail: {} }))}>${this.t("datapoint_change")}</button>\n            ${(this.hass?.config as { position_id?: string | null } | undefined)?.position_id\n              ? html`<button class="fp3d-btn" ?disabled=${!this.isAdmin} @click=${() => window.dispatchEvent(new CustomEvent("iobroker-position", { detail: { clear: true } }))}>${this.t("position_use_system")}</button>`\n              : nothing}\n          </p>\n        </div>\n        <p class="fp3d-sub fp3d-wide">${this.t("position_id_hint")}</p>\n',
+            'position datapoint',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  north_entity: "Kurs aus Kompass (Boot)",',
+            '  north_entity: "Kurs aus Kompass (Boot)",\n  position_id: "Position (für den Sonnenstand)",\n  position_system: "aus den Systemeinstellungen",\n  position_use_system: "Systemposition nehmen",\n  position_id_hint: "Ein Datenpunkt mit der Position, z. B. das GPS eines Boots (\\"Länge;Breite\\" wie serial-gps, \\"Breite,Länge\\" oder {lat, lon}): Sonnenstand und Sonnenbogen folgen ihm. Gilt für alle Grundrisse.",',
+            'position de',
+        );
+        code = replaceRequired(
+            code,
+            '  north_entity: "Heading from a compass (boat)",',
+            '  north_entity: "Heading from a compass (boat)",\n  position_id: "Position (for the sun)",\n  position_system: "from the system settings",\n  position_use_system: "Use the system position",\n  position_id_hint: "A datapoint with the position, e.g. the GPS of a boat (\\"lon;lat\\" like serial-gps, \\"lat,lon\\" or {lat, lon}): the sun and its arc follow it. Counts for all floor plans.",',
+            'position en',
+        );
+    }
+    return code;
+}
+
+/**
+ * A boat turns: the heading of a compass sensor (`settings.north_entity`) turns the plan under the sky, so that sun,
+ * shadow, sun patches and the compass ring follow it; `settings.north` stays a correction for the compass.
+ */
+function boatHeading(name: string, code: string): string {
+    if (name === 'viewer/viewer3d.ts') {
+        code = replaceRequired(
+            code,
+            '    const north = (this.building?.settings.north ?? 0) * DEG;\n    const az = (night ? sun.azimuth + 180 : sun.azimuth) * DEG;',
+            '    const north = this.fp3dNorth() * DEG;\n    const az = (night ? sun.azimuth + 180 : sun.azimuth) * DEG;',
+            'heading: sky disc',
+        );
+        code = replaceRequired(
+            code,
+            '    const north = (b?.settings.north ?? 0) * DEG;\n    const cloud = this.weather?.cloud ?? 0;\n    const shade',
+            '    const north = this.fp3dNorth() * DEG;\n    const cloud = this.weather?.cloud ?? 0;\n    const shade',
+            'heading: sun arc and shadow',
+        );
+        code = replaceRequired(
+            code,
+            '    const sun = this.building?.settings.sun_patches === false ? null : this.sun;\n    const north = (this.building?.settings.north ?? 0) * DEG;',
+            '    const sun = this.building?.settings.sun_patches === false ? null : this.sun;\n    const north = this.fp3dNorth() * DEG;',
+            'heading: sun patches',
+        );
+        code = replaceRequired(
+            code,
+            "  /** The sun's way across the sky today (null: no place known): drawn as an arc over the house. */\n  setSunPath(",
+            "  /** The heading of a boat (° clockwise from north, from a compass sensor; null: none): the plan turns under the sky. */\n  private fp3dHeading: number | null = null;\n\n  /** Where north lies in the plan (° clockwise from up): the setting, turned back by the heading. */\n  private fp3dNorth(): number {\n    return (this.building?.settings.north ?? 0) - (this.fp3dHeading ?? 0);\n  }\n\n  setHeading(deg: number | null): void {\n    // whole degrees: the noise of the sensor rebuilds nothing\n    const next = deg === null || !Number.isFinite(deg) ? null : ((Math.round(deg) % 360) + 360) % 360;\n    if (next === this.fp3dHeading) return;\n    this.fp3dHeading = next;\n    for (const fv of this.floors) this.buildSun(fv);\n    this.placeSky();\n    this.buildSunFx();\n    this.invalidate();\n  }\n\n  /** The sun's way across the sky today (null: no place known): drawn as an arc over the house. */\n  setSunPath(",
+            'heading: setHeading',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '    v.setSun(this.sunFx !== false && elevation !== null && typeof sun?.azimuth === "number" ? { elevation, azimuth: sun.azimuth } : null);\n',
+            '    v.setSun(this.sunFx !== false && elevation !== null && typeof sun?.azimuth === "number" ? { elevation, azimuth: sun.azimuth } : null);\n    // a boat: north follows its compass\n    const fp3dCourse = b.settings.north_entity ? parseFloat(hass.states[b.settings.north_entity]?.state ?? "") : NaN;\n    v.setHeading(Number.isFinite(fp3dCourse) ? fp3dCourse : null);\n',
+            'heading from the compass',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '        ${this.num(this.t("north"), s.north, (v) => set({ north: ((Math.round(v) % 360) + 360) % 360 }), 1)}\n',
+            '        ${this.num(this.t("north"), s.north, (v) => set({ north: ((Math.round(v) % 360) + 360) % 360 }), 1)}\n        ${this.entitySelect(this.t("north_entity"), s.north_entity ?? null, undefined, this.entityOptions((id) => id.startsWith("sensor.")), (v) => set({ north_entity: v === "none" ? null : v }))}\n        <p class="fp3d-sub fp3d-wide">${this.t("north_entity_hint")}</p>\n',
+            'heading sensor setting',
+        );
+    }
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  sun_arc?: "house" | "plot" | null;',
+            '  sun_arc?: "house" | "plot" | null;\n  /** A compass (° clockwise from north): the plan turns under the sky with it, e.g. a boat (null: none). */\n  north_entity?: string | null;',
+            'heading type',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  north_hint: "Die Nordrichtung braucht der Sonnenstand (Licht durch die Fenster).",',
+            '  north_hint: "Die Nordrichtung braucht der Sonnenstand (Licht durch die Fenster).",\n  north_entity: "Kurs aus Kompass (Boot)",\n  north_entity_hint: "Ein Sensor mit dem Kurs in Grad (0 = Norden, im Uhrzeigersinn): Sonne, Schatten und Kompassring drehen sich mit. Die Nordrichtung oben gilt dann als Korrektur, wenn der Kompass nicht zum Bug zeigt (0 = Bug im Grundriss oben).",',
+            'heading de',
+        );
+        code = replaceRequired(
+            code,
+            '  north_hint: "North is needed for the sun (light through the windows).",',
+            '  north_hint: "North is needed for the sun (light through the windows).",\n  north_entity: "Heading from a compass (boat)",\n  north_entity_hint: "A sensor with the heading in degrees (0 = north, clockwise): the sun, the shadow and the compass ring turn with it. North above is then a correction for a compass that does not point to the bow (0 = bow at the top of the plan).",',
+            'heading en',
+        );
+    }
+    return code;
+}
+
+/**
+ * The ioBroker datapoint is chosen at the device itself (frontend/datapoint.ts answers the events): the editor's device
+ * form shows the datapoint with "Ändern …", the device list of a room has "+ Datenpunkt aus ioBroker" (new devices,
+ * placed in the room).
+ */
+function deviceDatapoint(name: string, code: string): string {
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '    const auto = kind ? defaultHeight(kind, this.floor?.height ?? 2.5, light ? mount : null) : 1;\n    return html`<section>\n      <div class="fp3d-h3row"><h3>${this.t("device")}</h3>',
+            [
+                '    const auto = kind ? defaultHeight(kind, this.floor?.height ?? 2.5, light ? mount : null) : 1;',
+                '    const fp3dDatapoint = this.hass?.states[pl.entity_id]?.attributes.iobroker_id as string | undefined;',
+                '    return html`<section>',
+                '      <div class="fp3d-h3row"><h3>${this.t("device")}</h3>',
+            ].join('\n'),
+            'datapoint of a device',
+        );
+        code = replaceRequired(
+            code,
+            '        ${entityName(this.hass, pl.entity_id)}\n      </p>\n      <div class="fp3d-form">',
+            [
+                '        ${entityName(this.hass, pl.entity_id)}',
+                '      </p>',
+                '      ${fp3dDatapoint',
+                '        ? html`<p class="fp3d-sub fp3d-datapoint">',
+                '            ${this.t("datapoint")}: <code>${fp3dDatapoint}</code>',
+                '            ${admin',
+                '              ? html`<button class="fp3d-btn" @click=${() => window.dispatchEvent(new CustomEvent("iobroker-datapoint", { detail: { entityId: pl.entity_id } }))}>${this.t("datapoint_change")}</button>`',
+                '              : nothing}',
+                '          </p>`',
+                '        : nothing}',
+                '      <div class="fp3d-form">',
+            ].join('\n'),
+            'change the datapoint of a device',
+        );
+        code = replaceRequired(
+            code,
+            '      <h3>${this.t("devices")}</h3>\n      <p class="fp3d-sub">${this.t("devices_panel_hint")}</p>\n',
+            [
+                '      <h3>${this.t("devices")}</h3>',
+                '      <p class="fp3d-sub">${this.t("devices_panel_hint")}</p>',
+                '      ${admin',
+                '        ? html`<button class="fp3d-btn fp3d-wide-btn" @click=${() => window.dispatchEvent(new CustomEvent("iobroker-add-devices", { detail: { done: (ids: string[]) => this.placeDevices(ids, room) } }))}>${this.t("datapoint_add")}</button>`',
+                '        : nothing}',
+                '',
+            ].join('\n'),
+            'new devices from datapoints',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-dev-title {',
+            '      .fp3d-datapoint {\n        display: flex;\n        flex-wrap: wrap;\n        align-items: center;\n        gap: 6px;\n      }\n      .fp3d-datapoint code {\n        overflow-wrap: anywhere;\n      }\n      .fp3d-dev-title {',
+            'datapoint style',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  marker_height: "Höhe des Symbols (m)",',
+            '  marker_height: "Höhe des Symbols (m)",\n  datapoint: "Datenpunkt",\n  datapoint_change: "Ändern …",\n  datapoint_add: "+ Datenpunkt aus ioBroker",',
+            'datapoint de',
+        );
+        code = replaceRequired(
+            code,
+            '  marker_height: "Marker height (m)",',
+            '  marker_height: "Marker height (m)",\n  datapoint: "Datapoint",\n  datapoint_change: "Change …",\n  datapoint_add: "+ Datapoint from ioBroker",',
+            'datapoint en',
+        );
+    }
+    return code;
+}
+
+/**
+ * Editor and 3D view stay on the same floor: the floor being edited opens in 3D, and the editor opens on the floor shown
+ * in 3D (in the house view on the floor edited last). Upstream each keeps its own, and the editor, made anew on every
+ * switch, starts on the first floor of the list.
+ */
+function keepFloor(name: string, code: string): string {
+    if (name === 'panel.ts') {
+        code = replaceRequired(
+            code,
+            '  private pendingRoom: { plan: string; floorId: string | null; roomId: string | null } | null = null;',
+            '  private pendingRoom: { plan: string; floorId: string | null; roomId: string | null } | null = null;\n  /** The floor last edited (the editor opens on it when the 3D view shows the whole house). */\n  private editorFloor: string | null = null;',
+            'floor of the editor',
+        );
+        code = replaceRequired(
+            code,
+            '    if (mode === this._mode) return;\n    this.tt.stop();',
+            [
+                '    if (mode === this._mode) return;',
+                '    const fp3dEditor = this.renderRoot.querySelector("fp3d-editor") as (HTMLElement & { _floorId?: string | null }) | null;',
+                '    if (this._mode === "editor" && fp3dEditor?._floorId) {',
+                '      this.editorFloor = fp3dEditor._floorId;',
+                '      if (mode === "view" && (this.data.building?.floors.length ?? 0) > 1 && this._floorId !== this.editorFloor) {',
+                '        this._floorId = this.editorFloor;',
+                '        this._roomId = null;',
+                '      }',
+                '    }',
+                '    if (mode === "editor" && this._floorId) this.editorFloor = this._floorId;',
+                '    this.tt.stop();',
+            ].join('\n'),
+            'same floor in editor and 3D',
+        );
+        code = replaceRequired(
+            code,
+            '      .planId=${this.data.planId}\n',
+            '      .planId=${this.data.planId}\n      .startFloor=${this.editorFloor}\n',
+            'start floor of the editor',
+        );
+        // another floor plan: its own floors
+        code = replaceRequired(
+            code,
+            '    prefs.set("plan", plan);\n    this._floorId = null;',
+            '    prefs.set("plan", plan);\n    this._floorId = null;\n    this.editorFloor = null;',
+            'floor of the editor on another plan',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '  private declare _floorId: string | null;',
+            '  private declare _floorId: string | null;\n  /** The floor to open on (the one shown in 3D before), else the one of the house settings. */\n  startFloor: string | null = null;',
+            'start floor field',
+        );
+        code = replaceRequired(
+            code,
+            '      const start = this._doc.settings.editor_floor;',
+            '      const start = this.startFloor && this._doc.floors.some((f) => f.id === this.startFloor) ? this.startFloor : this._doc.settings.editor_floor;',
+            'start floor',
+        );
+    }
+    return code;
+}
+
+/**
+ * The floor the sun's arc and its compass ring stand on (`settings.sun_arc_floor`, default the ground floor): on a boat
+ * the deck is the ground floor, the ring may lie lower, e.g. at the waterline of the lower deck.
+ */
+function sunArcFloor(name: string, code: string): string {
+    const select = (t: string, s: string, floors: string, set: string): string =>
+        [
+            `<label class="${s === 's' ? 'fp3d-field fp3d-wide' : 'fp3d-set-field'}" title=\${${t}("sun_arc_floor_hint")}`,
+            `              >\${${t}("sun_arc_floor")}`,
+            `              <select ${s === 'st' ? '?disabled=${!admin} ' : ''}@change=\${(e: Event) => ${set}({ sun_arc_floor: (e.target as HTMLSelectElement).value || null })}>`,
+            `                <option value="" ?selected=\${!${s}.sun_arc_floor}>\${${t}("sun_arc_floor_ground")}</option>`,
+            `                \${${floors}.map((f) => html\`<option value=\${f.id} ?selected=\${${s}.sun_arc_floor === f.id}>\${f.name}</option>\`)}`,
+            '              </select></label',
+            '            >',
+        ].join('\n');
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  sun_arc?: "house" | "plot" | null;',
+            '  sun_arc?: "house" | "plot" | null;\n  /** The floor the sun\'s arc and its compass ring stand on (null: the ground floor). */\n  sun_arc_floor?: string | null;',
+            'sun arc floor type',
+        );
+    }
+    if (name === 'viewer/sun-arc.ts') {
+        code = replaceRequired(
+            code,
+            '  const gf = b ? groundFloor(b) : null;',
+            '  const gf = b ? arcFloor(b) : null;',
+            'sun arc floor',
+        );
+        code +=
+            '\n/** The floor the arc stands on: the one chosen in the settings, else the ground floor. */\nexport function arcFloor(b: Building) {\n  const id = b.settings.sun_arc_floor;\n  return (id ? b.floors.find((f) => f.id === id) : undefined) ?? groundFloor(b);\n}\n';
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = replaceRequired(
+            code,
+            'import { sunArcFrame, type SunArcFrame } from "./sun-arc.ts";',
+            'import { arcFloor, sunArcFrame, type SunArcFrame } from "./sun-arc.ts";',
+            'sun arc floor import',
+        );
+        code = replaceRequired(
+            code,
+            '    const gf = groundFloor(this.building);\n    const fv = gf ? this.floorMap.get(gf.id) : undefined;\n    return fv?.y',
+            '    const gf = arcFloor(this.building);\n    const fv = gf ? this.floorMap.get(gf.id) : undefined;\n    return fv?.y',
+            'sun arc floor pulled apart',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '                <option value="plot" ?selected=${st.sun_arc === "plot"}>${t("sun_arc_plot")}</option>\n              </select></label\n            >`',
+            `                <option value="plot" ?selected=\${st.sun_arc === "plot"}>\${t("sun_arc_plot")}</option>\n              </select></label\n            >${select(
+                't',
+                'st',
+                'b.floors',
+                'this.setPlanSettings',
+            )}\``,
+            'sun arc floor in the 3D settings',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '                <option value="plot" ?selected=${s.sun_arc === "plot"}>${this.t("sun_arc_plot")}</option>\n              </select></label\n            >`',
+            `                <option value="plot" ?selected=\${s.sun_arc === "plot"}>\${this.t("sun_arc_plot")}</option>\n              </select></label\n            >${select(
+                'this.t',
+                's',
+                'this._doc.floors',
+                'set',
+            )}\``,
+            'sun arc floor in the editor',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  sun_arc_plot: "das ganze Grundstück",',
+            '  sun_arc_plot: "das ganze Grundstück",\n  sun_arc_floor: "Sonnenbogen auf Höhe von",\n  sun_arc_floor_ground: "Erdgeschoss (Standard)",\n  sun_arc_floor_hint: "Auf welcher Etage Sonnenbogen und Kompassring stehen, z. B. auf einem Boot die Wasserlinie des Unterdecks statt des Decks.",',
+            'sun arc floor de',
+        );
+        code = replaceRequired(
+            code,
+            '  sun_arc_plot: "the whole plot",',
+            '  sun_arc_plot: "the whole plot",\n  sun_arc_floor: "Sun arc at the level of",\n  sun_arc_floor_ground: "Ground floor (default)",\n  sun_arc_floor_hint: "Which floor the sun arc and the compass ring stand on, e.g. on a boat the waterline of the lower deck instead of the deck.",',
+            'sun arc floor en',
+        );
+    }
+    return code;
+}
+
+/**
  * Own styles of the 3D view: "Puppenhaus" (see-through walls in their own colour), "Comic" (hard light steps, inked
  * outlines) and "Gouache" (painted). The screen-space part is frontend/vendor-ext/post.ts.
  */
@@ -597,6 +924,11 @@ const patches: Plugin = {
         code = sensorLook(name, code);
         code = editorDevices(name, code);
         code = solarText(name, code);
+        code = sunArcFloor(name, code);
+        code = keepFloor(name, code);
+        code = deviceDatapoint(name, code);
+        code = boatHeading(name, code);
+        code = gpsPosition(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

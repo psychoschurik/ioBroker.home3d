@@ -340,4 +340,31 @@ async function execute(
     }
     return { written: writes.length };
 }
+/** The value with every reference to datapoint `from` (state, actions, bindings) pointing to `to`. */
+function retarget<T>(value: T, from: string, to: string): T {
+    if (value === from) {
+        return to as T;
+    }
+    if (Array.isArray(value)) {
+        return value.map(v => retarget(v, from, to)) as T;
+    }
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, retarget(v, from, to)])) as T;
+    }
+    return value;
+}
+
+/** The mapping on another datapoint; the unit follows the new object (a datapoint without one keeps none). */
+export function withDatapoint(m: Mapping, to: string, obj: StateObject | undefined): Mapping {
+    const next = retarget(m, m.state, to);
+    const attributes = { ...(next.attributes ?? {}) } as Record<string, unknown>;
+    const unit = obj?.common?.unit;
+    if (typeof unit === 'string' && unit) {
+        attributes.unit_of_measurement = unit;
+    } else {
+        delete attributes.unit_of_measurement;
+    }
+    return { ...next, attributes };
+}
+
 export { validateMappings, entities, discover, execute, nameOf };

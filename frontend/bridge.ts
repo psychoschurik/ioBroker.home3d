@@ -5,9 +5,10 @@ import type { Hass, CallWS, ProtocolMessage, ProtocolRecord, StateObject, StateV
 import './mdi-icon.js';
 import './vendor/home3d.js';
 import { historyDuringPeriod, historyEnabled, statisticsDuringPeriod, timeTravelHistory } from './history.js';
-import { sunState } from './sun.js';
+import { parsePosition, sunState } from './sun.js';
 import { setupMoreInfo } from './more-info.js';
 import { setupDeviceDialog } from './device-dialog.js';
+import { pickDatapoint, setupDatapoints } from './datapoint.js';
 import { IoBroker, NAMESPACE } from './iobroker.js';
 import { Store, mappedIds, DATA_FILE } from './store.js';
 import { entities } from './entities.js';
@@ -28,7 +29,7 @@ let objects: Record<string, StateObject> = {},
     areas: Record<string, { area_id: string; name: string }> = {},
     subscribed = new Set<string>(),
     language = 'de',
-    position: { lat: number; lon: number } | null = null,
+    systemPosition: { lat: number; lon: number } | null = null,
     hass: Hass | undefined,
     timer: ReturnType<typeof setTimeout> | undefined,
     element:
@@ -67,7 +68,7 @@ const callWS: CallWS = msg => {
         return Promise.resolve({ energy_sources: [] });
     }
     if (msg?.type === 'home3d/timetravel/history') {
-        return timeTravelHistory(io, store.data.mappings, msg, position);
+        return timeTravelHistory(io, store.data.mappings, msg, place());
     }
     return store.call(msg);
 };
@@ -80,9 +81,16 @@ function onState(id: string, state: StateValue | null | undefined): void {
     }
     schedule();
 }
-/** Subscribes exactly the datapoints of the mappings; values arrive as push. */
+/** Where the system is: the GPS datapoint chosen in the editor (a boat), else the position of the system settings. */
+function place(): { lat: number; lon: number } | null {
+    const id = store.data.position_id;
+    return (id ? parsePosition(states[id]?.val) : null) ?? systemPosition;
+}
+/** Subscribes exactly the datapoints of the mappings (and of the position); values arrive as push. */
 async function follow(): Promise<void> {
-    const ids = mappedIds(store.data.mappings);
+    const ids = [
+        ...new Set([...mappedIds(store.data.mappings), ...(store.data.position_id ? [store.data.position_id] : [])]),
+    ];
     objects = await io.getObjects(ids);
     const next = new Set(ids);
     const added = ids.filter(id => !subscribed.has(id));
@@ -107,6 +115,7 @@ function schedule(): void {
     }, 50);
 }
 function render(): void {
+    const position = place();
     hass = {
         language,
         user: { is_admin: true, name: 'ioBroker' },
@@ -123,6 +132,7 @@ function render(): void {
             unit_system: { temperature: '°C', length: 'm' },
             time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             ...(position ? { latitude: position.lat, longitude: position.lon } : {}),
+            position_id: store.data.position_id ?? null,
         },
         callWS,
         callService: (domain: string, service: string, data: unknown) =>
@@ -178,7 +188,7 @@ store.onEvent((type, payload) => {
 async function start(): Promise<void> {
     await io.ready();
     language = await io.language();
-    position = await io.location();
+    systemPosition = await io.location();
     await store.load();
     areas = await store.areas();
     await follow();
@@ -192,13 +202,22 @@ async function start(): Promise<void> {
         .catch(e => console.warn('[home3d] subscribeFiles', e));
     render();
     // the sun moves on
-    if (position) {
-        setInterval(schedule, 60_000);
-    }
+    setInterval(schedule, 60_000);
 }
+const datapoints = {
+    callWS,
+    io,
+    socket: io.conn,
+    getLanguage: () => language,
+    refresh: follow,
+    setStatus,
+    getPositionId: () => store.data.position_id ?? null,
+};
+setupDatapoints(datapoints);
 setupDeviceDialog({
     callWS,
     refresh: follow,
+    pickDatapoint: m => pickDatapoint(datapoints, m),
     getHass: () => hass,
     getStates: ids => io.getStates(ids),
     reload: () => io.forget(),

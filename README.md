@@ -132,6 +132,14 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Fernseher zeigen das Bild ihres Media-Players (z. B. das Vorschaubild des YouTube-Videos von
   youtube-remote) und leuchten in der Farbe der App
 - (bluefox) Gerätedetails: ohne History-Adapter am Datenpunkt zeigt der Dialog nur den Wert, ohne Zeiträume und Verlauf
+- (bluefox) Einstellung „Sonnenbogen auf Höhe von“: Sonnenbogen und Kompassring können auf einer anderen Etage stehen
+  als dem Erdgeschoss, z. B. auf einem Boot am Unterdeck
+- (bluefox) Editor und 3D-Ansicht bleiben beim Umschalten auf derselben Etage
+- (bluefox) Datenpunkte am Gerät wählen: im Editor zeigt ein Gerät seinen ioBroker-Datenpunkt mit „Ändern …“ (Objekt-Browser),
+  die Geräteliste eines Raums hat „+ Datenpunkt aus ioBroker“ (neue Geräte, gleich im Raum platziert); auch in
+  „Geräte verbinden“ lässt sich der Datenpunkt eines Geräts ändern
+- (bluefox) Boote: „Kurs aus Kompass“ in den Hauseinstellungen dreht Sonne, Schatten und Kompassring mit dem Kurs
+- (bluefox) Position für den Sonnenstand aus einem Datenpunkt (z. B. GPS von serial-gps) statt aus den Systemeinstellungen
 - (bluefox) Build mit Vite statt esbuild; `npm run dev` startet einen Entwicklungsserver mit Hot Reload und
   simulierten Geräten
 
