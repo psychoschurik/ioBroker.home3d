@@ -116,6 +116,9 @@ export function mappedIds(mappings: Mapping[]): string[] {
         if (m.state) {
             ids.add(m.state);
         }
+        if (typeof m.when?.id === 'string') {
+            ids.add(m.when.id);
+        }
         for (const b of Object.values(m.attributes || {})) {
             if (b && typeof b === 'object' && typeof b.id === 'string') {
                 ids.add(b.id);

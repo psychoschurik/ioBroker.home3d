@@ -43,9 +43,20 @@ export interface ActionRule extends Binding {
     toggle?: boolean;
     optional?: boolean;
 }
+/**
+ * The state counts only while another datapoint has one of the values; otherwise the device shows `else` (default
+ * "off"). E.g. a washing machine and a dishwasher on one plug: the dishwasher runs only while the running machine is
+ * "dishwasher".
+ */
+export interface Condition {
+    id: string;
+    values: unknown[];
+    else?: string;
+}
 export interface Mapping extends Binding {
     entity_id: string;
     state: string;
+    when?: Condition;
     name?: string;
     area_id?: string;
     attributes?: Record<string, any>;

@@ -1,4 +1,13 @@
-import type { Mapping, Binding, StateObject, StateValue, RoomObject, IoAccess, ProtocolRecord } from './model.js';
+import type {
+    Mapping,
+    Binding,
+    Condition,
+    StateObject,
+    StateValue,
+    RoomObject,
+    IoAccess,
+    ProtocolRecord,
+} from './model.js';
 /** Stable, short hash for entity IDs (FNV-1a, 96 bit). Works without a secure context, unlike crypto.subtle. */
 function hash(text: string): string {
     let out = '';
@@ -45,6 +54,14 @@ function validateMappings(mappings: Mapping[], objects: Record<string, StateObje
         seen.add(m.entity_id);
         if (!objects[m.state]?.common || objects[m.state].type !== 'state') {
             fail(`Datenpunkt fehlt: ${m.state}`);
+        }
+        if (m.when !== undefined) {
+            if (typeof m.when?.id !== 'string' || !objects[m.when.id] || !Array.isArray(m.when.values)) {
+                fail(`Bedingung braucht einen vorhandenen Datenpunkt und eine Liste von Werten: ${m.entity_id}`);
+            }
+            if (m.when.else !== undefined && typeof m.when.else !== 'string') {
+                fail('else der Bedingung muss Text sein.');
+            }
         }
         for (const binding of Object.values(m.attributes || {})) {
             if (typeof binding === 'object' && binding?.id && !objects[binding.id]) {
@@ -154,6 +171,11 @@ export function transformed(value: unknown, binding: Binding, write = false): an
     }
     return value;
 }
+/** Whether the condition of a mapping holds (the other datapoint has one of the values). */
+function holds(when: Condition, states: Record<string, StateValue>): boolean {
+    const v = states[when.id]?.val;
+    return when.values.some(w => w === v || String(w) === String(v));
+}
 function entities(
     mappings: Mapping[],
     states: Record<string, StateValue>,
@@ -177,6 +199,9 @@ function entities(
         let value = transformed(s?.val, m);
         if (typeof value === 'boolean') {
             value = value ? 'on' : 'off';
+        }
+        if (m.when && !holds(m.when, states)) {
+            value = m.when.else ?? 'off';
         }
         out[m.entity_id] = {
             entity_id: m.entity_id,

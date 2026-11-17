@@ -18,7 +18,7 @@ with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
 | `frontend/device-dialog.ts`, `object-tree.ts`, `entity-picker.ts` | "Geräte verbinden" dialog with object tree |
 | `frontend/project.ts` | Project files (one plan + its images + the mappings it uses): format, reading, naming |
 | `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
-| `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D), `sensor-look.ts` (sensor symbols and texts, also in the editor's floor plan), `mdi-paths.ts` (the symbols drawn at once, without the whole @mdi/js set) |
+| `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D), `sensor-look.ts` (sensor symbols and texts, also in the editor's floor plan), `mdi-paths.ts` (the symbols drawn at once, without the whole @mdi/js set), `solar-text.ts` (the power written on the solar modules) |
 | `frontend/model.ts` | Types |
 | `vendor-src/home3d/src/` | Upstream 3D frontend (MIT), unchanged except names; patched at build time in `tasks.ts` |
 | `www/` | Served by web; completely generated and gitignored: `index.html`, `bridge.js`, `chunks/`, `vendor/home3d*.js`, the public files, `licenses/page-licenses.md` |
@@ -38,13 +38,16 @@ with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
 ## Rules
 
 - Never load all states. Subscribe only `mappedIds(mappings)`; the object tree loads objects only when the dialog opens.
-- Never reach external hosts from the page; links of the upstream frontend are rewritten to `help.html` in `tasks.ts`.
+- Never reach external hosts from the page (only exception: a picture whose URL a mapped datapoint gives, e.g. the
+  `entity_picture` of a media player such as a YouTube thumbnail); links of the upstream frontend are rewritten to `help.html` in `tasks.ts`.
+- A mapping may have a condition `when: { id, values, else }`: its state counts only while datapoint `id` has one of
+  `values`, else the device shows `else` (default "off"); `id` is subscribed like the state.
 - Writes to datapoints only through `execute()` (type, min/max and `write` are checked before the first write).
 - `Store.call()` serializes all requests, reloads `data.json` before changes (stale check against other browsers)
   and rolls back memory if a write fails. Events are sent only after success.
 - `crypto.randomUUID`/`crypto.subtle` are not available on plain http; use `uuid()` / the FNV hash in `entities.ts`.
 - All page links are relative (web serves the page under `/home3d/`, possibly behind a proxy).
-- Pro add-ons: only those whose backend this page brings are unlocked (`SERVED` in `tasks.ts`: weather, time travel, energy — shown as "Energie", without "Pro");
+- Pro add-ons: only those whose backend this page brings are unlocked (`SERVED` in `tasks.ts`: weather, time travel, energy, household — shown as "Energie" and "Haushalt", without "Pro");
   buttons of the others are removed (`proButtons`).
 - Do not mention the former upstream project name anywhere; keep the MIT copyright in LICENSE/NOTICE.
 - Own 3D styles: `looks()` in `tasks.ts` patches `looks.ts`, `theme.ts`, `fold.ts`, `viewer3d.ts`, `panel.ts` and `i18n.ts`;

@@ -188,12 +188,76 @@ function editorDevices(name: string, code: string): string {
     );
 }
 
+/** The power of every solar field written on its modules (frontend/vendor-ext/solar-text.ts). */
+function solarText(name: string, code: string): string {
+    if (name === 'components/view3d.ts') {
+        return replaceRequired(
+            code,
+            '    v.setSolarLevels(powers && !this.dimmed ? fieldLevels(b, powers) : new Map());',
+            '    v.setSolarLevels(powers && !this.dimmed ? fieldLevels(b, powers) : new Map());\n    v.setSolarWatts(powers ?? new Map());',
+            'solar watts',
+        );
+    }
+    if (name !== 'viewer/viewer3d.ts') {
+        return code;
+    }
+    code = `import { buildSolarText, writeSolarText } from "${root}/frontend/vendor-ext/solar-text.ts";\nimport { fieldModules as fp3dFieldModules } from "../solar.ts";\n${code}`;
+    code = replaceRequired(
+        code,
+        '  private solarLevels = new Map<string, number>();',
+        '  private solarLevels = new Map<string, number>();\n  private solarWatts = new Map<string, number>();\n  private solarTexts = new Set<Group>();',
+        'solar text fields',
+    );
+    code = replaceRequired(
+        code,
+        '  setSolarLevels(levels: Map<string, number>): void {',
+        [
+            '  /** The power of every solar field (W), written on its modules. */',
+            '  setSolarWatts(watts: Map<string, number>): void {',
+            '    this.solarWatts = watts;',
+            '    for (const g of [...this.solarTexts]) {',
+            '      let p = g.parent;',
+            '      while (p && p !== this.root) p = p.parent;',
+            '      if (!p) this.solarTexts.delete(g);',
+            '      else writeSolarText(g, watts);',
+            '    }',
+            '    this.invalidate();',
+            '  }',
+            '',
+            '  setSolarLevels(levels: Map<string, number>): void {',
+        ].join('\n'),
+        'solar watts setter',
+    );
+    const fields =
+        '.map(({ face, field }) => ({ id: field.id, corners: fp3dFieldModules(face, field).map((m) => m.corners), n: face.n }))';
+    code = replaceRequired(
+        code,
+        '      const solarMesh = solarLive ? new Mesh(solarLive.geometry, materials.solarLive) : null;',
+        `      const solarMesh = solarLive ? new Mesh(solarLive.geometry, materials.solarLive) : null;\n      const solarText = buildSolarText(garden${fields}, floor.elevation);\n      if (solarText) {\n        this.solarTexts.add(solarText);\n        writeSolarText(solarText, this.solarWatts);\n      }`,
+        'solar text of the garden fields',
+    );
+    code = replaceRequired(
+        code,
+        '        ...(solarMesh ? [solarMesh] : []),',
+        '        ...(solarMesh ? [solarMesh] : []),\n        ...(solarText ? [solarText] : []),',
+        'solar text in the floor',
+    );
+    return replaceRequired(
+        code,
+        '        lives.push(overlay);\n        writeSolarLevels(overlay, this.solarLevels);\n      }',
+        `        lives.push(overlay);\n        writeSolarLevels(overlay, this.solarLevels);\n      }\n      const roofText = buildSolarText(entries${fields}, geo.floor.elevation + geo.base);\n      if (roofText) {\n        this.solarTexts.add(roofText);\n        writeSolarText(roofText, this.solarWatts);\n        part.add(roofText);\n      }`,
+        'solar text of the roof fields',
+    );
+}
+
 /**
  * Add-ons whose backend this page brings: the weather (a `weather.*` device, e.g. a WMO code of open-meteo), the
- * time travel (`home3d/timetravel/history` from the history adapters, frontend/history.ts) and the energy view
- * (`recorder/statistics_during_period` from the history adapters; called just "Energie", without "Pro").
+ * time travel (`home3d/timetravel/history` from the history adapters, frontend/history.ts), the energy view
+ * (`recorder/statistics_during_period` from the history adapters) and the household (appliances with their time left
+ * and "finished", plants, fridge doors; the waste calendar needs `callApi`, which ioBroker has not, and stays empty).
+ * Energy and household are called just "Energie" and "Haushalt", without "Pro".
  */
-const SERVED = ['weather', 'time_travel', 'energy_pro'];
+const SERVED = ['weather', 'time_travel', 'energy_pro', 'household'];
 
 /** The served add-ons count as unlocked without a pack. */
 function unlockServed(name: string, code: string): string {
@@ -294,14 +358,16 @@ function looks(name: string, code: string): string {
             '  style_warm: "Warm / Wood & paper",\n  style_dollhouse: "Dollhouse",\n  style_comic: "Comic",\n  style_gouache: "Gouache",',
             'style names en',
         );
-        // the energy view is part of the adapter, not a Pro add-on
+        // the energy view and the household are part of the adapter, not Pro add-ons
         code = code
             .replace('Was Energie und Energie Pro brauchen.', 'Was die Energie-Ansicht braucht.')
             .replace('What energy and Energy Pro need.', 'What the energy view needs.')
-            .replaceAll(/ \((Energie|Energy) Pro\)/g, '')
-            .replaceAll(/"(Energie|Energy) Pro: (\w)/g, (_, _name: string, c: string) => `"${c.toUpperCase()}`)
-            .replaceAll('Energie Pro', 'Energie')
-            .replaceAll('Energy Pro', 'Energy');
+            .replaceAll(/ \((Energie|Energy|Haushalt|Household) Pro\)/g, '')
+            .replaceAll(
+                /"(Energie|Energy|Haushalt|Household) Pro: (\w)/g,
+                (_, _name: string, c: string) => `"${c.toUpperCase()}`,
+            )
+            .replaceAll(/(Energie|Energy|Haushalt|Household) Pro\b/g, '$1');
     }
     if (name === 'viewer/theme.ts') {
         code = replaceRequired(
@@ -530,6 +596,7 @@ const patches: Plugin = {
         code = keepUndoHistory(name, code);
         code = sensorLook(name, code);
         code = editorDevices(name, code);
+        code = solarText(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
@@ -540,6 +607,14 @@ const patches: Plugin = {
             );
         }
         if (name === 'components/view3d.ts') {
+            // a TV shows the picture of its media player (e.g. the thumbnail of a YouTube video) and the app's colour:
+            // only this part of the add-on "screens" (the rest needs its backend)
+            code = replaceRequired(
+                code,
+                '          const live = hasFeature("screens");',
+                '          const live = true;',
+                'TV picture',
+            );
             // the selected device in 3D: its frame pulses and it lies above the other symbols
             code = replaceRequired(
                 code,

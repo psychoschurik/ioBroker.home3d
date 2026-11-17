@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { entities, execute, wmoCondition } from '../frontend/entities';
+import { entities, execute, validateMappings, wmoCondition } from '../frontend/entities';
+import { mappedIds } from '../frontend/store';
 import { historyDuringPeriod, loggedBy, statisticsDuringPeriod, timeTravelHistory, type HistoryAccess } from '../frontend/history';
 import { sensorIcon, sensorShow, sensorText } from '../frontend/vendor-ext/sensor-look';
 import type { IoAccess, Mapping, StateObject } from '../frontend/model';
@@ -238,4 +239,25 @@ test('statistics: five-minute means of the solar power and the hourly change of 
         change['sensor.gas'].map(r => r.change),
         [2, 1],
     );
+});
+
+test('a condition: the dishwasher runs only while the shared plug says the dishwasher is the running machine', () => {
+    const dishwasher: Mapping = {
+        entity_id: 'binary_sensor.dishwasher',
+        state: 'll.state',
+        map: { starting: true, running: true, paused: true, ending: true, off: false },
+        when: { id: 'll.appliance', values: ['dishwasher'] },
+    };
+    const objects = { 'll.state': object('string'), 'll.appliance': object('string') };
+    const at = (state: string, appliance: string): string =>
+        entities([dishwasher], { 'll.state': { val: state, ts: 1 }, 'll.appliance': { val: appliance, ts: 1 } } as never, objects)[
+            'binary_sensor.dishwasher'
+        ].state;
+    assert.equal(at('running', 'dishwasher'), 'on');
+    assert.equal(at('running', 'washing_machine'), 'off');
+    assert.equal(at('running', ''), 'off');
+    assert.equal(at('off', 'dishwasher'), 'off');
+    assert.deepEqual(mappedIds([dishwasher]), ['ll.state', 'll.appliance']);
+    assert.deepEqual(validateMappings([dishwasher], objects), [dishwasher]);
+    assert.throws(() => validateMappings([{ ...dishwasher, when: { id: 'll.gone', values: [] } }], objects));
 });

@@ -124,6 +124,13 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Energie: Stromfluss-Leitungen, leuchtende Solarmodule, Glas-Hologramme mit Tageskurve und die Energieleiste
   (Verbrauch, Netz, Solar, Akku); die Statistik (Fünf-Minuten-Mittel, Zählerstände pro Stunde) kommt aus dem
   History-Adapter
+- (bluefox) Haushalt: Wasch- und Spülmaschinen zeigen ihre Restzeit und „Fertig!“, dazu die Glaskarte „Heute im
+  Haushalt“; die Restzeit kann in Sekunden kommen (z. B. laundrylens)
+- (bluefox) Zuordnungen mit Bedingung (`when`): der Zustand gilt nur, solange ein anderer Datenpunkt einen der Werte hat,
+  z. B. Wasch- und Spülmaschine an einer Steckdose
+- (bluefox) Energie: die Leistung jedes Solarfelds steht als Zahl auf seinen Modulen und dreht sich mit der Ansicht
+- (bluefox) Fernseher zeigen das Bild ihres Media-Players (z. B. das Vorschaubild des YouTube-Videos von
+  youtube-remote) und leuchten in der Farbe der App
 - (bluefox) Build mit Vite statt esbuild; `npm run dev` startet einen Entwicklungsserver mit Hot Reload und
   simulierten Geräten
 
