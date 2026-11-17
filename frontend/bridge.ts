@@ -30,6 +30,7 @@ let objects: Record<string, StateObject> = {},
     subscribed = new Set<string>(),
     language = 'de',
     systemPosition: { lat: number; lon: number } | null = null,
+    historyInstances: string[] = [],
     hass: Hass | undefined,
     timer: ReturnType<typeof setTimeout> | undefined,
     element:
@@ -68,7 +69,7 @@ const callWS: CallWS = msg => {
         return Promise.resolve({ energy_sources: [] });
     }
     if (msg?.type === 'home3d/timetravel/history') {
-        return timeTravelHistory(io, store.data.mappings, msg, place());
+        return timeTravelHistory(io, store.data.mappings, msg, place(), store.data.timetravel_instance ?? null);
     }
     return store.call(msg);
 };
@@ -133,6 +134,9 @@ function render(): void {
             time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             ...(position ? { latitude: position.lat, longitude: position.lon } : {}),
             position_id: store.data.position_id ?? null,
+            // the editor's house settings: where the time travel reads the past
+            timetravel_instance: store.data.timetravel_instance ?? null,
+            history_instances: historyInstances,
         },
         callWS,
         callService: (domain: string, service: string, data: unknown) =>
@@ -191,6 +195,7 @@ async function start(): Promise<void> {
     await io.ready();
     language = await io.language();
     systemPosition = await io.location();
+    historyInstances = await io.historyInstances();
     await store.load();
     areas = await store.areas();
     await follow();

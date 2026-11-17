@@ -151,6 +151,10 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Boote: „Meer um das Boot“ in den Hauseinstellungen – Wasser an der Wasserlinie mit Wellen aus einem
   Wellenhöhe- und einem Wellenlänge-Sensor (Länge in m oder Periode in s); die Wellen kommen von vorn
 - (bluefox) Die Quellen des 3D-Frontends liegen jetzt in `src-www/` statt in `vendor-src/home3d/`
+- (bluefox) Mit dem Meer stehen Sonnenbogen und Kompassring auf dem Wasser statt auf der Etage darunter
+- (bluefox) Zeitreise: In den Hauseinstellungen ist wählbar, aus welchem Verlauf sie liest, z. B. recorder.0 (zeichnet
+  alles Wichtige ohne Einstellung je Datenpunkt auf); was die Instanz nicht aufzeichnet, kommt weiter aus dem Verlauf,
+  der es aufzeichnet
 
 ### 0.4.0 (2026-11-15)
 

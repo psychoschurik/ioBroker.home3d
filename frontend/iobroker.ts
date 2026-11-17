@@ -105,6 +105,39 @@ export class IoBroker implements IoAccess, FileAccess {
             return null;
         }
     }
+    /** The instances that answer `getHistory` (history, influxdb, sql, recorder ...); empty if they cannot be read. */
+    async historyInstances(): Promise<string[]> {
+        try {
+            const view = await this.conn.getObjectViewSystem('instance', 'system.adapter.', 'system.adapter.\u9999');
+            return Object.values(view)
+                .filter(o => (o.common as { getHistory?: boolean } | undefined)?.getHistory)
+                .map(o => o._id.replace(/^system\.adapter\./, ''))
+                .sort();
+        } catch {
+            return [];
+        }
+    }
+    private recorded = new Map<string, { at: number; ids: Promise<Set<string> | null> }>();
+    /**
+     * The datapoints a history instance records (`getEnabledDPs`; the recorder answers with all it selected itself),
+     * null without an answer within 5 s. Kept for a minute: the time travel asks for every window.
+     */
+    recordedIds(instance: string): Promise<Set<string> | null> {
+        const hit = this.recorded.get(instance);
+        if (hit && Date.now() - hit.at < 60_000) {
+            return hit.ids;
+        }
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const ids = Promise.race([
+            this.conn.sendTo<Record<string, unknown> | null>(instance, 'getEnabledDPs', {}),
+            new Promise<null>(resolve => (timer = setTimeout(() => resolve(null), 5000))),
+        ])
+            .then(r => (r && typeof r === 'object' && !('error' in r) ? new Set(Object.keys(r)) : null))
+            .catch(() => null)
+            .finally(() => clearTimeout(timer));
+        this.recorded.set(instance, { at: Date.now(), ids });
+        return ids;
+    }
     /** Values of a datapoint from a history adapter. */
     getHistory(id: string, options: ioBroker.GetHistoryOptions): Promise<ioBroker.GetHistoryResult> {
         return this.conn.getHistory(id, options);

@@ -187,6 +187,35 @@ test('the time travel gets the states as compact rows, measured values as five-m
     assert.deepEqual(day.missing, ['light.gone']);
 });
 
+test('the time travel reads the datapoints the chosen instance records from it, the others as before', async () => {
+    const start = 1_700_000_000;
+    const asked: string[] = [];
+    const io: HistoryAccess = {
+        getObjects: async ids =>
+            Object.fromEntries(
+                ids.map(id => [id, object('boolean', id === 'b.open' ? { custom: { 'influxdb.0': { enabled: true } } } : {})]),
+            ),
+        defaultHistory: async () => 'history.0',
+        recordedIds: async instance => (instance === 'recorder.0' ? new Set(['a.open']) : null),
+        getHistory: async (id, options) => {
+            asked.push(`${id}@${options.instance}`);
+            return [{ val: true, ts: (start + 60) * 1000 }] as ioBroker.GetHistoryResult;
+        },
+    };
+    const mappings: Mapping[] = [
+        { entity_id: 'binary_sensor.a', state: 'a.open' },
+        { entity_id: 'binary_sensor.b', state: 'b.open' },
+        { entity_id: 'binary_sensor.c', state: 'c.open' },
+    ];
+    const msg = { start_time: start, end_time: start + 900, entity_ids: ['binary_sensor.a', 'binary_sensor.b', 'binary_sensor.c'] };
+    await timeTravelHistory(io, mappings, msg, null, 'recorder.0');
+    assert.deepEqual([...new Set(asked)].sort(), ['a.open@recorder.0', 'b.open@influxdb.0', 'c.open@history.0']);
+    // automatic: the recorder is not asked
+    asked.length = 0;
+    await timeTravelHistory(io, mappings, msg, null);
+    assert.deepEqual([...new Set(asked)].sort(), ['a.open@history.0', 'b.open@influxdb.0', 'c.open@history.0']);
+});
+
 test('statistics: five-minute means of the solar power and the hourly change of a counter', async () => {
     const t0 = Date.UTC(2026, 0, 5, 10, 0, 0);
     const io: HistoryAccess = {

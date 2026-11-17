@@ -89,6 +89,16 @@ export function setupDatapoints(o: DatapointOptions): void {
         })().catch(fail);
     });
 
+    // the editor's house settings: the history instance the time travel prefers (null: automatic)
+    window.addEventListener('iobroker-timetravel', ev => {
+        const instance = (ev as CustomEvent<{ instance?: string | null }>).detail?.instance || null;
+        void (async () => {
+            await o.callWS({ type: 'iobroker/timetravel/set', instance });
+            await o.refresh();
+            o.setStatus(instance ? `Zeitreise aus ${instance}` : 'Zeitreise: Verlauf automatisch');
+        })().catch(fail);
+    });
+
     // the editor's device list of a room: new devices from datapoints, placed in the room
     window.addEventListener('iobroker-add-devices', ev => {
         const done = (ev as CustomEvent<{ done?: (ids: string[]) => void }>).detail?.done;

@@ -418,7 +418,18 @@ function seaWaves(name: string, code: string): string {
                 '    this.fp3dSea = sea;',
                 '    // the neon grid on the ground would show through the water',
                 '    if (had !== !!sea) this.placeGround();',
+                '    // the arc of the sun stands on the water',
+                '    if (this.sunFx) this.buildSunFx();',
                 '    this.invalidate();',
+                '  }',
+                '',
+                '  /** The height of the water surface in the scene: the waterline, moving with the floor it lies in (the one below it). */',
+                '  private fp3dSeaY(): number | null {',
+                '    const sea = this.fp3dSea;',
+                '    if (!sea || !this.floors.length) return null;',
+                '    const ordered = [...this.floors].sort((p, q) => p.floor.elevation - q.floor.elevation);',
+                '    const home = [...ordered].reverse().find((f) => f.floor.elevation <= sea.level) ?? ordered[0];',
+                '    return sea.level + home.y;',
                 '  }',
                 '',
                 '  /** Builds the sea when the plan, the waves or the look changed, and keeps it at the waterline of its floor. */',
@@ -441,11 +452,7 @@ function seaWaves(name: string, code: string): string {
                 '      if (this.fp3dSeaMesh) this.root.add(this.fp3dSeaMesh);',
                 '    }',
                 '    this.fp3dSeaMoving = !!this.fp3dSeaMesh && !!sea && sea.height > 0.005 && !this.lowQuality;',
-                '    if (!this.fp3dSeaMesh || !sea) return;',
-                '    // the water goes up and down with the floor it lies in (the floor below the waterline)',
-                '    const ordered = [...this.floors].sort((p, q) => p.floor.elevation - q.floor.elevation);',
-                '    const home = [...ordered].reverse().find((f) => f.floor.elevation <= sea.level) ?? ordered[0];',
-                '    this.fp3dSeaMesh.position.y = sea.level + (home?.y ?? 0);',
+                '    if (this.fp3dSeaMesh) this.fp3dSeaMesh.position.y = this.fp3dSeaY() ?? 0;',
                 '  }',
                 '',
                 "  /** Pool Pro: the pools' water colour, movement, heating shimmer and cover; an empty list clears them. */",
@@ -470,6 +477,18 @@ function seaWaves(name: string, code: string): string {
             '    this.ground.visible = !box.isEmpty() && !this.lowQuality && this.theme !== "day" && !this.style.natural;',
             '    this.ground.visible = !box.isEmpty() && !this.lowQuality && this.theme !== "day" && !this.style.natural && !this.fp3dSea;',
             'sea: no grid under the water',
+        );
+        code = replaceRequired(
+            code,
+            '    if (!frame || !this.building) return frame;\n',
+            [
+                '    if (!frame || !this.building) return frame;',
+                '    // a boat on the sea: the arc and its compass ring stand on the water, not on a floor under it',
+                '    const fp3dWater = this.fp3dSeaY();',
+                '    if (fp3dWater !== null) return { ...frame, y: fp3dWater + 0.02 };',
+                '',
+            ].join('\n'),
+            'sea: the sun arc on the water',
         );
     }
     if (name === 'components/view3d.ts') {
@@ -526,14 +545,63 @@ function seaWaves(name: string, code: string): string {
         code = replaceRequired(
             code,
             '  north_entity: "Kurs aus Kompass (Boot)",',
-            '  north_entity: "Kurs aus Kompass (Boot)",\n  sea_on: "Meer um das Boot",\n  sea_level: "Wasserlinie (m)",\n  wave_height: "Wellenhöhe",\n  wave_length: "Wellenlänge",\n  sea_hint: "Die Wasserlinie ist die Höhe der Wasseroberfläche, gemessen wie die Höhe der Etagen (negativ = unter der Etage auf 0 m). Wellenhöhe: signifikante Höhe in m, vom Tal bis zum Kamm. Wellenlänge in m, oder die Periode in s. Die Wellen kommen von vorn: der Bug zeigt im Grundriss nach oben.",',
+            '  north_entity: "Kurs aus Kompass (Boot)",\n  sea_on: "Meer um das Boot",\n  sea_level: "Wasserlinie (m)",\n  wave_height: "Wellenhöhe",\n  wave_length: "Wellenlänge",\n  sea_hint: "Die Wasserlinie ist die Höhe der Wasseroberfläche, gemessen wie die Höhe der Etagen (negativ = unter der Etage auf 0 m). Wellenhöhe: signifikante Höhe in m, vom Tal bis zum Kamm. Wellenlänge in m, oder die Periode in s. Die Wellen kommen von vorn: der Bug zeigt im Grundriss nach oben. Sonnenbogen und Kompassring stehen dann auf dem Wasser.",',
             'sea de',
         );
         code = replaceRequired(
             code,
             '  north_entity: "Heading from a compass (boat)",',
-            '  north_entity: "Heading from a compass (boat)",\n  sea_on: "Sea around the boat",\n  sea_level: "Waterline (m)",\n  wave_height: "Wave height",\n  wave_length: "Wave length",\n  sea_hint: "The waterline is the height of the water surface, measured like the floors\' elevations (negative = below the floor at 0 m). Wave height: significant height in m, trough to crest. Wave length in m, or the period in s. The waves come from ahead: the bow points to the top of the plan.",',
+            '  north_entity: "Heading from a compass (boat)",\n  sea_on: "Sea around the boat",\n  sea_level: "Waterline (m)",\n  wave_height: "Wave height",\n  wave_length: "Wave length",\n  sea_hint: "The waterline is the height of the water surface, measured like the floors\' elevations (negative = below the floor at 0 m). Wave height: significant height in m, trough to crest. Wave length in m, or the period in s. The waves come from ahead: the bow points to the top of the plan. The sun arc and the compass ring then stand on the water.",',
             'sea en',
+        );
+    }
+    return code;
+}
+
+/**
+ * Where the time travel reads the past (editor's house settings, for all plans): automatically the history instance
+ * that logs each datapoint, or one chosen instance (e.g. the recorder, which selects its datapoints itself) for the
+ * datapoints it records. The list and the choice come from `hass.config`; the page saves it (`iobroker-timetravel`).
+ */
+function timeTravelSource(name: string, code: string): string {
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '              <p class="fp3d-sub fp3d-wide">${this.t("sea_hint")}</p>`\n          : nothing}\n',
+            [
+                '              <p class="fp3d-sub fp3d-wide">${this.t("sea_hint")}</p>`',
+                '          : nothing}',
+                '        ${((c: { history_instances?: string[]; timetravel_instance?: string | null }) => {',
+                '          const list = [...new Set([...(c.history_instances ?? []), ...(c.timetravel_instance ? [c.timetravel_instance] : [])])];',
+                '          return html`<label class="fp3d-field fp3d-wide"',
+                '              >${this.t("timetravel_source")}',
+                '              <select',
+                '                ?disabled=${!this.isAdmin}',
+                '                @change=${(e: Event) => window.dispatchEvent(new CustomEvent("iobroker-timetravel", { detail: { instance: (e.target as HTMLSelectElement).value || null } }))}',
+                '              >',
+                '                <option value="" ?selected=${!c.timetravel_instance}>${this.t("timetravel_auto")}</option>',
+                '                ${list.map((i) => html`<option value=${i} ?selected=${c.timetravel_instance === i}>${i}</option>`)}',
+                '              </select></label',
+                '            >',
+                '            <p class="fp3d-sub fp3d-wide">${this.t("timetravel_source_hint")}</p>`;',
+                '        })((this.hass?.config ?? {}) as { history_instances?: string[]; timetravel_instance?: string | null })}',
+                '',
+            ].join('\n'),
+            'time travel source',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  sea_on: "Meer um das Boot",',
+            '  sea_on: "Meer um das Boot",\n  timetravel_source: "Zeitreise liest aus",\n  timetravel_auto: "Automatisch (der Verlauf, der den Datenpunkt aufzeichnet)",\n  timetravel_source_hint: "Z. B. recorder.0: Er zeichnet alle wichtigen Datenpunkte auf, ohne Einstellung je Datenpunkt. Datenpunkte, die die gewählte Instanz nicht aufzeichnet, kommen weiter aus dem Verlauf, der sie aufzeichnet. Gilt für alle Grundrisse.",',
+            'time travel source de',
+        );
+        code = replaceRequired(
+            code,
+            '  sea_on: "Sea around the boat",',
+            '  sea_on: "Sea around the boat",\n  timetravel_source: "Time travel reads from",\n  timetravel_auto: "Automatic (the history that logs the datapoint)",\n  timetravel_source_hint: "E.g. recorder.0: it records all relevant datapoints without a setting per datapoint. Datapoints the chosen instance does not record still come from the history that logs them. Counts for all floor plans.",',
+            'time travel source en',
         );
     }
     return code;
@@ -1129,6 +1197,7 @@ const patches: Plugin = {
         code = gpsPosition(name, code);
         code = kioskMode(name, code);
         code = seaWaves(name, code);
+        code = timeTravelSource(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

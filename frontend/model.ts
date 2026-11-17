@@ -128,6 +128,8 @@ export interface StorageData {
     locate_plan: string;
     /** A datapoint with the position (GPS, e.g. on a boat) instead of the one of the system settings. */
     position_id?: string | null;
+    /** The history instance the time travel prefers for the datapoints it records (e.g. `recorder.0`); null: automatic. */
+    timetravel_instance?: string | null;
 }
 /** Format of 0.4.0, which kept everything (also the images as data URLs) in the state `home3d.0.storage`. */
 export interface LegacyStorageData {

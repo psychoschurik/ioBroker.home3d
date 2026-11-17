@@ -32,8 +32,10 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 
 ## Storage (files of `home3d.0`, meta object from `instanceObjects`)
 
-- `data.json`: `{ version: 2, plans, images: {id → file}, mappings, locate_plan, position_id? }` — written on every change;
-  `position_id`: a datapoint with the position (GPS on a boat) for `sun.sun` instead of the system settings
+- `data.json`: `{ version: 2, plans, images: {id → file}, mappings, locate_plan, position_id?, timetravel_instance? }` — written on every change;
+  `position_id`: a datapoint with the position (GPS on a boat) for `sun.sun` instead of the system settings;
+  `timetravel_instance`: the history instance (e.g. `recorder.0`) the time travel prefers for the datapoints it records
+  (`getEnabledDPs`), else per datapoint the instance of its `common.custom`, else the default history
 - `history/<plan>.json`: snapshots (max 30)
 - `images/<id>.<ext>`: binary images
 - IDs that are not `[A-Za-z0-9_-]{1,80}` become `x<hex>` file names (`fileKey`)

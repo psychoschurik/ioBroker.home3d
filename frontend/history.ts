@@ -1,6 +1,7 @@
 // The past of the devices from the history adapters of ioBroker (history, influxdb, sql): `history/history_during_period`
 // (the detail dialog) and `home3d/timetravel/history` (the time travel). The instance is the one that logs the datapoint
-// (its `common.custom`), else the default history of the system. Values become device states like the live ones.
+// (its `common.custom`), else the default history of the system; the time travel may prefer one instance (e.g. the recorder,
+// which selects its datapoints itself) for the datapoints it records. Values become device states like the live ones.
 import { transformed } from './entities.js';
 import type { Mapping, StateObject } from './model.js';
 import { sunAt } from './sun.js';
@@ -16,6 +17,8 @@ export interface HistoryAccess {
     getObjects(ids: string[]): Promise<Record<string, StateObject>>;
     defaultHistory(): Promise<string | null>;
     getHistory(id: string, options: ioBroker.GetHistoryOptions): Promise<ioBroker.GetHistoryResult>;
+    /** The datapoints an instance records (its `getEnabledDPs`); null if it does not answer. */
+    recordedIds?(instance: string): Promise<Set<string> | null>;
 }
 
 /** At most this many points per device and period; longer periods are reduced by the adapter (min/max per step). */
@@ -77,16 +80,28 @@ export async function historyEnabled(
 }
 
 /** The mappings of the wanted devices with the history instance that logs them (devices without one are left out). */
-async function sources(io: HistoryAccess, mappings: Mapping[], ids: string[]): Promise<Source[]> {
+/**
+ * Where the past of each device comes from: the instance that logs its datapoint, else the default history; with
+ * `preferred` that instance for every datapoint it records.
+ */
+async function sources(
+    io: HistoryAccess,
+    mappings: Mapping[],
+    ids: string[],
+    preferred: string | null = null,
+): Promise<Source[]> {
     const wanted = ids.map(id => mappings.find(m => m.entity_id === id)).filter((m): m is Mapping => !!m);
     if (!wanted.length) {
         return [];
     }
     const objects = await io.getObjects(wanted.map(m => m.state));
-    const fallback = await io.defaultHistory();
+    const [fallback, recorded] = await Promise.all([
+        io.defaultHistory(),
+        preferred && io.recordedIds ? io.recordedIds(preferred) : null,
+    ]);
     const out: Source[] = [];
     for (const m of wanted) {
-        const instance = loggedBy(objects[m.state], fallback);
+        const instance = preferred && recorded?.has(m.state) ? preferred : loggedBy(objects[m.state], fallback);
         if (instance) {
             out.push({ m, instance, type: objects[m.state]?.common?.type });
         }
@@ -253,12 +268,14 @@ async function means(io: HistoryAccess, src: Source, start: number, end: number)
 /**
  * Answers `home3d/timetravel/history`: the states of the devices (`entity_ids`) as rows and the five-minute means of
  * measured values (`statistic_ids`) of one window (times in seconds). `sun.sun` is calculated from the position.
+ * `preferred`: the history instance chosen for the time travel (null: automatic).
  */
 export async function timeTravelHistory(
     io: HistoryAccess,
     mappings: Mapping[],
     msg: { start_time?: unknown; end_time?: unknown; entity_ids?: unknown; statistic_ids?: unknown; type?: string },
     location: { lat: number; lon: number } | null,
+    preferred: string | null = null,
 ): Promise<WireDay> {
     const now = Date.now() / 1000;
     const end = Math.min(Number(msg.end_time) || now, now);
@@ -269,7 +286,10 @@ export async function timeTravelHistory(
     if (entityIds.includes('sun.sun') && location) {
         day.entities['sun.sun'] = wire(sunRows(location.lat, location.lon, start, end), start);
     }
-    const [states, stats] = await Promise.all([sources(io, mappings, entityIds), sources(io, mappings, statIds)]);
+    const [states, stats] = await Promise.all([
+        sources(io, mappings, entityIds, preferred),
+        sources(io, mappings, statIds, preferred),
+    ]);
     await Promise.all([
         ...states.map(async src => {
             try {
