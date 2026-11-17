@@ -158,6 +158,8 @@ function render(): void {
         if (element.setConfig) {
             element.setConfig({
                 type: 'custom:home3d-card',
+                // the card fills the page (an iframe in VIS) down to the bottom edge, not a fixed 420 px
+                fill: true,
                 ...(params.get('plan') ? { plan: params.get('plan') } : {}),
                 ...(params.get('template') ? { template: params.get('template') } : {}),
             });

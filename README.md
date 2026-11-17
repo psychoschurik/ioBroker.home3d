@@ -14,12 +14,13 @@ kein eigener Server, kein eigener Port, kein eigener Zugangsschlüssel.
 
 Nach der Installation:
 
-| | Adresse |
-| --- | --- |
-| Oberfläche (3D-Ansicht und Editor) | `http://<server>:8082/home3d/index.html` |
-| Tabletansicht (z. B. als iframe in vis) | `http://<server>:8082/home3d/index.html?view=card` |
+|                                             | Adresse                                            |
+|---------------------------------------------|----------------------------------------------------|
+| Oberfläche (3D-Ansicht und Editor)          | `http://<server>:8082/home3d/index.html`           |
+| Kiosk (Wandtablet, ohne die oberen Leisten) | `http://<server>:8082/home3d/index.html?kiosk`     |
+| Nur die 3D-Karte (als iframe in vis)        | `http://<server>:8082/home3d/index.html?view=card` |
 
-Beide Adressen stehen auch als Verweis im Reiter **Instanzen**. Die Instanz hat keine Einstellungen.
+Die ersten beiden Adressen stehen auch als Verweis im Reiter **Instanzen**. Die Instanz hat keine Einstellungen.
 
 1. **Geräte verbinden** öffnet den ioBroker-Objektbaum. Datenpunkte auswählen und übernehmen.
 2. Im **Editor** Etagen, Räume, Türen und Möbel anlegen und den ioBroker-Räumen (`enum.rooms.*`) zuordnen.
@@ -145,6 +146,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Neu: `index.html?kiosk` für Wandtablets – die 3D-Ansicht ohne die beiden oberen Leisten; Editor, „Projekte“
   und „Geräte verbinden“ sind dort nicht erreichbar
 - (bluefox) Editor: „Kiosk ↗“ öffnet den bearbeiteten Plan im Kiosk-Modus in einem neuen Tab
+- (bluefox) Der Verweis „Tabletansicht“ in der Kopfzeile und im Reiter Instanzen ist durch „Kiosk“ ersetzt;
+  `?view=card` (3D-Karte als iframe in VIS) füllt jetzt die ganze Höhe statt 420 px und zeigt keine Kopfzeile mehr
 
 ### 0.4.0 (2026-11-15)
 

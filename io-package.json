@@ -68,11 +68,11 @@
                     "de": "3D Home"
                 }
             },
-            "card": {
-                "link": "%web_protocol%://%web_bind%:%web_port%/home3d/index.html?view=card",
+            "kiosk": {
+                "link": "%web_protocol%://%web_bind%:%web_port%/home3d/index.html?kiosk",
                 "name": {
-                    "en": "Tablet view",
-                    "de": "Tabletansicht"
+                    "en": "Kiosk",
+                    "de": "Kiosk"
                 }
             }
         },
