@@ -1327,6 +1327,471 @@ function boatGear(name: string, code: string): string {
 }
 
 /**
+ * The weather beyond the condition: wind from own sensors or the weather entity (wind indicators "wind_vane" that turn
+ * with it; on the sea the waves run with it, whitecaps from 4 Bft, gusts ruffle the water), rain rings on the sea and
+ * wet surfaces, cloud shadows drifting with the wind, fog from the visibility or the dew point, and a warning when the
+ * air pressure falls fast (frontend/vendor-ext/weather-data.ts, sky-shade.ts, wind-vane.ts, sea.ts).
+ */
+function weatherMore(name: string, code: string): string {
+    const data = `${root}/frontend/vendor-ext/weather-data.ts`;
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "nav_light",\n] as const;',
+            '  "nav_light",\n  "wind_vane",\n] as const;',
+            'vane type',
+        );
+        code = replaceRequired(
+            code,
+            '"propeller", "nav_light"],',
+            '"propeller", "nav_light", "wind_vane"],',
+            'vane in the library',
+        );
+        code = replaceRequired(
+            code,
+            '  nav_light: [0.14, 0.14, 0.1],',
+            '  nav_light: [0.14, 0.14, 0.1],\n  // a wind indicator: the length of its arrow, sock or flag\n  wind_vane: [0.8, 0.8, 0.3],',
+            'vane size',
+        );
+        code = replaceRequired(
+            code,
+            '  sea_speed?: string | null;',
+            [
+                '  sea_speed?: string | null;',
+                '  /** The wind: sensors of its speed (kn, km/h or m/s by the unit), the direction it comes from (°) and the gusts; else the weather entity. */',
+                '  wind_speed?: string | null;',
+                '  wind_dir?: string | null;',
+                '  wind_gust?: string | null;',
+                "  /** The air pressure: a fast fall (3 hPa in 3 h) shows a warning; else the weather entity's pressure. */",
+                '  pressure_entity?: string | null;',
+            ].join('\n'),
+            'wind settings type',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  nav_light: ["boat", []],',
+            '  nav_light: ["boat", []],\n  wind_vane: ["outdoor", []],',
+            'vane in the library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "tank":\n',
+            [
+                '    case "wind_vane":',
+                '      // a wind indicator: its post and an arrow',
+                '      return [',
+                '        circle(0, 0, 0.04, "fp3d-sym-strong"),',
+                '        line(0, d / 2 - 0.03, 0, -d / 2 + 0.03, "fp3d-sym-strong"),',
+                '        line(-w / 6, -d / 2 + 0.15, 0, -d / 2 + 0.03, "fp3d-sym-strong"),',
+                '        line(w / 6, -d / 2 + 0.15, 0, -d / 2 + 0.03, "fp3d-sym-strong"),',
+                '      ];',
+                '    case "tank":',
+                '',
+            ].join('\n'),
+            'vane symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "tank":\n',
+            '    case "wind_vane":\n    case "tank":\n',
+            'vane not as furniture',
+        );
+    }
+    if (name === 'viewer/theme.ts') {
+        code = `import { SKY_GLSL as FP3D_SKY_GLSL, skyUniforms as fp3dSkyUniforms } from "${root}/frontend/vendor-ext/sky-shade.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    Object.assign(shader.uniforms, uniform.style ?? styleUniforms);',
+            '    Object.assign(shader.uniforms, uniform.style ?? styleUniforms);\n    Object.assign(shader.uniforms, fp3dSkyUniforms);',
+            'sky uniforms',
+        );
+        code = replaceRequired(
+            code,
+            '.replace("#include <common>", `#include <common>\\n${GLSL}`)',
+            '.replace("#include <common>", `#include <common>\\n${FP3D_SKY_GLSL}\\n${GLSL}`)',
+            'sky shader code',
+        );
+        code = replaceRequired(
+            code,
+            '      cc *= fp3dK * fp3dStyleFloor(cc, n);',
+            '      cc *= fp3dK * fp3dStyleFloor(cc, n);\n      // under the open sky: cloud shadows, wet in the rain\n      cc = fp3dSky(cc, n, vFp3dWorld);',
+            'sky on surfaces',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = [
+            `import { skyUniforms as fp3dSkyUniforms } from "${root}/frontend/vendor-ext/sky-shade.ts";`,
+            `import { setSeaWeather as fp3dSetSeaWeather } from "${root}/frontend/vendor-ext/sea.ts";`,
+            `import { gustiness as fp3dGustiness, type Wind as Fp3dWind } from "${data}";`,
+            `import { animateVane as fp3dAnimateVane, buildVane as fp3dBuildVane, disposeVanes as fp3dDisposeVanes, vaneKey as fp3dVaneKey, type VaneScene as Fp3dVaneScene, type VaneState as Fp3dVane } from "${root}/frontend/vendor-ext/wind-vane.ts";`,
+            code,
+        ].join('\n');
+        code = replaceRequired(
+            code,
+            "  /** Pool Pro: the pools' water colour, movement, heating shimmer and cover; an empty list clears them. */\n  setPools(",
+            [
+                '  /** The wind (m/s, the direction it comes from, gusts) for the sea, the clouds and the wind indicators; null: unknown. */',
+                '  private fp3dWind: Fp3dWind | null = null;',
+                '  private fp3dVanes: Fp3dVane[] = [];',
+                '  private fp3dVaneGroup: Group | null = null;',
+                '  private fp3dVaneSig = "";',
+                '  /** Clouds drift, whitecaps and rain move on the sea, an indicator swings: frames keep coming. */',
+                '  private fp3dSkyMoving = false;',
+                '  private fp3dSkyClock = 0;',
+                '',
+                '  fp3dSetWind(w: Fp3dWind | null): void {',
+                '    if (JSON.stringify(w) === JSON.stringify(this.fp3dWind)) return;',
+                '    this.fp3dWind = w;',
+                '    this.invalidate();',
+                '  }',
+                '',
+                '  fp3dSetVanes(list: Fp3dVane[]): void {',
+                '    if (JSON.stringify(list) === JSON.stringify(this.fp3dVanes)) return;',
+                '    this.fp3dVanes = list;',
+                '    this.invalidate();',
+                '  }',
+                '',
+                '  /** Where the wind blows to in the plan (rad, clockwise from the top of the plan); null: no direction known. */',
+                '  private fp3dWindTo(): number | null {',
+                '    const w = this.fp3dWind;',
+                '    if (!w || w.from === null) return null;',
+                '    return ((this.fp3dNorth() + w.from + 180) * Math.PI) / 180;',
+                '  }',
+                '',
+                '  /** The sky over the plan every frame: cloud shadows, wet surfaces, the weather on the sea, the wind indicators. */',
+                '  private fp3dSkyFrame(): void {',
+                '    const t = this.flowTime.value;',
+                '    const dt = Math.min(1, Math.max(0, t - this.fp3dSkyClock));',
+                '    this.fp3dSkyClock = t;',
+                '    const w = this.fp3dWind;',
+                '    const to = this.fp3dWindTo();',
+                '    const dir: [number, number] | null = to === null ? null : [Math.sin(to), -Math.cos(to)];',
+                '    const gust = fp3dGustiness(w);',
+                '    const weather = this.weather;',
+                '    const u = fp3dSkyUniforms;',
+                '    // the shadows of the clouds: by day, in a natural look, under a broken sky (an overcast one casts no patches)',
+                '    const cover = weather?.cloud ?? 0;',
+                '    const elev = this.sun?.elevation ?? -90;',
+                '    const shadows = !!weather && this.style.natural && elev > 2 && !this.lowQuality && !this.options.safeFx && cover > 0.08 && cover < 0.97;',
+                '    u.uFp3dCloud.value = shadows ? Math.min(1, (elev - 2) / 8) : 0;',
+                '    u.uFp3dCover.value = cover;',
+                '    if (shadows && dir && w) {',
+                '      const drift = Math.min(6, 0.5 + 0.3 * w.speed) * dt;',
+                '      u.uFp3dCloudOff.value.set((u.uFp3dCloudOff.value.x + dir[0] * drift) % 100000, (u.uFp3dCloudOff.value.y + dir[1] * drift) % 100000);',
+                '    }',
+                '    u.uFp3dWet.value = weather && this.style.natural && !this.lowQuality ? Math.min(1, weather.rain * 1.4) : 0;',
+                '    // under the open sky: the deck of a boat (its top floor), the roofs of a house (above its top floor)',
+                '    const top = [...this.floors].sort((p, q) => q.group.position.y - p.group.position.y)[0];',
+                '    u.uFp3dSkyMinY.value = !top ? 1e6 : this.fp3dSea ? top.group.position.y - 0.05 : top.group.position.y + top.floor.height - 0.05;',
+                '    const seaWind = weather && w ? w.speed : 0;',
+                '    if (this.fp3dSeaMesh) fp3dSetSeaWeather(this.fp3dSeaMesh, { dir, wind: seaWind, gust: weather ? gust : 0, rain: weather?.rain ?? 0 }, dt);',
+                '    let moving = (u.uFp3dCloud.value > 0 && !!dir && !!w && w.speed > 0.2) || (!!this.fp3dSeaMesh && !!weather && (seaWind >= 5.5 || weather.rain > 0 || gust > 0));',
+                '    // the wind indicators: built anew when they or their floor changed, turned by the wind every frame',
+                '    const light = this.theme === "day" || this.style.natural;',
+                '    const parts: { v: Fp3dVane; scene: Fp3dVaneScene }[] = [];',
+                '    for (const v of this.fp3dVanes) {',
+                '      const fv = this.floorMap.get(v.floor);',
+                '      if (!fv || !fv.group.visible || fv.o < 0.3) continue;',
+                '      parts.push({ v, scene: { floorY: fv.group.position.y, light } });',
+                '    }',
+                '    const sig = parts.map((p) => fp3dVaneKey(p.v, p.scene)).join("|");',
+                '    if (sig !== this.fp3dVaneSig) {',
+                '      this.fp3dVaneSig = sig;',
+                '      if (this.fp3dVaneGroup) {',
+                '        this.root.remove(this.fp3dVaneGroup);',
+                '        fp3dDisposeVanes(this.fp3dVaneGroup);',
+                '        this.fp3dVaneGroup = null;',
+                '      }',
+                '      if (parts.length) {',
+                '        const g = new Group();',
+                '        for (const p of parts) g.add(fp3dBuildVane(p.v, p.scene));',
+                '        this.root.add(g);',
+                '        this.fp3dVaneGroup = g;',
+                '      }',
+                '    }',
+                '    if (this.fp3dVaneGroup) {',
+                '      const vw = to === null || !w ? null : { to, speed: w.speed, gust };',
+                '      for (const c of this.fp3dVaneGroup.children) fp3dAnimateVane(c, vw, t);',
+                '      if (vw && vw.speed > 0.3) moving = true;',
+                '    }',
+                '    this.fp3dSkyMoving = moving && !this.lowQuality;',
+                '  }',
+                '',
+                "  /** Pool Pro: the pools' water colour, movement, heating shimmer and cover; an empty list clears them. */",
+                '  setPools(',
+            ].join('\n'),
+            'sky: setWind',
+        );
+        code = replaceRequired(
+            code,
+            '    this.fp3dGearFrame();\n',
+            '    this.fp3dGearFrame();\n    this.fp3dSkyFrame();\n',
+            'sky: every frame',
+        );
+        code = replaceRequired(
+            code,
+            '|| this.fp3dSeaMoving || this.fp3dGearMoving;',
+            '|| this.fp3dSeaMoving || this.fp3dGearMoving || this.fp3dSkyMoving;',
+            'sky: frames while the clouds drift',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = `import { beaufort as fp3dBeaufort, compassPoint as fp3dCompass, defaultVaneY as fp3dVaneY, fogOf as fp3dFogOf, PressureLog as Fp3dPressureLog, pressureFall as fp3dPressureFall, pressureHpa as fp3dPressureHpa, stormLevel as fp3dStormLevel, windOf as fp3dWindOf, type Sample as Fp3dSample, type States as Fp3dStates } from "${data}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    const weather = raw ? limitEffects(raw, b.settings.weather_effects) : null;\n',
+            [
+                '    // the wind: the own sensors while they report, else the weather entity; fog also from the visibility or the dew point',
+                '    const fp3dWeatherId = weatherEntity(hass, this.weatherEntityId ?? b.settings.weather_entity);',
+                '    const fp3dWind = fp3dWindOf(hass.states as unknown as Fp3dStates, { speed: b.settings.wind_speed, dir: b.settings.wind_dir, gust: b.settings.wind_gust, weather: fp3dWeatherId }, Date.now());',
+                '    const fp3dFog = fp3dFogOf(fp3dWeatherId ? hass.states[fp3dWeatherId]?.attributes : null) ?? 0;',
+                '    const fp3dRaw = raw ? { ...raw, fog: Math.max(raw.fog, fp3dFog), wind: fp3dWind ? Math.min(1, (fp3dWind.speed * 3.6) / 60) : raw.wind } : null;',
+                '    const weather = fp3dRaw ? limitEffects(fp3dRaw, b.settings.weather_effects) : null;',
+                '    // the air pressure: a fast fall warns of a storm and darkens the sky',
+                '    this.fp3dPressure(hass, b.settings.pressure_entity ?? null, fp3dWeatherId);',
+                '',
+            ].join('\n'),
+            'wind and fog',
+        );
+        code = replaceRequired(
+            code,
+            '(elevation + 4) / 16))) * (1 - 0.45 * this.cloud);',
+            '(elevation + 4) / 16))) * (1 - 0.45 * this.cloud) * (1 - 0.2 * this.fp3dStormLevel);',
+            'storm: a darker sky',
+        );
+        code = replaceRequired(
+            code,
+            '    this.watchLightning(!!weather?.lightning);\n',
+            [
+                '    this.watchLightning(!!weather?.lightning);',
+                '    v.fp3dSetWind(fp3dWind);',
+                '    // the wind indicators: speed in knots on a boat, else in km/h, the compass point and Beaufort over them',
+                '    const fp3dBoat = typeof b.settings.sea_level === "number";',
+                '    const fp3dLetter = (k: string) => translate(hass, k as I18nKey).charAt(0).toUpperCase();',
+                '    const [fp3dN, fp3dE, fp3dS, fp3dW] = ["compass_n", "compass_e", "compass_s", "compass_w"].map(fp3dLetter);',
+                '    const fp3dPoints = [fp3dN, fp3dN + fp3dE, fp3dE, fp3dS + fp3dE, fp3dS, fp3dS + fp3dW, fp3dW, fp3dN + fp3dW];',
+                '    const fp3dWindSpeed = (ms: number) => `${formatNumber(hass, fp3dBoat ? ms / 0.514444 : ms * 3.6, 0)} ${fp3dBoat ? "kn" : "km/h"}`;',
+                '    const fp3dWindText = fp3dWind',
+                '      ? [',
+                '          fp3dWindSpeed(fp3dWind.speed),',
+                '          fp3dWind.from !== null ? fp3dCompass(fp3dWind.from, fp3dPoints) : "",',
+                '          `${fp3dBeaufort(fp3dWind.speed)} Bft`,',
+                '          fp3dWind.gust !== null && fp3dWind.gust - fp3dWind.speed >= 2.5 ? `${translate(hass, "wind_gusts" as I18nKey)} ${fp3dWindSpeed(fp3dWind.gust)}` : "",',
+                '        ]',
+                '          .filter(Boolean)',
+                '          .join(" · ")',
+                '      : "";',
+                '    v.fp3dSetVanes(',
+                '      b.floors.flatMap((fl) =>',
+                '        fl.furniture',
+                '          .filter((f) => f.type === "wind_vane")',
+                '          .map((f) => {',
+                '            const kind = f.gear_kind ?? "windex";',
+                '            return {',
+                '              id: f.id,',
+                '              floor: fl.id,',
+                '              x: f.x,',
+                '              z: f.z,',
+                '              kind,',
+                '              size: f.w,',
+                '              base: f.gear_y ?? fp3dVaneY(kind),',
+                '              mast: !!f.gear_mast,',
+                '              label: fp3dWindText,',
+                '              warn: !!fp3dWind && (fp3dWind.speed >= 10.8 || (fp3dWind.gust ?? 0) >= 13.9),',
+                '            };',
+                '          }),',
+                '      ),',
+                '    );',
+                '',
+            ].join('\n'),
+            'wind to the viewer',
+        );
+        code = replaceRequired(
+            code,
+            '  private renderAlerts() {\n    const b = this.building;\n    if (!this._alerts.length || !b) return nothing;\n    const shown = this._alerts.slice(0, 3);\n    return html`<div class="fp3d-alert-banner" role="alert">\n',
+            [
+                '  /** The air pressure seen while the page is open, and from the history of its sensor (read every ten minutes). */',
+                '  private fp3dPressLog = new Fp3dPressureLog();',
+                '  private fp3dPressHist: { id: string; at: number; samples: Fp3dSample[] } | null = null;',
+                '  /** The warning of a falling pressure (empty: none) and how strong it is (0 … 2). */',
+                '  private fp3dStorm = "";',
+                '  private fp3dStormLevel = 0;',
+                '',
+                '  /** Follows the air pressure (the sensor, else the weather entity) and warns when it falls fast. */',
+                '  private fp3dPressure(hass: HomeAssistant, sensor: string | null, weatherId: string | null): void {',
+                '    const id = sensor && sensor !== "none" && hass.states[sensor] ? sensor : null;',
+                '    const st = id ? hass.states[id] : undefined;',
+                '    const wa = weatherId ? hass.states[weatherId]?.attributes : undefined;',
+                '    const raw = parseFloat(String(st ? st.state : (wa?.pressure ?? "")));',
+                '    const unit = String((st ? st.attributes.unit_of_measurement : wa?.pressure_unit) ?? "hPa");',
+                '    const now = Date.now();',
+                '    let fall: number | null = null;',
+                '    if (Number.isFinite(raw) && !this.replay) {',
+                '      const hpa = fp3dPressureHpa(raw, unit);',
+                '      if (hpa > 800 && hpa < 1100) this.fp3dPressLog.add(now, hpa);',
+                '      if (id && (!this.fp3dPressHist || this.fp3dPressHist.id !== id || now - this.fp3dPressHist.at > 10 * 60 * 1000)) {',
+                '        this.fp3dPressHist = { id, at: now, samples: this.fp3dPressHist?.id === id ? this.fp3dPressHist.samples : [] };',
+                '        void (hass.callWS({ type: "history/history_during_period", start_time: new Date(now - 3.5 * 3600 * 1000).toISOString(), end_time: new Date(now).toISOString(), entity_ids: [id], minimal_response: true, no_attributes: true }) as Promise<Record<string, { s: string; lu: number }[]>>)',
+                '          .then((res) => {',
+                '            if (this.fp3dPressHist?.id !== id) return;',
+                '            this.fp3dPressHist.samples = (res?.[id] ?? []).map((r) => ({ t: r.lu * 1000, v: fp3dPressureHpa(parseFloat(r.s), unit) })).filter((s) => s.v > 800 && s.v < 1100);',
+                '            this.requestUpdate();',
+                '          })',
+                '          .catch(() => {});',
+                '      }',
+                '      fall = fp3dPressureFall(this.fp3dPressLog.merged(this.fp3dPressHist?.id === id ? this.fp3dPressHist.samples : []), now);',
+                '    }',
+                '    const level = fp3dStormLevel(fall);',
+                '    const text = level && fall !== null ? `${translate(hass, (level === 2 ? "storm_warning" : "storm_falling") as I18nKey)} ${formatNumber(hass, fall, 1)} hPa / 3 h` : "";',
+                '    this.fp3dStormLevel = level;',
+                '    if (text !== this.fp3dStorm) {',
+                '      this.fp3dStorm = text;',
+                '      this.requestUpdate();',
+                '    }',
+                '  }',
+                '',
+                '  private renderAlerts() {',
+                '    const b = this.building;',
+                '    if ((!this._alerts.length && !this.fp3dStorm) || !b) return nothing;',
+                '    const shown = this._alerts.slice(0, 3);',
+                '    return html`<div class="fp3d-alert-banner" role="alert">',
+                '      ${this.fp3dStorm ? html`<span class="fp3d-alert ${this.fp3dStormLevel === 2 ? "" : "fp3d-alert-alarm_pending"}" title=${this.fp3dStorm}>${this.fp3dStorm}</span>` : nothing}',
+                '',
+            ].join('\n'),
+            'storm warning',
+        );
+        code = replaceRequired(
+            code,
+            '${this._alerts.length ? "fp3d-has-alerts" : ""}',
+            '${this._alerts.length || this.fp3dStorm ? "fp3d-has-alerts" : ""}',
+            'storm: room for the banner',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = `import { defaultVaneY as fp3dVaneY, VANE_KINDS as FP3D_VANE_KINDS } from "${data}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '"propeller", "nav_light"]);',
+            '"propeller", "nav_light", "wind_vane"]);',
+            'vane: no state links',
+        );
+        code = replaceRequired(
+            code,
+            '${fp3dIsGear(f.type) ? this.fp3dRenderGearForm(f) : nothing}',
+            '${fp3dIsGear(f.type) ? this.fp3dRenderGearForm(f) : nothing} ${f.type === "wind_vane" ? this.fp3dRenderVaneForm(f) : nothing}',
+            'vane form',
+        );
+        code = replaceRequired(
+            code,
+            "  /** A boat's gear: what a tank holds and its sensors, the rudder angle, the engine speed, a navigation light. */\n",
+            [
+                '  /** A wind indicator: which one, its height, whether a mast or pole is drawn; the wind comes from the house settings. */',
+                '  private fp3dRenderVaneForm(f: Furniture) {',
+                '    const kind = f.gear_kind ?? "windex";',
+                '    return html`<div class="fp3d-form fp3d-links">',
+                '      <label class="fp3d-field fp3d-wide"',
+                '        >${this.t("vane_kind" as I18nKey)}',
+                '        <select ?disabled=${!this.isAdmin} @change=${(e: Event) => this.updateFurniture({ gear_kind: (e.target as HTMLSelectElement).value })}>',
+                '          ${FP3D_VANE_KINDS.map((k) => html`<option value=${k} ?selected=${k === kind}>${this.t(`vane_${k}` as I18nKey)}</option>`)}',
+                '        </select></label',
+                '      >',
+                '      ${this.num(this.t("gear_y" as I18nKey), f.gear_y ?? fp3dVaneY(kind), (v) => this.updateFurniture({ gear_y: Math.round(Math.min(40, Math.max(0, v)) * 100) / 100 }), 0.1, 0)}',
+                '      <label class="fp3d-check fp3d-wide"',
+                '        ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${!!f.gear_mast} @change=${(e: Event) => this.updateFurniture({ gear_mast: (e.target as HTMLInputElement).checked || undefined })} />',
+                '        ${this.t("vane_mast" as I18nKey)}</label',
+                '      >',
+                '      <p class="fp3d-sub fp3d-wide">${this.t("vane_hint" as I18nKey)}</p>',
+                '    </div>`;',
+                '  }',
+                '',
+                "  /** A boat's gear: what a tank holds and its sensors, the rudder angle, the engine speed, a navigation light. */",
+                '',
+            ].join('\n'),
+            'vane form method',
+        );
+        code = replaceRequired(
+            code,
+            '              <p class="fp3d-sub fp3d-wide">${this.t("rain_entity_hint")}</p>`\n          : nothing}\n',
+            [
+                '              <p class="fp3d-sub fp3d-wide">${this.t("rain_entity_hint")}</p>`',
+                '          : nothing}',
+                '        ${this.hass',
+                '          ? html`${(["wind_speed", "wind_dir", "wind_gust", "pressure_entity"] as const).map((key) =>',
+                '                this.entitySelect(this.t(key as I18nKey), s[key] ?? null, undefined, this.entityOptions((id) => id.startsWith("sensor.")), (v) => set({ [key]: v === "none" ? null : v })),',
+                '              )}',
+                '              <p class="fp3d-sub fp3d-wide">${this.t("wind_hint" as I18nKey)}</p>`',
+                '          : nothing}',
+                '',
+            ].join('\n'),
+            'wind settings',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_wind_vane: 'Windanzeiger',
+            vane_kind: 'Art',
+            vane_windex: 'Verklicker (Masttopp)',
+            vane_sock: 'Windsack',
+            vane_flag: 'Flagge',
+            vane_mast: 'Mast bzw. Stange bis zur Etage zeichnen',
+            vane_hint:
+                'Dreht sich mit dem Wind aus ⚙ → Haus (Wind-Sensoren) oder aus der Wetter-Entität: Der Verklicker zeigt in den Wind, Windsack und Flagge wehen mit ihm. Der Windsack steht ab 15 kn waagerecht, Böen lassen alle schwingen. Darüber stehen Wind, Richtung und Beaufort. Breite = Länge von Pfeil, Sack oder Flagge.',
+            wind_speed: 'Wind (Sensor)',
+            wind_dir: 'Windrichtung (Sensor, ° woher)',
+            wind_gust: 'Böen (Sensor)',
+            pressure_entity: 'Luftdruck (Sensor)',
+            wind_hint:
+                'Wind in kn, km/h oder m/s (nach der Einheit) und die Richtung, aus der er kommt (wahrer Wind, 0 = Norden). Ohne Sensor, oder wenn er seit einer Stunde nichts meldet, gilt der Wind der Wetter-Entität. Der Wind dreht die Windanzeiger, auf dem Meer laufen die Wellen mit ihm, ab 4 Bft mit Schaumkronen, Böen kräuseln das Wasser, die Wolkenschatten ziehen mit ihm. Fällt der Luftdruck in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung und der Himmel wird dunkler.',
+            wind_gusts: 'Böen',
+            storm_falling: 'Luftdruck fällt:',
+            storm_warning: 'Sturmwarnung, Luftdruck fällt:',
+        };
+        const en: Record<string, string> = {
+            furn_wind_vane: 'Wind indicator',
+            vane_kind: 'Kind',
+            vane_windex: 'Windex (masthead)',
+            vane_sock: 'Windsock',
+            vane_flag: 'Flag',
+            vane_mast: 'Draw a mast or pole down to the floor',
+            vane_hint:
+                'Turns with the wind from ⚙ → House (wind sensors) or from the weather entity: the windex points into the wind, the windsock and the flag fly with it. The windsock stands out straight from 15 kn, gusts make them all swing. Above it: wind, direction and Beaufort. Width = length of the arrow, sock or flag.',
+            wind_speed: 'Wind (sensor)',
+            wind_dir: 'Wind direction (sensor, ° from)',
+            wind_gust: 'Gusts (sensor)',
+            pressure_entity: 'Air pressure (sensor)',
+            wind_hint:
+                'Wind in kn, km/h or m/s (by the unit) and the direction it comes from (true wind, 0 = north). Without a sensor, or when it has not reported for an hour, the wind of the weather entity counts. The wind turns the wind indicators; on the sea the waves run with it, with whitecaps from 4 Bft, gusts ruffle the water, the cloud shadows drift with it. When the air pressure falls by 3 hPa or more in 3 hours, a warning shows and the sky gets darker.',
+            wind_gusts: 'gusts',
+            storm_falling: 'Pressure falling:',
+            storm_warning: 'Storm warning, pressure falling:',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  furn_nav_light: "Positionslicht",',
+            `  furn_nav_light: "Positionslicht",${lines(de)}`,
+            'wind de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_nav_light: "Navigation light",',
+            `  furn_nav_light: "Navigation light",${lines(en)}`,
+            'wind en',
+        );
+    }
+    return code;
+}
+
+/**
  * A boat turns: the heading of a compass sensor (`settings.north_entity`) turns the plan under the sky, so that sun,
  * shadow, sun patches and the compass ring follow it; `settings.north` stays a correction for the compass.
  */
@@ -1921,6 +2386,7 @@ const patches: Plugin = {
         code = timeTravelSource(name, code);
         code = boatAnchor(name, code);
         code = boatGear(name, code);
+        code = weatherMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

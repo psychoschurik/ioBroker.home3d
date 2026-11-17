@@ -4,6 +4,8 @@
 // The surface is a ring around the hull, so no water stands inside the boat; it is dense at the hull and coarse far
 // out, where it fades. The waves are Gerstner waves moved in the vertex shader: no work on the CPU per frame.
 import { BufferGeometry, Float32BufferAttribute, Mesh, ShaderMaterial, UniformsLib, UniformsUtils } from 'three';
+import { SKY_GLSL, skyUniforms } from './sky-shade';
+import { whitecaps } from './weather-data';
 
 type Vec2 = [number, number];
 
@@ -48,6 +50,7 @@ const VERT = /* glsl */ `
   varying vec2 vPlan;
   varying float vCrest;
   varying vec3 vNormal;
+  varying vec3 vWorld;
   #include <fog_pars_vertex>
   void main() {
     vec3 p = position;
@@ -76,6 +79,7 @@ const VERT = /* glsl */ `
     vPlan = position.xz;
     vCrest = uAmp > 0.0 ? y / uAmp : 0.0;
     vNormal = n;
+    vWorld = (modelMatrix * vec4(p, 1.0)).xyz;
     vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mvPosition;
     #include <fog_vertex>
@@ -92,11 +96,19 @@ const FRAG = /* glsl */ `
   uniform float uDrift;
   uniform float uReach;
   uniform vec4 uHull;
+  uniform float uTime;
+  uniform vec2 uWindDir;
+  uniform float uWindVis;
+  uniform float uWhite;
+  uniform float uGust;
+  uniform float uRain;
+  varying vec3 vWorld;
   varying float vFar;
   varying float vCrest;
   varying vec3 vNormal;
   varying vec2 vPlan;
   #include <fog_pars_fragment>
+${SKY_GLSL}
   void main() {
     vec3 n = normalize(vNormal);
     // light from ahead and above: the faces of the waves turned to it are lighter
@@ -128,8 +140,45 @@ const FRAG = /* glsl */ `
       float hull = (1.0 - smoothstep(0.0, 0.2 + 0.8 * uWake, vFar * uReach)) * (0.3 + 0.7 * fore * fore);
       foam = max(foam, uWake * max(max(trail, arms * 0.75), hull));
     }
+    vec2 wp = vWorld.xz;
+    // metres per pixel: fine things (rings of rain) only close up, where they do not shimmer
+    float near = 1.0 - smoothstep(0.03, 0.12, fwidth(wp.x) + fwidth(wp.y));
+    vec2 across = vec2(-uWindDir.y, uWindDir.x);
+    if (uGust > 0.0 || uWhite > 0.0) {
+      // gusts: darker patches of ruffled water running with the wind
+      vec2 q = (wp - uWindDir * uTime * uWindVis) / 9.0;
+      float g = fp3dSkyNoise(q) * 0.65 + fp3dSkyNoise(q * 2.3 + 5.1) * 0.35;
+      col *= 1.0 - 0.17 * smoothstep(0.55, 0.75, g) * (0.3 + 0.7 * uGust);
+    }
+    if (uWhite > 0.0) {
+      // whitecaps: short white streaks across the wind that come and go, more in a stronger wind
+      // (two patterns drifting at different speeds: where both are high a cap breaks, then it fades again)
+      vec2 r = vec2(dot(wp, uWindDir), dot(wp, across));
+      float caps = fp3dSkyNoise(vec2(r.x / 0.55 - uTime * 0.9, r.y / 1.5)) * fp3dSkyNoise(vec2(r.x / 0.9 - uTime * 0.35 + 7.3, r.y / 2.2 + 2.9));
+      float th = mix(0.62, 0.44, uWhite);
+      // torn: fine holes in the foam
+      float torn = 0.45 + 0.55 * fp3dSkyNoise(wp / 0.3 + uTime * 0.2);
+      foam = max(foam, smoothstep(th, th + 0.1, caps) * torn * (0.55 + 0.45 * uWhite) * (0.6 + 0.4 * clamp(vCrest + 0.5, 0.0, 1.0)));
+    }
+    if (uRain > 0.0 && near > 0.0) {
+      // rain: rings spreading where the drops fall
+      float rings = 0.0;
+      for (int k = 0; k < 2; k++) {
+        float sz = k == 0 ? 0.8 : 0.53;
+        vec2 cp = wp / sz + float(k) * 0.37;
+        vec2 cell = floor(cp);
+        float h = fp3dSkyHash(cell + float(k) * 17.0);
+        if (h > 0.25 + 0.7 * uRain) continue;
+        vec2 c = vec2(0.5) + (vec2(fp3dSkyHash(cell + 3.1), fp3dSkyHash(cell + 7.9)) - 0.5) * 0.2;
+        float ph = fract(uTime * (0.9 + 0.5 * h) + h * 7.0);
+        float d = abs(length(fract(cp) - c) - ph * 0.32) * sz;
+        rings += (1.0 - smoothstep(0.0, 0.012 + fwidth(wp.x), d)) * (1.0 - ph);
+      }
+      col *= 1.0 - 0.1 * uRain;
+      foam = max(foam, clamp(rings, 0.0, 1.0) * 0.5 * near * min(1.0, uRain * 1.5));
+    }
     foam = clamp(foam, 0.0, 1.0);
-    col = mix(col, uFoam, foam);
+    col = mix(col, uFoam, foam) * fp3dCloudShade(wp);
     gl_FragColor = vec4(col, max(uAlpha, foam * 0.95) * (1.0 - smoothstep(0.45, 1.0, vFar)));
     #include <fog_fragment>
   }
@@ -306,10 +355,17 @@ export function buildSea(outline: Vec2[], params: SeaParams, time: { value: numb
             uDrift: { value: 0 },
             uReach: { value: reach },
             uHull: { value: hull },
+            // the weather, set every frame by the viewer (setSeaWeather)
+            uWindDir: { value: [0, 1] },
+            uWindVis: { value: 0 },
+            uWhite: { value: 0 },
+            uGust: { value: 0 },
+            uRain: { value: 0 },
         },
     ]);
-    // the clock is shared with the viewer (merge copies, so it is set afterwards)
+    // the clock and the sky are shared with the viewer (merge copies, so they are set afterwards)
     uniforms.uTime = time;
+    Object.assign(uniforms, skyUniforms);
     const mesh = new Mesh(
         geo,
         new ShaderMaterial({
@@ -324,6 +380,8 @@ export function buildSea(outline: Vec2[], params: SeaParams, time: { value: numb
     mesh.frustumCulled = false;
     mesh.renderOrder = 4;
     mesh.userData.fp3dSea = seaKey(outline, params, light);
+    mesh.userData.fp3dWaves = waves;
+    mesh.userData.fp3dDir = [0, 1];
     return mesh;
 }
 
@@ -332,6 +390,49 @@ export function setSeaMotion(mesh: Mesh, speed: number | undefined, drift: numbe
     const u = (mesh.material as ShaderMaterial).uniforms;
     u.uWake.value = wakeStrength(speed);
     u.uDrift.value = drift;
+}
+
+/** The weather on the sea: the wind (m/s) and where it blows to in the plan, gusts and rain (0 … 1). */
+export interface SeaWeather {
+    /** Where the wind blows to in the plan (x, z; unit length); null: no wind, the waves come from ahead. */
+    dir: [number, number] | null;
+    /** Wind speed (m/s). */
+    wind: number;
+    /** How hard it gusts (0 … 1). */
+    gust: number;
+    /** How hard it rains (0 … 1). */
+    rain: number;
+}
+
+/**
+ * The waves turn slowly to run with the wind (`dt`: seconds since the last frame), the whitecaps come from 4 Bft on,
+ * gusts ruffle the water, raindrops make rings.
+ */
+export function setSeaWeather(mesh: Mesh, w: SeaWeather, dt: number): void {
+    const u = (mesh.material as ShaderMaterial).uniforms;
+    const cur = mesh.userData.fp3dDir as [number, number];
+    const target = w.dir && w.wind >= 1 ? w.dir : [0, 1];
+    const k = Math.min(1, Math.max(0, dt) * 0.4);
+    let dx = cur[0] + (target[0] - cur[0]) * k;
+    let dz = cur[1] + (target[1] - cur[1]) * k;
+    const l = Math.hypot(dx, dz);
+    if (l < 1e-3) {
+        // turned right round: step across first
+        dx = -cur[1];
+        dz = cur[0];
+    } else {
+        dx /= l;
+        dz /= l;
+    }
+    mesh.userData.fp3dDir = [dx, dz];
+    // each wave of the set (running to +z, turned by its angle) turned so that +z points with the wind
+    const base = mesh.userData.fp3dWaves as number[][];
+    u.uWave.value = base.flatMap(([x, z, kk, a]) => [dz * x + dx * z, -dx * x + dz * z, kk, a]);
+    u.uWindDir.value = [dx, dz];
+    u.uWindVis.value = Math.min(5, 0.4 + 0.25 * w.wind);
+    u.uWhite.value = whitecaps(w.wind);
+    u.uGust.value = w.wind >= 1 ? Math.min(1, Math.max(0, w.gust)) : 0;
+    u.uRain.value = Math.min(1, Math.max(0, w.rain));
 }
 
 /** What the sea is built from: a mesh with another key is built anew (the level and the speed only change uniforms). */

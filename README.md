@@ -169,6 +169,14 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   die Seitenleiste mit ihrer Scrollposition und Suche und Bereiche der Möbelbibliothek
 - (bluefox) Ein Fernseher, der gerade nichts abspielt (YouTube, während man ein Video sucht), zeigt das YouTube-Logo
   bzw. den Namen der App statt des Vorschaubilds des letzten Videos oder nur eines farbigen Leuchtens
+- (bluefox) Wind: Sensoren für Wind, Windrichtung und Böen (sonst gilt die Wetter-Entität) und ein Windanzeiger
+  (Verklicker, Windsack, Flagge), der sich mit dem Wind dreht und Wind, Richtung und Beaufort zeigt; Böen lassen ihn
+  schwingen
+- (bluefox) Meer: die Wellen laufen mit dem Wind, ab 4 Bft mit Schaumkronen, Böen kräuseln das Wasser, Regen macht Ringe;
+  Deck und Dächer werden im Regen nass, Wolkenschatten ziehen mit dem Wind über Meer, Deck und Dächer
+- (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
+- (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
+  6 hPa eine Sturmwarnung, und der Himmel wird dunkler
 
 ### 0.4.0 (2026-11-15)
 
