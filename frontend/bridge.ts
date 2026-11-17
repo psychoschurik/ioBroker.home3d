@@ -4,7 +4,7 @@ import { element as $ } from './dom.js';
 import type { Hass, CallWS, ProtocolMessage, ProtocolRecord, StateObject, StateValue } from './types.js';
 import './mdi-icon.js';
 import './vendor/home3d.js';
-import { historyDuringPeriod, statisticsDuringPeriod, timeTravelHistory } from './history.js';
+import { historyDuringPeriod, historyEnabled, statisticsDuringPeriod, timeTravelHistory } from './history.js';
 import { sunState } from './sun.js';
 import { setupMoreInfo } from './more-info.js';
 import { setupDeviceDialog } from './device-dialog.js';
@@ -55,6 +55,9 @@ io.conn.registerConnectionHandler(connected => {
 const callWS: CallWS = msg => {
     if (msg?.type === 'history/history_during_period') {
         return historyDuringPeriod(io, store.data.mappings, msg);
+    }
+    if (msg?.type === 'home3d/iobroker/history_enabled') {
+        return historyEnabled(io, store.data.mappings, msg as { entity_ids?: unknown });
     }
     if (msg?.type === 'recorder/statistics_during_period') {
         return statisticsDuringPeriod(io, store.data.mappings, msg);

@@ -57,6 +57,25 @@ interface Source {
     type: string | undefined;
 }
 
+const idList = (value: unknown): string[] =>
+    (Array.isArray(value) ? value : [value]).filter((id): id is string => typeof id === 'string');
+
+/** The devices whose datapoint a history adapter logs (its own `common.custom`, not only the default history). */
+export async function historyEnabled(
+    io: HistoryAccess,
+    mappings: Mapping[],
+    msg: { entity_ids?: unknown },
+): Promise<string[]> {
+    const wanted = idList(msg.entity_ids)
+        .map(id => mappings.find(m => m.entity_id === id))
+        .filter((m): m is Mapping => !!m);
+    if (!wanted.length) {
+        return [];
+    }
+    const objects = await io.getObjects(wanted.map(m => m.state));
+    return wanted.filter(m => loggedBy(objects[m.state], null)).map(m => m.entity_id);
+}
+
 /** The mappings of the wanted devices with the history instance that logs them (devices without one are left out). */
 async function sources(io: HistoryAccess, mappings: Mapping[], ids: string[]): Promise<Source[]> {
     const wanted = ids.map(id => mappings.find(m => m.entity_id === id)).filter((m): m is Mapping => !!m);
@@ -117,9 +136,6 @@ async function rowsOf(io: HistoryAccess, src: Source, start: number, end: number
     }
     return rows.sort((a, b) => a.lu - b.lu);
 }
-
-const idList = (value: unknown): string[] =>
-    (Array.isArray(value) ? value : [value]).filter((id): id is string => typeof id === 'string');
 
 /** Answers `history/history_during_period` for the mapped devices; devices without history get no rows. */
 export async function historyDuringPeriod(

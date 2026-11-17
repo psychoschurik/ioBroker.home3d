@@ -31,7 +31,7 @@ const STYLE = `
 .mi{max-width:720px}.mi-head{display:flex;align-items:center;gap:14px}.mi-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:#2b3d4e;color:#8fd0f3;--mdc-icon-size:26px;flex-shrink:0}
 .mi-icon.on{background:#f5a623;color:#1b2631}.mi-name{flex:1;min-width:0}.mi-name h2{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mi-name small{color:#8faabd;font-size:11px;word-break:break-all}
 .mi-close{border:0;background:transparent;font-size:22px;padding:4px 10px}.mi-now{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:18px 0 6px}.mi-value{font-size:34px;font-weight:500}.mi-value small{font-size:16px;color:#a9bdce;margin-left:4px}
-.mi-since{color:#8faabd;font-size:12px}.mi-actions{display:flex;gap:8px;margin:10px 0}.mi-ranges{display:flex;gap:6px;margin:16px 0 8px;flex-wrap:wrap}.mi-ranges button{padding:5px 12px;font-size:12px}.mi-ranges button[aria-pressed=true]{background:#288cbd;border-color:#288cbd;color:#fff}
+.mi [hidden]{display:none!important}.mi-since{color:#8faabd;font-size:12px}.mi-actions{display:flex;gap:8px;margin:10px 0}.mi-ranges{display:flex;gap:6px;margin:16px 0 8px;flex-wrap:wrap}.mi-ranges button{padding:5px 12px;font-size:12px}.mi-ranges button[aria-pressed=true]{background:#288cbd;border-color:#288cbd;color:#fff}
 .mi-chart{position:relative;height:220px;background:#1b2631;border:1px solid #314151;border-radius:6px}.mi-chart svg{display:block;width:100%;height:100%}.mi-chart text{font-size:10px;fill:#8faabd}
 .mi-tip{position:absolute;pointer-events:none;background:#263544;border:1px solid #4a5c6c;border-radius:4px;padding:4px 8px;font-size:12px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
 .mi-legend{display:flex;gap:16px;font-size:12px;color:#a9bdce;margin-top:6px}.mi-legend i{display:inline-block;width:12px;height:3px;margin-right:6px;vertical-align:middle}
@@ -85,6 +85,8 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
     let range = RANGES[1];
     let ticker: ReturnType<typeof setInterval> | undefined;
     let loading = 0;
+    /** Whether a history adapter logs the device shown (null: not known yet). */
+    let logged: boolean | null = null;
 
     const fmt = (v: number, digits = 1): string =>
         new Intl.NumberFormat(getHass()?.language || 'de', { maximumFractionDigits: digits }).format(v);
@@ -209,6 +211,13 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
         return typeof h === 'string' && entity(h) ? [e.entity_id, h] : [e.entity_id];
     }
 
+    /** Show or hide the history part (ranges, chart, legend, list): a device without history shows only its value. */
+    function showHistory(show: boolean): void {
+        for (const sel of ['.mi-ranges', '.mi-chart', '.mi-legend', '.mi-list']) {
+            (dialog!.querySelector(sel) as HTMLElement).hidden = !show;
+        }
+    }
+
     async function history(): Promise<void> {
         const e = current ? entity(current) : undefined;
         if (!dialog || !e) {
@@ -217,13 +226,30 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
         const chart = dialog.querySelector('.mi-chart') as HTMLElement;
         const list = dialog.querySelector('.mi-list')!;
         const legend = dialog.querySelector('.mi-legend')!;
-        chart.innerHTML = '<div class="mi-empty">Verlauf wird geladen …</div>';
         list.innerHTML = '';
         legend.innerHTML = '';
         const ids = series(e);
+        const ticket = ++loading;
+        if (logged === null) {
+            showHistory(false);
+            try {
+                logged =
+                    ((await callWS({ type: 'home3d/iobroker/history_enabled', entity_ids: ids })) as string[]).length >
+                    0;
+            } catch {
+                logged = true;
+            }
+            if (ticket !== loading || current !== e.entity_id) {
+                return;
+            }
+        }
+        showHistory(logged);
+        if (!logged) {
+            return;
+        }
+        chart.innerHTML = '<div class="mi-empty">Verlauf wird geladen …</div>';
         const end = Date.now();
         const start = end - range.ms;
-        const ticket = ++loading;
         let rows: Record<string, Row[]>;
         try {
             rows =
@@ -243,8 +269,7 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
             return;
         }
         if (!ids.some(id => rows[id]?.length)) {
-            chart.innerHTML =
-                '<div class="mi-empty">Kein Verlauf. Für diesen Datenpunkt ist in ioBroker kein History-Adapter (history, influxdb, sql) aktiviert.</div>';
+            chart.innerHTML = '<div class="mi-empty">Keine Werte in diesem Zeitraum.</div>';
             return;
         }
         if (numeric(e)) {
@@ -384,6 +409,9 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
             return;
         }
         dialog ??= make();
+        if (current !== e.entity_id) {
+            logged = null;
+        }
         current = e.entity_id;
         showNow();
         actions(e);

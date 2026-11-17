@@ -131,6 +131,7 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Energie: die Leistung jedes Solarfelds steht als Zahl auf seinen Modulen und dreht sich mit der Ansicht
 - (bluefox) Fernseher zeigen das Bild ihres Media-Players (z. B. das Vorschaubild des YouTube-Videos von
   youtube-remote) und leuchten in der Farbe der App
+- (bluefox) Gerätedetails: ohne History-Adapter am Datenpunkt zeigt der Dialog nur den Wert, ohne Zeiträume und Verlauf
 - (bluefox) Build mit Vite statt esbuild; `npm run dev` startet einen Entwicklungsserver mit Hot Reload und
   simulierten Geräten
 
