@@ -4,6 +4,8 @@
 backend process. The web adapter serves `www/` under `/home3d/`, and the page talks to ioBroker over the socket of web
 with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
 
+Setup on a new machine, the test system vitanova (boat) and what is configured there: see `HANDOVER.md`.
+
 ## Layout
 
 | Path | Content |
