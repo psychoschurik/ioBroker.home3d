@@ -155,6 +155,20 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Zeitreise: In den Hauseinstellungen ist wählbar, aus welchem Verlauf sie liest, z. B. recorder.0 (zeichnet
   alles Wichtige ohne Einstellung je Datenpunkt auf); was die Instanz nicht aufzeichnet, kommt weiter aus dem Verlauf,
   der es aufzeichnet
+- (bluefox) Boote: neues Möbelstück „Anker“ (Draußen) für den Bugbeschlag – mit Kettenzähler und Wassertiefe liegt er
+  im Beschlag, hängt an der Kette oder liegt auf dem Grund, die Kette als Kettenlinie durchs Wasser; darüber Kettenlänge
+  und Tiefe, der Alarmradius als Kreis auf dem Wasser (rot bei Alarm)
+- (bluefox) Boote: neuer Bibliotheksbereich „Boot“ mit Anker, Tank, Ruder, Antrieb und Positionslicht. Tanks als
+  Glaskasten mit der Flüssigkeit bis zum Füllstand (Frischwasser, Diesel, Gas, Grau-, Schwarzwasser), mit Litern und
+  Warnfarbe; das Ruderblatt dreht sich mit der Ruderlage; der Propeller dreht sich mit der Motordrehzahl;
+  Positionslichter (Anker-, Dampfer-, Seiten-, Hecklicht) leuchten mit ihrem Schalter, nachts mit Lichthof und
+  Spiegelung auf dem Meer
+- (bluefox) Meer: mit einem Fahrt-Sensor (kn, km/h oder m/s) strömt das Wasser am Rumpf vorbei, mit Bugwelle,
+  Kielwasser und Heckwelle
+- (bluefox) Zurück aus der 3D-Ansicht zeigt der Editor wieder, was er vorher zeigte: Etage, Auswahl, Werkzeug, Zoom,
+  die Seitenleiste mit ihrer Scrollposition und Suche und Bereiche der Möbelbibliothek
+- (bluefox) Ein Fernseher, der gerade nichts abspielt (YouTube, während man ein Video sucht), zeigt das YouTube-Logo
+  bzw. den Namen der App statt des Vorschaubilds des letzten Videos oder nur eines farbigen Leuchtens
 
 ### 0.4.0 (2026-11-15)
 

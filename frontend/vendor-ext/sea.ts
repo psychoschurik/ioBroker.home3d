@@ -14,6 +14,13 @@ export interface SeaParams {
     height: number;
     /** Wave length (m). */
     length: number;
+    /** Speed through the water (m/s, ahead): the water streams past the hull, with a bow wave and a wake; 0 or none: lying still. */
+    speed?: number;
+}
+
+/** How strong the wake is drawn at a speed (m/s): from about half a knot, full at about 7 knots. */
+export function wakeStrength(speed: number | undefined): number {
+    return Math.min(1, Math.max(0, ((speed ?? 0) - 0.25) / 3.4));
 }
 
 /** Wave length when no datapoint gives one (m). */
@@ -35,8 +42,10 @@ const VERT = /* glsl */ `
   uniform vec4 uWave[3];
   uniform float uSteep;
   uniform float uAmp;
+  uniform float uDrift;
   attribute float aFar;
   varying float vFar;
+  varying vec2 vPlan;
   varying float vCrest;
   varying vec3 vNormal;
   #include <fog_pars_vertex>
@@ -48,7 +57,8 @@ const VERT = /* glsl */ `
       vec4 w = uWave[i];
       if (w.w <= 0.0) continue;
       float k = w.z;
-      float ph = k * dot(w.xy, position.xz) - sqrt(9.81 * k) * uTime;
+      // the water streams aft past a moving boat: the waves are carried with it
+      float ph = k * dot(w.xy, position.xz - vec2(0.0, uDrift)) - sqrt(9.81 * k) * uTime;
       float c = cos(ph);
       float s = sin(ph);
       float wa = k * w.w;
@@ -63,6 +73,7 @@ const VERT = /* glsl */ `
     }
     p.y += y;
     vFar = aFar;
+    vPlan = position.xz;
     vCrest = uAmp > 0.0 ? y / uAmp : 0.0;
     vNormal = n;
     vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
@@ -77,9 +88,14 @@ const FRAG = /* glsl */ `
   uniform vec3 uFoam;
   uniform float uAlpha;
   uniform float uFoamAmount;
+  uniform float uWake;
+  uniform float uDrift;
+  uniform float uReach;
+  uniform vec4 uHull;
   varying float vFar;
   varying float vCrest;
   varying vec3 vNormal;
+  varying vec2 vPlan;
   #include <fog_pars_fragment>
   void main() {
     vec3 n = normalize(vNormal);
@@ -87,8 +103,34 @@ const FRAG = /* glsl */ `
     float lit = clamp(dot(n, normalize(vec3(0.3, 0.85, -0.45))), 0.0, 1.0);
     vec3 col = mix(uDeep, uLight, pow(lit, 3.0));
     // the crests foam in a rough sea only (calm water has none, however its ripples go)
-    col = mix(col, uFoam, smoothstep(0.55, 1.0, vCrest) * uFoamAmount);
-    gl_FragColor = vec4(col, uAlpha * (1.0 - smoothstep(0.45, 1.0, vFar)));
+    float foam = smoothstep(0.55, 1.0, vCrest) * uFoamAmount;
+    if (uWake > 0.0) {
+      // uHull: x of the middle, z of the bow and of the stern, half the beam (the bow points to -z)
+      float side = abs(vPlan.x - uHull.x);
+      float flow = vPlan.y - uDrift;
+      // streaks along the flow (fine lengthwise lines that wander a little), patchy as the water carries them aft
+      float lines = 0.5 + 0.5 * sin((vPlan.x - uHull.x) * 11.0 + sin(flow * 0.35) * 2.2);
+      float patches = 0.75 + 0.25 * sin(flow * 0.9 + sin((vPlan.x - uHull.x) * 1.7) * 1.3);
+      float streak = (0.45 + 0.55 * lines) * patches;
+      // the turbulent water behind the stern, narrowing and fading
+      float aft = vPlan.y - uHull.z;
+      float trail = aft > 0.0
+        ? (1.0 - smoothstep(uHull.w * 0.45, uHull.w * 0.8 + aft * 0.03, side)) * exp(-aft / (6.0 + 30.0 * uWake)) * streak
+        : 0.0;
+      // the Kelvin arms: from the bow at 19.5 degrees to both sides
+      float fromBow = vPlan.y - uHull.y;
+      float arm = abs(side - fromBow * 0.354);
+      float arms = fromBow > 0.0
+        ? (1.0 - smoothstep(0.0, 0.18 + fromBow * 0.02, arm)) * exp(-fromBow / (14.0 + 50.0 * uWake)) * patches
+        : 0.0;
+      // the bow wave along the hull, strongest at the bow
+      float fore = clamp((uHull.z - vPlan.y) / max(uHull.z - uHull.y, 1.0), 0.0, 1.0);
+      float hull = (1.0 - smoothstep(0.0, 0.2 + 0.8 * uWake, vFar * uReach)) * (0.3 + 0.7 * fore * fore);
+      foam = max(foam, uWake * max(max(trail, arms * 0.75), hull));
+    }
+    foam = clamp(foam, 0.0, 1.0);
+    col = mix(col, uFoam, foam);
+    gl_FragColor = vec4(col, max(uAlpha, foam * 0.95) * (1.0 - smoothstep(0.45, 1.0, vFar)));
     #include <fog_fragment>
   }
 `;
@@ -195,6 +237,15 @@ export function buildSea(outline: Vec2[], params: SeaParams, time: { value: numb
     for (const [x, z] of outline) {
         size = Math.max(size, Math.hypot(x - c[0], z - c[1]));
     }
+    // the hull's extent for the wake: the middle, bow and stern, half the beam
+    const xs = outline.map(p => p[0]);
+    const zs = outline.map(p => p[1]);
+    const hull = [
+        (Math.min(...xs) + Math.max(...xs)) / 2,
+        Math.min(...zs),
+        Math.max(...zs),
+        (Math.max(...xs) - Math.min(...xs)) / 2,
+    ];
     // a few wave lengths of sea, at least so much that the edge is far from the boat
     const reach = Math.min(600, Math.max(60, size * 8, length * 3));
     // the corners of the hull are among the angles, so the inner ring is the hull itself
@@ -250,6 +301,11 @@ export function buildSea(outline: Vec2[], params: SeaParams, time: { value: numb
             uAlpha: { value: colors.alpha },
             // foam from about 0.3 m of wave height, full at 1.5 m
             uFoamAmount: { value: 0.55 * Math.min(1, Math.max(0, (height - 0.3) / 1.2)) },
+            // set every frame by the viewer (setSeaMotion): the speed changes without building the sea anew
+            uWake: { value: 0 },
+            uDrift: { value: 0 },
+            uReach: { value: reach },
+            uHull: { value: hull },
         },
     ]);
     // the clock is shared with the viewer (merge copies, so it is set afterwards)
@@ -271,7 +327,14 @@ export function buildSea(outline: Vec2[], params: SeaParams, time: { value: numb
     return mesh;
 }
 
-/** What the sea is built from: a mesh with another key is built anew (the level only moves it). */
+/** The water streaming past at a speed (m/s): `drift` is how far it has moved aft since the start (m). */
+export function setSeaMotion(mesh: Mesh, speed: number | undefined, drift: number): void {
+    const u = (mesh.material as ShaderMaterial).uniforms;
+    u.uWake.value = wakeStrength(speed);
+    u.uDrift.value = drift;
+}
+
+/** What the sea is built from: a mesh with another key is built anew (the level and the speed only change uniforms). */
 export function seaKey(outline: Vec2[], params: SeaParams, light: boolean): string {
     return `${outline.map(p => p.map(v => v.toFixed(2)).join(',')).join(';')}|${(params.length || 0).toFixed(1)}|${(params.height || 0).toFixed(2)}|${light ? 1 : 0}`;
 }
