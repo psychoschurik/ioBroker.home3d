@@ -393,6 +393,153 @@ function kioskMode(name: string, code: string): string {
 }
 
 /**
+ * A boat: the sea around it at the waterline, with the waves of a wave height and a wave length sensor
+ * (frontend/vendor-ext/sea.ts). Set in the editor's house settings, below the heading and the position.
+ */
+function seaWaves(name: string, code: string): string {
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { buildSea as fp3dBuildSea, disposeSea as fp3dDisposeSea, seaKey as fp3dSeaKey, seaOutline as fp3dSeaOutline, type SeaParams as Fp3dSea } from "${root}/frontend/vendor-ext/sea.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            "  /** Pool Pro: the pools' water colour, movement, heating shimmer and cover; an empty list clears them. */\n  setPools(",
+            [
+                '  /** A boat: the sea at its waterline (null: none). */',
+                '  private fp3dSea: Fp3dSea | null = null;',
+                '  private fp3dSeaMesh: Mesh | null = null;',
+                '  private fp3dSeaBuilding: Building | null = null;',
+                '  private fp3dSeaHull: [number, number][] = [];',
+                '  /** The waves run: frames keep coming (the tablet level shows the sea at rest). */',
+                '  private fp3dSeaMoving = false;',
+                '',
+                '  setSea(sea: Fp3dSea | null): void {',
+                '    const sig = (s: Fp3dSea | null) => (s ? `${s.level.toFixed(2)}:${s.height.toFixed(2)}:${s.length.toFixed(1)}` : "");',
+                '    if (sig(sea) === sig(this.fp3dSea)) return;',
+                '    const had = !!this.fp3dSea;',
+                '    this.fp3dSea = sea;',
+                '    // the neon grid on the ground would show through the water',
+                '    if (had !== !!sea) this.placeGround();',
+                '    this.invalidate();',
+                '  }',
+                '',
+                '  /** Builds the sea when the plan, the waves or the look changed, and keeps it at the waterline of its floor. */',
+                '  private fp3dSeaFrame(): void {',
+                '    const sea = this.fp3dSea;',
+                '    const b = this.building;',
+                '    const light = this.theme === "day" || this.style.natural;',
+                '    if (sea && b && b !== this.fp3dSeaBuilding) {',
+                '      this.fp3dSeaBuilding = b;',
+                '      this.fp3dSeaHull = fp3dSeaOutline(b.floors.flatMap((f) => f.rooms.map((r) => r.points)), b.settings.wall_exterior);',
+                '    }',
+                '    const key = sea && b ? fp3dSeaKey(this.fp3dSeaHull, sea, light) : "";',
+                '    if (this.fp3dSeaMesh && this.fp3dSeaMesh.userData.fp3dSea !== key) {',
+                '      this.root.remove(this.fp3dSeaMesh);',
+                '      fp3dDisposeSea(this.fp3dSeaMesh);',
+                '      this.fp3dSeaMesh = null;',
+                '    }',
+                '    if (sea && b && !this.fp3dSeaMesh) {',
+                '      this.fp3dSeaMesh = fp3dBuildSea(this.fp3dSeaHull, sea, this.flowTime, light);',
+                '      if (this.fp3dSeaMesh) this.root.add(this.fp3dSeaMesh);',
+                '    }',
+                '    this.fp3dSeaMoving = !!this.fp3dSeaMesh && !!sea && sea.height > 0.005 && !this.lowQuality;',
+                '    if (!this.fp3dSeaMesh || !sea) return;',
+                '    // the water goes up and down with the floor it lies in (the floor below the waterline)',
+                '    const ordered = [...this.floors].sort((p, q) => p.floor.elevation - q.floor.elevation);',
+                '    const home = [...ordered].reverse().find((f) => f.floor.elevation <= sea.level) ?? ordered[0];',
+                '    this.fp3dSeaMesh.position.y = sea.level + (home?.y ?? 0);',
+                '  }',
+                '',
+                "  /** Pool Pro: the pools' water colour, movement, heating shimmer and cover; an empty list clears them. */",
+                '  setPools(',
+            ].join('\n'),
+            'sea: setSea',
+        );
+        code = replaceRequired(
+            code,
+            '    this.placeFog();\n    if (this.firework) {',
+            '    this.placeFog();\n    this.fp3dSeaFrame();\n    if (this.firework) {',
+            'sea: every frame',
+        );
+        code = replaceRequired(
+            code,
+            '    const flowing = this.flowActive || this.solarActive || this.soundActive || this.poolActive;',
+            '    const flowing = this.flowActive || this.solarActive || this.soundActive || this.poolActive || this.fp3dSeaMoving;',
+            'sea: frames while the waves run',
+        );
+        code = replaceRequired(
+            code,
+            '    this.ground.visible = !box.isEmpty() && !this.lowQuality && this.theme !== "day" && !this.style.natural;',
+            '    this.ground.visible = !box.isEmpty() && !this.lowQuality && this.theme !== "day" && !this.style.natural && !this.fp3dSea;',
+            'sea: no grid under the water',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '    v.setHeading(Number.isFinite(fp3dCourse) ? fp3dCourse : null);\n',
+            [
+                '    v.setHeading(Number.isFinite(fp3dCourse) ? fp3dCourse : null);',
+                '    // a boat: the sea at its waterline, with the waves of the sensors (a length in s is the period: deep water)',
+                '    const fp3dNum = (id: string | null | undefined) => {',
+                '      const st = id ? hass.states[id] : undefined;',
+                '      const n = parseFloat(st?.state ?? "");',
+                '      return Number.isFinite(n) ? { n, unit: String(st?.attributes.unit_of_measurement ?? "") } : null;',
+                '    };',
+                '    const fp3dWaveH = fp3dNum(b.settings.wave_height);',
+                '    const fp3dWaveL = fp3dNum(b.settings.wave_length);',
+                '    const fp3dLength = fp3dWaveL ? (fp3dWaveL.unit === "s" ? (9.81 * fp3dWaveL.n * fp3dWaveL.n) / (2 * Math.PI) : fp3dWaveL.n) : 0;',
+                '    v.setSea(typeof b.settings.sea_level === "number" ? { level: b.settings.sea_level, height: Math.max(0, fp3dWaveH?.n ?? 0), length: Math.max(0, fp3dLength) } : null);',
+                '',
+            ].join('\n'),
+            'sea from the sensors',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '        <p class="fp3d-sub fp3d-wide">${this.t("position_id_hint")}</p>\n',
+            [
+                '        <p class="fp3d-sub fp3d-wide">${this.t("position_id_hint")}</p>',
+                '        <label class="fp3d-check fp3d-wide"',
+                '          ><input type="checkbox" .checked=${typeof s.sea_level === "number"} ?disabled=${!this.isAdmin} @change=${(e: Event) => set({ sea_level: (e.target as HTMLInputElement).checked ? -1 : null })} />',
+                '          ${this.t("sea_on")}</label',
+                '        >',
+                '        ${typeof s.sea_level === "number"',
+                '          ? html`${this.num(this.t("sea_level"), s.sea_level, (v) => set({ sea_level: v }), 0.05)}',
+                '              ${this.entitySelect(this.t("wave_height"), s.wave_height ?? null, undefined, this.entityOptions((id) => id.startsWith("sensor.")), (v) => set({ wave_height: v === "none" ? null : v }))}',
+                '              ${this.entitySelect(this.t("wave_length"), s.wave_length ?? null, undefined, this.entityOptions((id) => id.startsWith("sensor.")), (v) => set({ wave_length: v === "none" ? null : v }))}',
+                '              <p class="fp3d-sub fp3d-wide">${this.t("sea_hint")}</p>`',
+                '          : nothing}',
+                '',
+            ].join('\n'),
+            'sea settings',
+        );
+    }
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  north_entity?: string | null;',
+            "  north_entity?: string | null;\n  /** A boat: the height of the water surface (m, like the floors' elevations); null: no sea. */\n  sea_level?: number | null;\n  /** The waves of the sea: sensors with the significant wave height (m) and the wave length (m; in s it is the period). */\n  wave_height?: string | null;\n  wave_length?: string | null;",
+            'sea type',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  north_entity: "Kurs aus Kompass (Boot)",',
+            '  north_entity: "Kurs aus Kompass (Boot)",\n  sea_on: "Meer um das Boot",\n  sea_level: "Wasserlinie (m)",\n  wave_height: "Wellenhöhe",\n  wave_length: "Wellenlänge",\n  sea_hint: "Die Wasserlinie ist die Höhe der Wasseroberfläche, gemessen wie die Höhe der Etagen (negativ = unter der Etage auf 0 m). Wellenhöhe: signifikante Höhe in m, vom Tal bis zum Kamm. Wellenlänge in m, oder die Periode in s. Die Wellen kommen von vorn: der Bug zeigt im Grundriss nach oben.",',
+            'sea de',
+        );
+        code = replaceRequired(
+            code,
+            '  north_entity: "Heading from a compass (boat)",',
+            '  north_entity: "Heading from a compass (boat)",\n  sea_on: "Sea around the boat",\n  sea_level: "Waterline (m)",\n  wave_height: "Wave height",\n  wave_length: "Wave length",\n  sea_hint: "The waterline is the height of the water surface, measured like the floors\' elevations (negative = below the floor at 0 m). Wave height: significant height in m, trough to crest. Wave length in m, or the period in s. The waves come from ahead: the bow points to the top of the plan.",',
+            'sea en',
+        );
+    }
+    return code;
+}
+
+/**
  * A boat turns: the heading of a compass sensor (`settings.north_entity`) turns the plan under the sky, so that sun,
  * shadow, sun patches and the compass ring follow it; `settings.north` stays a correction for the compass.
  */
@@ -981,6 +1128,7 @@ const patches: Plugin = {
         code = boatHeading(name, code);
         code = gpsPosition(name, code);
         code = kioskMode(name, code);
+        code = seaWaves(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

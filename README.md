@@ -148,6 +148,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Editor: „Kiosk ↗“ öffnet den bearbeiteten Plan im Kiosk-Modus in einem neuen Tab
 - (bluefox) Der Verweis „Tabletansicht“ in der Kopfzeile und im Reiter Instanzen ist durch „Kiosk“ ersetzt;
   `?view=card` (3D-Karte als iframe in VIS) füllt jetzt die ganze Höhe statt 420 px und zeigt keine Kopfzeile mehr
+- (bluefox) Boote: „Meer um das Boot“ in den Hauseinstellungen – Wasser an der Wasserlinie mit Wellen aus einem
+  Wellenhöhe- und einem Wellenlänge-Sensor (Länge in m oder Periode in s); die Wellen kommen von vorn
 
 ### 0.4.0 (2026-11-15)
 
