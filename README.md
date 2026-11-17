@@ -144,6 +144,7 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   simulierten Geräten
 - (bluefox) Neu: `index.html?kiosk` für Wandtablets – die 3D-Ansicht ohne die beiden oberen Leisten; Editor, „Projekte“
   und „Geräte verbinden“ sind dort nicht erreichbar
+- (bluefox) Editor: „Kiosk ↗“ öffnet den bearbeiteten Plan im Kiosk-Modus in einem neuen Tab
 
 ### 0.4.0 (2026-11-15)
 

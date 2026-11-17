@@ -366,6 +366,29 @@ function kioskMode(name: string, code: string): string {
             'kiosk stays in 3D',
         );
     }
+    if (name === 'components/editor.ts') {
+        // the plan being edited, in a new tab as the wall tablet shows it
+        code = replaceRequired(
+            code,
+            '        <button title=${this.t("fit_hint")} @click=${() => (close(), this.fit())}>${this.t("fit")}</button>\n      </div>\n',
+            '        <button title=${this.t("fit_hint")} @click=${() => (close(), this.fit())}>${this.t("fit")}</button>\n      </div>\n      <div class="fp3d-seg fp3d-seg-menu">\n        <button title=${this.t("kiosk_open_hint")} @click=${() => (close(), window.open(`index.html?kiosk${this.planId ? `&plan=${encodeURIComponent(this.planId)}` : ""}`, "_blank", "noopener"))}>${this.t("kiosk_open")}</button>\n      </div>\n',
+            'kiosk button',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  split_3d: "3D daneben",\n',
+            '  split_3d: "3D daneben",\n  kiosk_open: "Kiosk ↗",\n  kiosk_open_hint: "Im Kiosk-Modus öffnen: dieser Plan in 3D ohne die oberen Leisten, in einem neuen Tab – für Wandtablets",\n',
+            'kiosk de',
+        );
+        code = replaceRequired(
+            code,
+            '  split_3d: "3D beside",\n',
+            '  split_3d: "3D beside",\n  kiosk_open: "Kiosk ↗",\n  kiosk_open_hint: "Open in kiosk mode: this plan in 3D without the bars at the top, in a new tab – for wall tablets",\n',
+            'kiosk en',
+        );
+    }
     return code;
 }
 
