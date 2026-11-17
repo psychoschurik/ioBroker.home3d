@@ -2,7 +2,11 @@
 // Values come as push (subscribeState) and only for the datapoints that are mapped to devices.
 import { element as $ } from './dom.js';
 import type { Hass, CallWS, ProtocolMessage, ProtocolRecord, StateObject, StateValue } from './types.js';
+import './mdi-icon.js';
 import './vendor/home3d.js';
+import { historyDuringPeriod, statisticsDuringPeriod, timeTravelHistory } from './history.js';
+import { sunState } from './sun.js';
+import { setupMoreInfo } from './more-info.js';
 import { setupDeviceDialog } from './device-dialog.js';
 import { IoBroker, NAMESPACE } from './iobroker.js';
 import { Store, mappedIds, DATA_FILE } from './store.js';
@@ -24,6 +28,7 @@ let objects: Record<string, StateObject> = {},
     areas: Record<string, { area_id: string; name: string }> = {},
     subscribed = new Set<string>(),
     language = 'de',
+    position: { lat: number; lon: number } | null = null,
     hass: Hass | undefined,
     timer: ReturnType<typeof setTimeout> | undefined,
     element:
@@ -46,7 +51,23 @@ io.conn.registerConnectionHandler(connected => {
         void store.sync().catch(() => {});
     }
 });
-const callWS: CallWS = msg => store.call(msg);
+// The history is read beside the store: Store.call() serializes, a long query would hold up saving.
+const callWS: CallWS = msg => {
+    if (msg?.type === 'history/history_during_period') {
+        return historyDuringPeriod(io, store.data.mappings, msg);
+    }
+    if (msg?.type === 'recorder/statistics_during_period') {
+        return statisticsDuringPeriod(io, store.data.mappings, msg);
+    }
+    if (msg?.type === 'energy/get_prefs') {
+        // ioBroker has no energy dashboard: the editor's proposals find nothing, the sensors are chosen by hand
+        return Promise.resolve({ energy_sources: [] });
+    }
+    if (msg?.type === 'home3d/timetravel/history') {
+        return timeTravelHistory(io, store.data.mappings, msg, position);
+    }
+    return store.call(msg);
+};
 
 function onState(id: string, state: StateValue | null | undefined): void {
     if (state) {
@@ -86,7 +107,11 @@ function render(): void {
     hass = {
         language,
         user: { is_admin: true, name: 'ioBroker' },
-        states: entities(store.data.mappings, states, objects),
+        // the sun lights the rooms; ioBroker has none, it is calculated from the position of the system
+        states: {
+            ...entities(store.data.mappings, states, objects),
+            ...(position ? { 'sun.sun': sunState(position.lat, position.lon) } : {}),
+        },
         areas,
         floors: {},
         devices: {},
@@ -94,6 +119,7 @@ function render(): void {
         config: {
             unit_system: { temperature: '°C', length: 'm' },
             time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            ...(position ? { latitude: position.lat, longitude: position.lon } : {}),
         },
         callWS,
         callService: (domain: string, service: string, data: unknown) =>
@@ -149,6 +175,7 @@ store.onEvent((type, payload) => {
 async function start(): Promise<void> {
     await io.ready();
     language = await io.language();
+    position = await io.location();
     await store.load();
     areas = await store.areas();
     await follow();
@@ -161,6 +188,10 @@ async function start(): Promise<void> {
         })
         .catch(e => console.warn('[home3d] subscribeFiles', e));
     render();
+    // the sun moves on
+    if (position) {
+        setInterval(schedule, 60_000);
+    }
 }
 setupDeviceDialog({
     callWS,
@@ -180,34 +211,5 @@ $('project-open').onclick = async () => {
         setStatus(`Fehler · ${(e as Error).message}`);
     }
 };
-// The icon component of the original host is not available here. Use local accessible symbols as fallback.
-if (!customElements.get('ha-icon')) {
-    customElements.define(
-        'ha-icon',
-        class extends HTMLElement {
-            static observedAttributes = ['icon'];
-            connectedCallback(): void {
-                this.update();
-            }
-            attributeChangedCallback(): void {
-                this.update();
-            }
-            update(): void {
-                const name = this.getAttribute('icon') || '';
-                this.textContent = /light|lamp/.test(name)
-                    ? '◉'
-                    : /thermometer/.test(name)
-                      ? '♨'
-                      : /window|door/.test(name)
-                        ? '▣'
-                        : /play/.test(name)
-                          ? '▶'
-                          : /pause/.test(name)
-                            ? 'Ⅱ'
-                            : '◇';
-                this.setAttribute('aria-label', name.replace('mdi:', ''));
-            }
-        },
-    );
-}
+setupMoreInfo({ callWS, getHass: () => hass });
 start().catch(e => setStatus(`Fehler · ${e?.message || e}`));

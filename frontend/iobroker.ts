@@ -84,6 +84,31 @@ export class IoBroker implements IoAccess, FileAccess {
     setState(id: string, value: any): Promise<void> {
         return this.conn.setState(id, value, false);
     }
+    /** The history instance of the system settings (null: none). */
+    async defaultHistory(): Promise<string | null> {
+        try {
+            return (await this.conn.getSystemConfig()).common.defaultHistory || null;
+        } catch {
+            return null;
+        }
+    }
+    /** The position of the system (system settings), null if none is set. */
+    async location(): Promise<{ lat: number; lon: number } | null> {
+        try {
+            const c = (await this.conn.getSystemConfig()).common as { latitude?: unknown; longitude?: unknown };
+            const lat = Number(c.latitude);
+            const lon = Number(c.longitude);
+            return c.latitude !== '' && c.latitude != null && Number.isFinite(lat) && Number.isFinite(lon)
+                ? { lat, lon }
+                : null;
+        } catch {
+            return null;
+        }
+    }
+    /** Values of a datapoint from a history adapter. */
+    getHistory(id: string, options: ioBroker.GetHistoryOptions): Promise<ioBroker.GetHistoryResult> {
+        return this.conn.getHistory(id, options);
+    }
     // Files of home3d.0
     async readText(name: string): Promise<string | null> {
         try {

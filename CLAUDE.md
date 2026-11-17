@@ -14,10 +14,11 @@ with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
 | `frontend/iobroker.ts` | `IoBroker`: socket-client wrapper, implements `IoAccess` (objects/states) and `FileAccess` (files of `home3d.0`) |
 | `frontend/store.ts` | `Store`: plans, history, images, mappings; handles every `callWS` message of the 3D frontend |
 | `frontend/entities.ts` | Mapping ioBroker datapoints ↔ devices of the 3D frontend, validation, actions (`execute`) |
+| `frontend/history.ts`, `sun.ts`, `more-info.ts`, `mdi-icon.ts` | `history/history_during_period`, `home3d/timetravel/history` and `recorder/statistics_during_period` (energy) from the history adapters (beside `Store.call()`); `sun.sun` from the system position; detail dialog with history curve; `<ha-icon>` drawn with `@mdi/js` (full set loaded on demand) |
 | `frontend/device-dialog.ts`, `object-tree.ts`, `entity-picker.ts` | "Geräte verbinden" dialog with object tree |
 | `frontend/project.ts` | Project files (one plan + its images + the mappings it uses): format, reading, naming |
 | `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
-| `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D) |
+| `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D), `sensor-look.ts` (sensor symbols and texts, also in the editor's floor plan), `mdi-paths.ts` (the symbols drawn at once, without the whole @mdi/js set) |
 | `frontend/model.ts` | Types |
 | `vendor-src/home3d/src/` | Upstream 3D frontend (MIT), unchanged except names; patched at build time in `tasks.ts` |
 | `www/` | Served by web; completely generated and gitignored: `index.html`, `bridge.js`, `chunks/`, `vendor/home3d*.js`, the public files, `licenses/page-licenses.md` |
@@ -43,6 +44,8 @@ with `@iobroker/socket-client` (like vis-2). Login and ACL are those of web.
   and rolls back memory if a write fails. Events are sent only after success.
 - `crypto.randomUUID`/`crypto.subtle` are not available on plain http; use `uuid()` / the FNV hash in `entities.ts`.
 - All page links are relative (web serves the page under `/home3d/`, possibly behind a proxy).
+- Pro add-ons: only those whose backend this page brings are unlocked (`SERVED` in `tasks.ts`: weather, time travel, energy — shown as "Energie", without "Pro");
+  buttons of the others are removed (`proButtons`).
 - Do not mention the former upstream project name anywhere; keep the MIT copyright in LICENSE/NOTICE.
 - Own 3D styles: `looks()` in `tasks.ts` patches `looks.ts`, `theme.ts`, `fold.ts`, `viewer3d.ts`, `panel.ts` and `i18n.ts`;
   code that is new goes to `frontend/vendor-ext/` and is imported by the patch, not into `vendor-src/`.

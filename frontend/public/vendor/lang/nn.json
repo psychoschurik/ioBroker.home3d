@@ -1788,7 +1788,7 @@
  "energy_tariff_sensor": "Tariff (t.d. €/kWh)",
  "energy_gas_meter": "Gassmålar",
  "energy_water_meter": "Vassmålar",
- "energy_meters_hint": "Energie Pro: huskortet viser kor mykje gass og vatn som er brukt i dag – frå statistikken til målarane (målarstand, t.d. i m³). «Hent frå energi-dashbordet» fyller òg dei ut.",
+ "energy_meters_hint": "Energie: huskortet viser kor mykje gass og vatn som er brukt i dag – frå statistikken til målarane (målarstand, t.d. i m³). «Hent frå energi-dashbordet» fyller òg dei ut.",
  "holo_gas": "Gass",
  "holo_water": "Vatn",
  "holo_today_short": "i dag",

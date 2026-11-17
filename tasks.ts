@@ -39,8 +39,8 @@ const localLinks = (text: string): string =>
 
 /**
  * A button of a Pro add-on is shown only when the add-on is unlocked: in ioBroker there is no pack that unlocks it,
- * and the backend parts behind it (camera pictures, weather, history for the time travel) are not there either, so a
- * locked button (🔒) would only lead nowhere. `anchor` is a unique text inside the button, `lock` the lock part of
+ * and where the backend part behind it is missing (camera pictures) a locked button (🔒) would only lead nowhere.
+ * The add-ons this page serves itself are unlocked (see unlockServed). `anchor` is a unique text inside the button, `lock` the lock part of
  * its label, `open` what stays of it.
  */
 function gateButton(code: string, anchor: string, lock: string, open: string, condition: string): string {
@@ -92,6 +92,119 @@ $1}
 $1if (changed.has("planId") && changed.get("planId") !== undefined) {
 `,
         'undo per plan',
+    );
+}
+
+/** Sensor markers with a symbol by what they report, the humidity next to the temperature (frontend/vendor-ext/sensor-look.ts). */
+function sensorLook(name: string, code: string): string {
+    if (name !== 'markers.ts') {
+        return code;
+    }
+    code = `import { sensorIcon, sensorShow, sensorText } from "${root}/frontend/vendor-ext/sensor-look.ts";\n${code}`;
+    code = replaceRequired(
+        code,
+        '        icon: pl.icon ? mdiIcon(pl.icon) : iconSvg(kind),',
+        '        icon: pl.icon ? mdiIcon(pl.icon) : sensorIcon(st) ? mdiIcon(sensorIcon(st)!) : iconSvg(kind),',
+        'sensor icon',
+    );
+    code = replaceRequired(
+        code,
+        '        text: stateText(hass, st),',
+        '        text: sensorText(st, stateText(hass, st), hass.language),',
+        'sensor text',
+    );
+    return replaceRequired(
+        code,
+        '        show: pl.marker ?? undefined,',
+        '        show: pl.marker ?? sensorShow(st),',
+        'sensor shown',
+    );
+}
+
+/**
+ * The editor's floor plan: devices get the symbols of the 3D view (a drop for water, flames for smoke …, see
+ * sensor-look.ts), and a selected device hides the corners of its room as furniture does – on a deck that spans the
+ * whole boat its corners lay over the sensors and took the next click.
+ */
+function editorDevices(name: string, code: string): string {
+    if (name !== 'components/editor.ts') {
+        return code;
+    }
+    code = `import { sensorPath } from "${root}/frontend/vendor-ext/sensor-look.ts";\n${code}`;
+    code = replaceRequired(
+        code,
+        '        <path d=${iconPath(kind)} transform="translate(-7.2 -7.2) scale(0.6)" />',
+        '        ${((p) => (p ? svg`<path class="fp3d-mdi" d=${p} transform="translate(-8.4 -8.4) scale(0.7)" />` : svg`<path d=${iconPath(kind)} transform="translate(-7.2 -7.2) scale(0.6)" />`))(sensorPath(pl.icon, this.hass?.states[pl.entity_id]))}',
+        'editor device symbol',
+    );
+    code = replaceRequired(
+        code,
+        '      .fp3d-device-on path {\n        stroke: #2a1a00;\n      }',
+        [
+            '      .fp3d-device-on path {',
+            '        stroke: #2a1a00;',
+            '      }',
+            '      .fp3d-device path.fp3d-mdi {',
+            '        fill: var(--fp3d-text);',
+            '        stroke: none;',
+            '      }',
+            '      .fp3d-device-on path.fp3d-mdi {',
+            '        fill: #2a1a00;',
+            '      }',
+            '      .fp3d-sel-ring {',
+            '        fill: rgba(55, 224, 255, 0.18);',
+            '        stroke: var(--fp3d-accent);',
+            '        stroke-width: 2;',
+            '        pointer-events: none;',
+            '        transform-box: fill-box;',
+            '        transform-origin: center;',
+            '        animation: fp3d-sel-pulse 1.4s ease-in-out infinite;',
+            '      }',
+            '      @keyframes fp3d-sel-pulse {',
+            '        0%, 100% { opacity: 1; transform: scale(1); }',
+            '        50% { opacity: 0.35; transform: scale(1.35); }',
+            '      }',
+        ].join('\n'),
+        'editor device symbol style',
+    );
+    // the selected device: a pulsing ring, drawn above the devices next to it
+    code = replaceRequired(
+        code,
+        'return svg`<g>${floor.placements.map((pl) => {',
+        'return svg`<g>${[...floor.placements].sort((a, b) => Number(a.entity_id === this._deviceId) - Number(b.entity_id === this._deviceId)).map((pl) => {',
+        'selected device on top',
+    );
+    code = replaceRequired(
+        code,
+        '<circle r="18" class="fp3d-hit" /><circle r="12" />',
+        '${sel ? svg`<circle r="17" class="fp3d-sel-ring" />` : nothing}<circle r="18" class="fp3d-hit" /><circle r="12" />',
+        'selected device ring',
+    );
+    return replaceRequired(
+        code,
+        '!this._openingId && !this._furnitureId && !this.isFixedItem("room", this.room.id) ? this.renderHandles(this.room)',
+        '!this._openingId && !this._furnitureId && !this._deviceId && !this.isFixedItem("room", this.room.id) ? this.renderHandles(this.room)',
+        'room corners under a device',
+    );
+}
+
+/**
+ * Add-ons whose backend this page brings: the weather (a `weather.*` device, e.g. a WMO code of open-meteo), the
+ * time travel (`home3d/timetravel/history` from the history adapters, frontend/history.ts) and the energy view
+ * (`recorder/statistics_during_period` from the history adapters; called just "Energie", without "Pro").
+ */
+const SERVED = ['weather', 'time_travel', 'energy_pro'];
+
+/** The served add-ons count as unlocked without a pack. */
+function unlockServed(name: string, code: string): string {
+    if (name !== 'features.ts') {
+        return code;
+    }
+    return replaceRequired(
+        code,
+        '  const out = new Set<Feature>();',
+        `  const out = new Set<Feature>(${JSON.stringify(SERVED)} as Feature[]);`,
+        'served add-ons',
     );
 }
 
@@ -181,6 +294,14 @@ function looks(name: string, code: string): string {
             '  style_warm: "Warm / Wood & paper",\n  style_dollhouse: "Dollhouse",\n  style_comic: "Comic",\n  style_gouache: "Gouache",',
             'style names en',
         );
+        // the energy view is part of the adapter, not a Pro add-on
+        code = code
+            .replace('Was Energie und Energie Pro brauchen.', 'Was die Energie-Ansicht braucht.')
+            .replace('What energy and Energy Pro need.', 'What the energy view needs.')
+            .replaceAll(/ \((Energie|Energy) Pro\)/g, '')
+            .replaceAll(/"(Energie|Energy) Pro: (\w)/g, (_, _name: string, c: string) => `"${c.toUpperCase()}`)
+            .replaceAll('Energie Pro', 'Energie')
+            .replaceAll('Energy Pro', 'Energy');
     }
     if (name === 'viewer/theme.ts') {
         code = replaceRequired(
@@ -404,8 +525,40 @@ const patches: Plugin = {
             );
         }
         code = looks(name, code);
+        code = unlockServed(name, code);
         code = proButtons(name, code);
         code = keepUndoHistory(name, code);
+        code = sensorLook(name, code);
+        code = editorDevices(name, code);
+        if (name === 'viewer/viewer3d.ts') {
+            // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
+            code = replaceRequired(
+                code,
+                '        this.devicePins.set(key, pin);\n        this.labels.append(pin.el);',
+                '        this.devicePins.set(key, pin);\n        this.labels.append(pin.el);\n        pin.el.classList.toggle("fp3d-dev-sel", d.id === this.selectedDevice);',
+                'selected device of a new pin',
+            );
+        }
+        if (name === 'components/view3d.ts') {
+            // the selected device in 3D: its frame pulses and it lies above the other symbols
+            code = replaceRequired(
+                code,
+                '      .fp3d-dev-sel {\n        outline: 2px solid var(--fp3d-accent);\n        outline-offset: 2px;\n      }',
+                [
+                    '      .fp3d-dev-sel {',
+                    '        outline: 3px solid var(--fp3d-accent);',
+                    '        outline-offset: 2px;',
+                    '        z-index: 10 !important;',
+                    '        animation: fp3d-pin-pulse 1.4s ease-in-out infinite;',
+                    '      }',
+                    '      @keyframes fp3d-pin-pulse {',
+                    '        0%, 100% { outline-offset: 2px; outline-color: var(--fp3d-accent); }',
+                    '        50% { outline-offset: 7px; outline-color: rgba(55, 224, 255, 0.35); }',
+                    '      }',
+                ].join('\n'),
+                'selected device in 3D',
+            );
+        }
         // Only human-readable names are changed, never protocol IDs.
         code = localLinks(code).replaceAll('Home Assistant', 'ioBroker');
         if (name === 'i18n.ts') {

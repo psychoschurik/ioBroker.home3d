@@ -63,6 +63,9 @@ function validateMappings(mappings: Mapping[], objects: Record<string, StateObje
                 if (r.field === undefined && !Object.hasOwn(r, 'value') && !r.toggle) {
                     fail('Aktion braucht field, value oder toggle.');
                 }
+                if (r.convert !== undefined && r.convert !== 'rgb_hex' && r.convert !== 'rgbw_hex') {
+                    fail('convert einer Aktion muss rgb_hex oder rgbw_hex sein.');
+                }
                 for (const key of ['scale', 'offset'] as const) {
                     if (r[key] !== undefined && !Number.isFinite(r[key])) {
                         fail(`${key} muss eine Zahl sein.`);
@@ -73,7 +76,76 @@ function validateMappings(mappings: Mapping[], objects: Record<string, StateObje
     }
     return mappings;
 }
-function transformed(value: unknown, binding: Binding): any {
+/** "#rrggbb" or "#rrggbbww" → [r, g, b] (null if it is no colour). */
+function hexToRgb(value: unknown): [number, number, number] | null {
+    const m = typeof value === 'string' ? /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(value.trim()) : null;
+    if (!m) {
+        return null;
+    }
+    const n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+/** [r, g, b] → "#rrggbb" (with "00" for the white channel of `rgbw_hex`). */
+function rgbToHex(value: unknown, white: boolean): string {
+    if (!Array.isArray(value) || value.length < 3 || value.slice(0, 3).some(v => !Number.isFinite(Number(v)))) {
+        fail('Farbe muss [r, g, b] sein.');
+    }
+    const hex = value
+        .slice(0, 3)
+        .map(v =>
+            Math.max(0, Math.min(255, Math.round(Number(v))))
+                .toString(16)
+                .padStart(2, '0'),
+        )
+        .join('');
+    return `#${hex}${white ? '00' : ''}`;
+}
+/** WMO weather code (0 clear … 99 thunderstorm with hail) → weather condition. */
+export function wmoCondition(value: unknown): string {
+    const code = Number(value);
+    if (value === null || value === undefined || value === '' || !Number.isFinite(code)) {
+        return 'unknown';
+    }
+    if (code <= 1) {
+        return 'sunny';
+    }
+    if (code === 2) {
+        return 'partlycloudy';
+    }
+    if (code === 3) {
+        return 'cloudy';
+    }
+    if (code === 45 || code === 48) {
+        return 'fog';
+    }
+    if (code === 65 || code === 82) {
+        return 'pouring';
+    }
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) {
+        return 'snowy';
+    }
+    if (code === 56 || code === 57 || code === 66 || code === 67) {
+        return 'snowy-rainy';
+    }
+    if (code >= 95) {
+        return 'lightning-rainy';
+    }
+    if ((code >= 51 && code <= 64) || (code >= 80 && code <= 81)) {
+        return 'rainy';
+    }
+    return 'exceptional';
+}
+/** A value of ioBroker as the device shows it (`write`: a value of the device as ioBroker takes it). */
+export function transformed(value: unknown, binding: Binding, write = false): any {
+    if (binding?.convert === 'wmo') {
+        if (write) {
+            fail('Ein Wettercode kann nicht geschrieben werden.');
+        }
+        return wmoCondition(value);
+    }
+    if (binding?.convert) {
+        return write ? rgbToHex(value, binding.convert === 'rgbw_hex') : hexToRgb(value);
+    }
     if (binding?.map && Object.hasOwn(binding.map, String(value))) {
         return binding.map[String(value)];
     }
@@ -222,7 +294,7 @@ async function execute(
                 fail(`Nicht schreibbar: ${r.id}`);
             }
             let value = r.toggle ? !(await io.getState(r.id))?.val : r.field ? data[r.field] : r.value;
-            value = transformed(value, r);
+            value = transformed(value, r, true);
             if (typeof value !== o.common.type) {
                 fail(`Falscher Werttyp für ${r.id}: erwartet ${o.common.type}.`);
             }

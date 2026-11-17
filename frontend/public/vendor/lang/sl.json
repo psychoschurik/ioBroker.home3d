@@ -1788,7 +1788,7 @@
  "energy_tariff_sensor": "Tarifa (npr. €/kWh)",
  "energy_gas_meter": "Plinomer",
  "energy_water_meter": "Vodomer",
- "energy_meters_hint": "Energie Pro: kartica hiše pokaže, koliko plina in vode je bilo danes porabljenega – iz statistike števcev (stanje, npr. v m³). »Prevzemi iz nadzorne plošče energije« izpolni tudi njiju.",
+ "energy_meters_hint": "Energie: kartica hiše pokaže, koliko plina in vode je bilo danes porabljenega – iz statistike števcev (stanje, npr. v m³). »Prevzemi iz nadzorne plošče energije« izpolni tudi njiju.",
  "holo_gas": "Plin",
  "holo_water": "Voda",
  "holo_today_short": "danes",

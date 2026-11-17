@@ -1788,7 +1788,7 @@
  "energy_tariff_sensor": "Tariff (t.ex. €/kWh)",
  "energy_gas_meter": "Gasmätare",
  "energy_water_meter": "Vattenmätare",
- "energy_meters_hint": "Energie Pro: huskortet visar hur mycket gas och vatten som använts i dag – från mätarnas statistik (mätarställning, t.ex. i m³). ”Hämta från energipanelen” fyller i dem också.",
+ "energy_meters_hint": "Energie: huskortet visar hur mycket gas och vatten som använts i dag – från mätarnas statistik (mätarställning, t.ex. i m³). ”Hämta från energipanelen” fyller i dem också.",
  "holo_gas": "Gas",
  "holo_water": "Vatten",
  "holo_today_short": "i dag",

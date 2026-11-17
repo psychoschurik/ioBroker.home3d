@@ -1788,7 +1788,7 @@
  "energy_tariff_sensor": "Taryfa (np. zł/kWh)",
  "energy_gas_meter": "Gazomierz",
  "energy_water_meter": "Wodomierz",
- "energy_meters_hint": "Energie Pro: karta domu pokazuje, ile gazu i wody zużyto dziś – ze statystyk liczników (stan licznika, np. w m³). „Pobierz z panelu energii” uzupełnia też je.",
+ "energy_meters_hint": "Energie: karta domu pokazuje, ile gazu i wody zużyto dziś – ze statystyk liczników (stan licznika, np. w m³). „Pobierz z panelu energii” uzupełnia też je.",
  "holo_gas": "Gaz",
  "holo_water": "Woda",
  "holo_today_short": "dziś",

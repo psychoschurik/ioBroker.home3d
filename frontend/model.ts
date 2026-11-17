@@ -29,6 +29,12 @@ export interface Binding {
     map?: Record<string, unknown>;
     scale?: number;
     offset?: number;
+    /**
+     * Colour as text in ioBroker: `rgb_hex` "#rrggbb", `rgbw_hex` "#rrggbbww" (the white channel is written as 00).
+     * Read it becomes [r, g, b], written an [r, g, b] becomes the text again. `wmo`: a weather code of the WMO (as the
+     * weather adapters give it, e.g. open-meteo) becomes the weather condition of the 3D frontend (read only).
+     */
+    convert?: 'rgb_hex' | 'rgbw_hex' | 'wmo';
 }
 export interface ActionRule extends Binding {
     id: string;

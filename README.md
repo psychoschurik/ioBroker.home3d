@@ -108,6 +108,22 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Knöpfe von Pro-Erweiterungen, die in ioBroker nicht freigeschaltet sind (Spur, Kameras, Wetter, Zeitreise,
   „Durch die Kamera“), werden nicht mehr mit Schloss angezeigt, sondern ausgeblendet
 - (bluefox) Rückgängig (Strg+Z) im Editor behält seinen Verlauf beim Wechsel in die 3D-Ansicht und zurück
+- (bluefox) Sensoren in 3D mit eigenem Symbol (Tropfen für Wasser, Flamme für Rauch, Bewegung, Fenster, Tür, Tank …);
+  Temperatur zeigt die Luftfeuchte daneben, Klimawerte sind auch ohne geöffneten Raum sichtbar
+- (bluefox) Neu: Detail-Dialog beim Antippen eines Geräts mit Verlauf aus dem History-Adapter (history, influxdb, sql):
+  Kurve für Messwerte (Temperatur mit Luftfeuchte), Zeiten für Kontakte, Bewegung, Wasser und Rauch
+- (bluefox) RGB-Lichter: Farbe als Hex-Text von ioBroker (`#rrggbb`, `#rrggbbww`) wird gelesen und geschrieben
+- (bluefox) Neu: Zeitreise – der Tag (oder die Woche) wird aus dem History-Adapter abgespielt, mit Sonnenstand
+- (bluefox) Neu: Wetter in 3D (Wolken, Regen, Schnee, Nebel, Wind) aus einem Wetter-Gerät; WMO-Wettercodes (z. B.
+  open-meteo) werden mit `convert: "wmo"` umgerechnet, ein eigener Regensensor hat Vorrang
+- (bluefox) Sonnenlicht in 3D aus der Position in den Systemeinstellungen
+- (bluefox) Editor: Geräte im Grundriss mit denselben Symbolen wie in 3D; ein gewähltes Gerät blendet die Eckpunkte
+  seines Raums aus (sie lagen über Sensoren und nahmen den nächsten Klick)
+- (bluefox) Das gewählte Gerät ist deutlich markiert: im Grundriss ein pulsierender Ring (und es liegt über den Geräten
+  daneben), in 3D ein pulsierender Rahmen, auch wenn die 3D-Ansicht erst nach der Auswahl geöffnet wird
+- (bluefox) Energie: Stromfluss-Leitungen, leuchtende Solarmodule, Glas-Hologramme mit Tageskurve und die Energieleiste
+  (Verbrauch, Netz, Solar, Akku); die Statistik (Fünf-Minuten-Mittel, Zählerstände pro Stunde) kommt aus dem
+  History-Adapter
 - (bluefox) Build mit Vite statt esbuild; `npm run dev` startet einen Entwicklungsserver mit Hot Reload und
   simulierten Geräten
 
