@@ -185,6 +185,11 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Regenbogen: steht die Sonne tief (unter 42°) und scheint, während es regnet oder bis zu zehn Minuten danach,
   wölbt sich gegenüber der Sonne ein Regenbogen hinter dem Haus – Violett innen, Rot außen, mit schwächerem Nebenbogen
   in umgekehrten Farben und hellerem Himmel innen
+- (bluefox) Bäume und Jahreszeiten: Laubbaum, Nadelbaum, Obstbaum und Strauch unter „Garten & Außen“. Sie tragen die
+  Jahreszeit nach Datum und Breitengrad (auf der Südhalbkugel umgekehrt): kahl im Winter, frisches Grün und Blüten am
+  Obstbaum im Frühling, Äpfel im Spätsommer, gelbes, oranges und rotes Laub im Herbst, das im Wind fällt, Schnee auf
+  Kronen und Ästen, solange es schneit. Im Wind neigen sie sich, die Krone schwingt, Böen schütteln sie; auch die
+  Bibliothek zeigt jetzt Bilder der Bäume und Autos
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler

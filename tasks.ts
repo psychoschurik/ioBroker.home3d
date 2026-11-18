@@ -2763,6 +2763,249 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
 }
 
 /**
+ * Trees and bushes (trees.ts): furniture outside, dressed for the season from the date and the latitude (bare in
+ * winter, blossom and fresh green in spring, fruit in late summer, autumn colours and falling leaves), with snow
+ * while it snows, swaying in the wind.
+ */
+function treesMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "car_van",\n] as const;',
+            '  "car_van",\n  "tree",\n  "tree_conifer",\n  "tree_fruit",\n  "bush",\n] as const;',
+            'trees: furniture types',
+        );
+        code = replaceRequired(
+            code,
+            '"wind_vane", "robot_mower", "sprinkler"],',
+            '"wind_vane", "robot_mower", "sprinkler", "tree", "tree_conifer", "tree_fruit", "bush"],',
+            'trees: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  car_van: [2.05, 5.3, 2.3],',
+            [
+                '  car_van: [2.05, 5.3, 2.3],',
+                '  // trees and bushes: the crown (width, depth) and the height',
+                '  tree: [4.5, 4.5, 7],',
+                '  tree_conifer: [3, 3, 8],',
+                '  tree_fruit: [3.5, 3.5, 4.2],',
+                '  bush: [1.6, 1.6, 1.3],',
+            ].join('\n'),
+            'trees: sizes',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  car_van: ["vehicle", ["garage", "garden"]],',
+            [
+                '  car_van: ["vehicle", ["garage", "garden"]],',
+                '  tree: ["outdoor", ["garden"]],',
+                '  tree_conifer: ["outdoor", ["garden"]],',
+                '  tree_fruit: ["outdoor", ["garden"]],',
+                '  bush: ["outdoor", ["garden"]],',
+            ].join('\n'),
+            'trees: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "car_sedan":\n    case "car_hatchback":\n    case "car_van": {',
+            [
+                '    case "tree":',
+                '    case "tree_fruit":',
+                '    case "bush": {',
+                '      // a tree from above: its crown, a ring of leaves and the trunk (a bush has none)',
+                '      const r = Math.min(w, d) / 2;',
+                '      return [',
+                '        circle(0, 0, r, "fp3d-sym-strong"),',
+                '        circle(0, 0, r * 0.62),',
+                '        ...(type === "bush" ? [] : [circle(0, 0, Math.min(0.18, r * 0.12), "fp3d-sym-fill")]),',
+                '      ];',
+                '    }',
+                '    case "tree_conifer": {',
+                '      // a conifer from above: its crown and the branches like a star',
+                '      const r = Math.min(w, d) / 2;',
+                '      return [',
+                '        circle(0, 0, r, "fp3d-sym-strong"),',
+                '        ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => line(0, 0, Math.cos((i * Math.PI) / 4) * r * 0.9, Math.sin((i * Math.PI) / 4) * r * 0.9)),',
+                '      ];',
+                '    }',
+                '    case "car_sedan":',
+                '    case "car_hatchback":',
+                '    case "car_van": {',
+            ].join('\n'),
+            'trees: symbols',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "car_sedan":\n    case "car_hatchback":\n    case "car_van":\n    case "robot_mower":',
+            '    case "tree":\n    case "tree_conifer":\n    case "tree_fruit":\n    case "bush":\n    case "car_sedan":\n    case "car_hatchback":\n    case "car_van":\n    case "robot_mower":',
+            'trees: drawn by the sky frame',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  furn_nav_light: "Positionslicht",',
+            '  furn_nav_light: "Positionslicht",\n  furn_tree: "Laubbaum",\n  furn_tree_conifer: "Nadelbaum",\n  furn_tree_fruit: "Obstbaum",\n  furn_bush: "Strauch",',
+            'trees de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_nav_light: "Navigation light",',
+            '  furn_nav_light: "Navigation light",\n  furn_tree: "Broadleaf tree",\n  furn_tree_conifer: "Conifer",\n  furn_tree_fruit: "Fruit tree",\n  furn_bush: "Bush",',
+            'trees en',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { animateTree as fp3dAnimateTree, buildTree as fp3dBuildTree, disposeTrees as fp3dDisposeTrees, treeKey as fp3dTreeKey, type TreeSpec as Fp3dTree } from "${root}/frontend/vendor-ext/trees.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  private fp3dRainbow: Fp3dRainbow | null = null;\n',
+            [
+                '  private fp3dRainbow: Fp3dRainbow | null = null;',
+                '  /** Trees and bushes, built anew when they, their floor, the look or the season change. */',
+                '  private fp3dTrees: Fp3dTree[] = [];',
+                '  private fp3dTreeGroup: Group | null = null;',
+                '  private fp3dTreeSig = "";',
+                '',
+                '  fp3dSetTrees(list: Fp3dTree[]): void {',
+                '    if (JSON.stringify(list) === JSON.stringify(this.fp3dTrees)) return;',
+                '    this.fp3dTrees = list;',
+                '    this.invalidate();',
+                '  }',
+                '',
+            ].join('\n'),
+            'trees: fields',
+        );
+        code = replaceRequired(
+            code,
+            '    this.fp3dSkyMoving = moving && !this.lowQuality;\n',
+            [
+                '    // the trees: they sway in the wind (without a known direction only a little), their leaves fall in autumn',
+                '    const treeParts: { t: Fp3dTree; y: number }[] = [];',
+                '    for (const tr of this.fp3dTrees) {',
+                '      const fv = this.floorMap.get(tr.floor);',
+                '      if (!fv || !fv.group.visible || fv.o < 0.3) continue;',
+                '      treeParts.push({ t: tr, y: fv.group.position.y });',
+                '    }',
+                '    const treeSig = (light ? "l|" : "d|") + treeParts.map((p) => fp3dTreeKey(p.t, p.y)).join("|");',
+                '    if (treeSig !== this.fp3dTreeSig) {',
+                '      this.fp3dTreeSig = treeSig;',
+                '      if (this.fp3dTreeGroup) {',
+                '        this.root.remove(this.fp3dTreeGroup);',
+                '        fp3dDisposeTrees(this.fp3dTreeGroup);',
+                '        this.fp3dTreeGroup = null;',
+                '      }',
+                '      if (treeParts.length) {',
+                '        const g = new Group();',
+                '        for (const p of treeParts) {',
+                '          const tree = fp3dBuildTree(p.t, !!light);',
+                '          tree.position.set(p.t.x, p.y, p.t.z);',
+                '          g.add(tree);',
+                '        }',
+                '        this.root.add(g);',
+                '        this.fp3dTreeGroup = g;',
+                '      }',
+                '    }',
+                '    if (this.fp3dTreeGroup) {',
+                '      const tw = w ? { to: to ?? 0, speed: to === null ? w.speed * 0.4 : w.speed, gust } : null;',
+                '      for (const c of this.fp3dTreeGroup.children) if (fp3dAnimateTree(c, tw, t, this.lowQuality ? 0 : dt)) moving = true;',
+                '    }',
+                '    this.fp3dSkyMoving = moving && !this.lowQuality;',
+                '',
+            ].join('\n'),
+            'trees: every frame',
+        );
+        code = replaceRequired(
+            code,
+            '    this.fp3dRainbow?.dispose();\n',
+            '    this.fp3dRainbow?.dispose();\n    if (this.fp3dTreeGroup) fp3dDisposeTrees(this.fp3dTreeGroup);\n',
+            'trees: dispose',
+        );
+    }
+    if (name === 'viewer/preview.ts') {
+        // the library's pictures: trees (in summer) and cars (in their first colour) come from their own builders
+        code = `import { buildTree as fp3dPrevTree, disposeTrees as fp3dPrevDispose, isTreeKind as fp3dPrevIsTree } from "${root}/frontend/vendor-ext/trees.ts";\nimport { buildCar as fp3dPrevCar, CAR_COLORS as fp3dPrevCarColors, isCarKind as fp3dPrevIsCar } from "${root}/frontend/vendor-ext/cars.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            "  scene.add(mesh, edges);\n\n  // look from the front right, a little from above; fit the item's box into the picture\n  const box = new Box3().setFromObject(mesh);",
+            [
+                '  scene.add(mesh, edges);',
+                '  const fp3dOwn = fp3dPrevIsTree(item.type)',
+                '    ? fp3dPrevTree({',
+                '        id: item.type,',
+                '        floor: "",',
+                '        kind: item.type,',
+                '        x: 0,',
+                '        z: 0,',
+                '        angle: 0,',
+                '        w: item.w,',
+                '        d: item.d,',
+                '        h: item.h,',
+                '        season: { leaf: 1, fresh: 0.2, autumn: 0, fall: 0, blossom: 0, fruit: item.type === "tree_fruit" ? 1 : 0 },',
+                '        snow: 0,',
+                '      })',
+                '    : fp3dPrevIsCar(item.type)',
+                '      ? fp3dPrevCar(item.type, item.w, item.d, item.h, fp3dPrevCarColors[item.type])',
+                '      : null;',
+                '  if (fp3dOwn) scene.add(fp3dOwn);',
+                '',
+                "  // look from the front right, a little from above; fit the item's box into the picture",
+                '  const box = new Box3().setFromObject(fp3dOwn ?? mesh);',
+            ].join('\n'),
+            'trees and cars: library pictures',
+        );
+        code = replaceRequired(
+            code,
+            '  cache.set(key, url);\n',
+            '  if (fp3dOwn) fp3dPrevDispose(fp3dOwn);\n  cache.set(key, url);\n',
+            'trees and cars: pictures freed',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = `import { isTreeKind as fp3dIsTreeKind, seasonOf as fp3dSeasonOf, type TreeKind as Fp3dTreeKind } from "${root}/frontend/vendor-ext/trees.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    v.fp3dSetVanes(\n',
+            [
+                '    // trees and bushes: the season from the date and the latitude (sun.sun), snow while it snows',
+                '    const fp3dLat = hass.states["sun.sun"]?.attributes?.latitude;',
+                '    const fp3dSeason = fp3dSeasonOf(Date.now(), typeof fp3dLat === "number" ? fp3dLat : null);',
+                '    const fp3dSnowing = /snow/.test((fp3dWeatherId ? hass.states[fp3dWeatherId]?.state : "") ?? "") ? 1 : 0;',
+                '    v.fp3dSetTrees(',
+                '      b.floors.flatMap((fl) =>',
+                '        fl.furniture',
+                '          .filter((f) => fp3dIsTreeKind(f.type))',
+                '          .map((f) => ({',
+                '            id: f.id,',
+                '            floor: fl.id,',
+                '            kind: f.type as Fp3dTreeKind,',
+                '            x: f.x,',
+                '            z: f.z,',
+                '            angle: ((f.rotation ?? 0) * Math.PI) / 180,',
+                '            w: f.w,',
+                '            d: f.d,',
+                '            h: f.h,',
+                '            season: fp3dSeason,',
+                '            snow: fp3dSnowing,',
+                '          })),',
+                '      ),',
+                '    );',
+                '    v.fp3dSetVanes(',
+            ].join('\n'),
+            'trees to the viewer',
+        );
+    }
+    return code;
+}
+
+/**
  * The weather beyond the condition: wind from own sensors or the weather entity (wind indicators "wind_vane" that turn
  * with it; on the sea the waves run with it, whitecaps from 4 Bft, gusts ruffle the water), rain rings on the sea and
  * wet surfaces, cloud shadows drifting with the wind, fog from the visibility or the dew point, and a warning when the
@@ -3990,6 +4233,7 @@ const patches: Plugin = {
         code = upwardWindows(name, code);
         code = weatherMore(name, code);
         code = homeMore(name, code);
+        code = treesMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
