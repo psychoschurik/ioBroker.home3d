@@ -1,6 +1,8 @@
 // Where the sun stands (NOAA's approximation, good to a fraction of a degree): the 3D view lights the rooms with it
 // (`sun.sun`), the time travel replays it. ioBroker has no sun entity; the position is that of the system settings.
 
+import { moonAttributes } from './moon.js';
+
 const RAD = Math.PI / 180;
 
 /** Elevation (degrees above the horizon, with refraction) and azimuth (degrees from north, clockwise) at time t (ms). */
@@ -78,6 +80,8 @@ export function sunState(
             friendly_name: 'Sonne',
             elevation: Math.round(elevation * 100) / 100,
             azimuth: Math.round(azimuth * 100) / 100,
+            // the moon and the stars of the night sky
+            ...moonAttributes(lat, lon, t),
         },
         last_changed: now,
         last_updated: now,

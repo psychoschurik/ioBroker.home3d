@@ -2864,6 +2864,7 @@ function weatherMore(name: string, code: string): string {
         code = [
             `import { skyUniforms as fp3dSkyUniforms } from "${root}/frontend/vendor-ext/sky-shade.ts";`,
             `import { CloudLayer as Fp3dCloudLayer } from "${root}/frontend/vendor-ext/clouds.ts";`,
+            `import { NightSky as Fp3dNightSky, type MoonView as Fp3dMoonView } from "${root}/frontend/vendor-ext/night-sky.ts";`,
             `import { setSeaWeather as fp3dSetSeaWeather } from "${root}/frontend/vendor-ext/sea.ts";`,
             `import { gustiness as fp3dGustiness, type Wind as Fp3dWind } from "${data}";`,
             `import { animateVane as fp3dAnimateVane, buildVane as fp3dBuildVane, disposeVanes as fp3dDisposeVanes, vaneKey as fp3dVaneKey, type VaneScene as Fp3dVaneScene, type VaneState as Fp3dVane } from "${root}/frontend/vendor-ext/wind-vane.ts";`,
@@ -2883,6 +2884,16 @@ function weatherMore(name: string, code: string): string {
                 '  private fp3dSkyClock = 0;',
                 '  /** The clouds themselves, over their shadows (made when first shown). */',
                 '  private fp3dClouds: Fp3dCloudLayer | null = null;',
+                '  /** The stars and the moon with its phase (made when first shown); the moon from sun.sun (null: unknown). */',
+                '  private fp3dNightSky: Fp3dNightSky | null = null;',
+                '  private fp3dMoon: Fp3dMoonView | null = null;',
+                '',
+                '  fp3dSetMoon(m: Fp3dMoonView | null): void {',
+                '    if (JSON.stringify(m) === JSON.stringify(this.fp3dMoon)) return;',
+                '    this.fp3dMoon = m;',
+                '    this.placeSky();',
+                '    this.invalidate();',
+                '  }',
                 '',
                 '  fp3dSetWind(w: Fp3dWind | null): void {',
                 '    if (JSON.stringify(w) === JSON.stringify(this.fp3dWind)) return;',
@@ -2955,6 +2966,25 @@ function weatherMore(name: string, code: string): string {
                 '        top: b.y1 - 6,',
                 '      });',
                 '    }',
+                '    // the night sky: stars as it gets dark, the moon with its phase while it is up',
+                '    const nightOn = !!weather && weather.disc !== false && !!this.sun && !this.lowQuality && !this.options.safeFx;',
+                '    if (nightOn && !this.fp3dNightSky) {',
+                '      this.fp3dNightSky = new Fp3dNightSky();',
+                '      this.root.add(this.fp3dNightSky.group);',
+                '    }',
+                '    if (this.fp3dNightSky) {',
+                '      this.fp3dNightSky.update(',
+                '        {',
+                '          moon: nightOn ? this.fp3dMoon : null,',
+                '          sun: nightOn ? this.sun : null,',
+                '          north: this.fp3dNorth(),',
+                '          cover,',
+                '          camera: this.camera,',
+                '          time: t,',
+                '        },',
+                '        this.renderer.getPixelRatio(),',
+                '      );',
+                '    }',
                 '    let moving = ((u.uFp3dCloud.value > 0 || cloudsShown) && !!dir && !!w && w.speed > 0.2) || (!!this.fp3dSeaMesh && !!weather && (seaWind >= 5.5 || weather.rain > 0 || gust > 0));',
                 '    // the wind indicators: built anew when they or their floor changed, turned by the wind every frame',
                 '    const light = this.theme === "day" || this.style.natural;',
@@ -2994,6 +3024,12 @@ function weatherMore(name: string, code: string): string {
         );
         code = replaceRequired(
             code,
+            '    if (!sun || !w || w.disc === false || cloud > 0.85 || (!night && sun.elevation < 1)) {',
+            '    if (!sun || !w || w.disc === false || cloud > 0.85 || (!night && sun.elevation < 1) || (night && !!this.fp3dMoon)) {',
+            'moon: the night sky draws it',
+        );
+        code = replaceRequired(
+            code,
             '    this.fp3dGearFrame();\n',
             '    this.fp3dGearFrame();\n    this.fp3dSkyFrame();\n',
             'sky: every frame',
@@ -3007,11 +3043,28 @@ function weatherMore(name: string, code: string): string {
         code = replaceRequired(
             code,
             '    this.sunFx.dispose();\n',
-            '    this.sunFx.dispose();\n    this.fp3dClouds?.dispose();\n',
+            '    this.sunFx.dispose();\n    this.fp3dClouds?.dispose();\n    this.fp3dNightSky?.dispose();\n',
             'clouds: dispose',
         );
     }
     if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            "    // the compass ring's letters: the first letter of each direction in the user's language\n",
+            [
+                '    // the moon and the stars: from sun.sun (frontend/moon.ts)',
+                '    const fp3dSunNum = (k: string): number | null => (typeof sun?.[k] === "number" ? (sun[k] as number) : null);',
+                '    const [fp3dMe, fp3dMa, fp3dMp, fp3dMf] = ["moon_elevation", "moon_azimuth", "moon_phase", "moon_fraction"].map(fp3dSunNum);',
+                '    v.fp3dSetMoon(',
+                '      this.sunFx !== false && fp3dMe !== null && fp3dMa !== null && fp3dMp !== null && fp3dMf !== null',
+                '        ? { elevation: fp3dMe, azimuth: fp3dMa, phase: fp3dMp, fraction: fp3dMf, sidereal: fp3dSunNum("sidereal") ?? 0, latitude: fp3dSunNum("latitude") ?? 50 }',
+                '        : null,',
+                '    );',
+                "    // the compass ring's letters: the first letter of each direction in the user's language",
+                '',
+            ].join('\n'),
+            'moon from sun.sun',
+        );
         code = `import { beaufort as fp3dBeaufort, compassPoint as fp3dCompass, defaultVaneY as fp3dVaneY, fogOf as fp3dFogOf, PressureLog as Fp3dPressureLog, pressureFall as fp3dPressureFall, pressureHpa as fp3dPressureHpa, stormLevel as fp3dStormLevel, windOf as fp3dWindOf, type Sample as Fp3dSample, type States as Fp3dStates } from "${data}";\n${code}`;
         code = replaceRequired(
             code,

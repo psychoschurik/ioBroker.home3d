@@ -4,6 +4,7 @@
 // which selects its datapoints itself) for the datapoints it records. Values become device states like the live ones.
 import { transformed } from './entities.js';
 import type { Mapping, StateObject } from './model.js';
+import { moonAttributes } from './moon.js';
 import { sunAt } from './sun.js';
 
 /** One row as the 3D frontend expects it (minimal response): state and time of the last update in seconds. */
@@ -224,7 +225,11 @@ function sunRows(lat: number, lon: number, start: number, end: number): { t: num
     const rows: { t: number; value: WireValue }[] = [];
     for (let t = start; t <= end; t += 600) {
         const { elevation, azimuth } = sunAt(lat, lon, t * 1000);
-        const attrs = { elevation: Math.round(elevation * 10) / 10, azimuth: Math.round(azimuth * 10) / 10 };
+        const attrs = {
+            elevation: Math.round(elevation * 10) / 10,
+            azimuth: Math.round(azimuth * 10) / 10,
+            ...moonAttributes(lat, lon, t * 1000),
+        };
         rows.push({ t, value: [elevation < -0.833 ? 'below_horizon' : 'above_horizon', attrs] });
     }
     return rows;
