@@ -197,6 +197,165 @@ function wheelOverLabels(name: string, code: string): string {
     );
 }
 
+/**
+ * Per device: the colour of its marker while active (3D pin and the editor's floor plan) and a row of symbols to pick
+ * from under "Eigenes Symbol" (sensor-look.ts: ICON_PICKS, markerInk).
+ */
+function markerLooks(name: string, code: string): string {
+    const look = `${root}/frontend/vendor-ext/sensor-look.ts`;
+    if (name === 'model.ts') {
+        return replaceRequired(
+            code,
+            '  icon?: string | null;\n  /** An own name in the plan (null = the entity',
+            '  icon?: string | null;\n  /** The colour of its marker while it is active ("#rrggbb"; null = the warm default). */\n  active_color?: string | null;\n  /** An own name in the plan (null = the entity',
+            'active colour: model',
+        );
+    }
+    if (name === 'markers.ts') {
+        return replaceRequired(
+            code,
+            '        show: pl.marker ?? sensorShow(st),',
+            '        show: pl.marker ?? sensorShow(st),\n        activeColor: pl.active_color || undefined,',
+            'active colour: marker',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { markerInk as fp3dMarkerInk } from "${look}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  glow: { color: [number, number, number]; level: number } | null;',
+            '  glow: { color: [number, number, number]; level: number } | null;\n  /** The colour of the pin while active, chosen at the device (the glow of a light wins). */\n  activeColor?: string;',
+            'active colour: marker type',
+        );
+        return replaceRequired(
+            code,
+            [
+                '      const glow = d.glow ? `rgb(${d.glow.color.map((c) => Math.round(c * 255)).join(", ")})` : "";',
+                '      if (pin.glow !== glow) {',
+                '        pin.glow = glow;',
+                '        if (glow) el.style.setProperty("--fp3d-glow", glow);',
+                '        else el.style.removeProperty("--fp3d-glow");',
+            ].join('\n'),
+            [
+                '      const own = d.glow ? null : fp3dMarkerInk(d.activeColor);',
+                '      const glow = d.glow ? `rgb(${d.glow.color.map((c) => Math.round(c * 255)).join(", ")})` : own ? (d.activeColor as string) : "";',
+                '      if (pin.glow !== glow) {',
+                '        pin.glow = glow;',
+                '        if (glow) el.style.setProperty("--fp3d-glow", glow);',
+                '        else el.style.removeProperty("--fp3d-glow");',
+                '        // the writing on an own colour: white on a dark one',
+                '        if (own) el.style.setProperty("--fp3d-on-text", own);',
+                '        else el.style.removeProperty("--fp3d-on-text");',
+            ].join('\n'),
+            'active colour: pin',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '      .fp3d-dev-on {\n        color: #2a1a00;',
+            '      .fp3d-dev-on {\n        color: var(--fp3d-on-text, #2a1a00);',
+            'active colour: pin ink',
+        );
+        return replaceRequired(
+            code,
+            '      .fp3d-dev-on .fp3d-dev-text {\n        color: #2a1a00;',
+            '      .fp3d-dev-on .fp3d-dev-text {\n        color: var(--fp3d-on-text, #2a1a00);',
+            'active colour: pin text',
+        );
+    }
+    if (name !== 'components/editor.ts') {
+        return code;
+    }
+    code = `import { ICON_PICKS as FP3D_ICON_PICKS, markerInk as fp3dMarkerInk } from "${look}";\n${code}`;
+    // the floor plan: an active device in its own colour
+    code = replaceRequired(
+        code,
+        '<g data-device=${pl.entity_id} class=${cls} transform="translate(${x} ${y})">',
+        '<g data-device=${pl.entity_id} class=${cls} style=${fp3dMarkerInk(pl.active_color) ? `--fp3d-warm:${pl.active_color};--fp3d-on-text:${fp3dMarkerInk(pl.active_color)}` : ""} transform="translate(${x} ${y})">',
+        'active colour: floor plan',
+    );
+    code = replaceRequired(
+        code,
+        '      .fp3d-device-on path {\n        stroke: #2a1a00;\n      }',
+        '      .fp3d-device-on path {\n        stroke: var(--fp3d-on-text, #2a1a00);\n      }',
+        'active colour: floor plan ink',
+    );
+    code = replaceRequired(
+        code,
+        '      .fp3d-device-on path.fp3d-mdi {\n        fill: #2a1a00;\n      }',
+        [
+            '      .fp3d-device-on path.fp3d-mdi {',
+            '        fill: var(--fp3d-on-text, #2a1a00);',
+            '      }',
+            '      .fp3d-icon-picks {',
+            '        display: flex;',
+            '        flex-wrap: wrap;',
+            '        gap: 4px;',
+            '      }',
+            '      .fp3d-icon-pick {',
+            '        width: 30px;',
+            '        height: 30px;',
+            '        padding: 0;',
+            '        display: grid;',
+            '        place-items: center;',
+            '        border-radius: 7px;',
+            '        border: 1px solid rgba(127, 127, 127, 0.35);',
+            '        background: transparent;',
+            '        color: var(--fp3d-text);',
+            '        cursor: pointer;',
+            '        --mdc-icon-size: 18px;',
+            '      }',
+            '      .fp3d-icon-pick:hover:not(:disabled) {',
+            '        border-color: var(--fp3d-accent);',
+            '      }',
+            '      .fp3d-icon-pick-on {',
+            '        border-color: var(--fp3d-accent);',
+            '        background: rgba(55, 224, 255, 0.18);',
+            '      }',
+            '      .fp3d-color-row input[type="color"] {',
+            '        width: 52px;',
+            '        height: 34px;',
+            '        padding: 2px;',
+            '        flex: none;',
+            '      }',
+        ].join('\n'),
+        'active colour: editor styles',
+    );
+    code = replaceRequired(
+        code,
+        '        ${this.iconInput(pl.icon, (v) => this.updateDevice({ icon: v }))}',
+        '        ${this.iconInput(pl.icon, (v) => this.updateDevice({ icon: v }))}\n        ${this.fp3dActiveColor(pl.active_color, (v) => this.updateDevice({ active_color: v }))}',
+        'active colour: field',
+    );
+    return replaceRequired(
+        code,
+        '      </span></label\n    >`;\n  }\n\n  /** How the marker of a device or furniture item shows in 3D. */',
+        [
+            '      </span></label',
+            '    >',
+            '      <div class="fp3d-icon-picks fp3d-wide">',
+            '        ${FP3D_ICON_PICKS.map((n) => html`<button type="button" class=${n === value?.replace(/^mdi:/, "") ? "fp3d-icon-pick fp3d-icon-pick-on" : "fp3d-icon-pick"} title=${n} ?disabled=${!this.isAdmin} @click=${() => onChange(n === value?.replace(/^mdi:/, "") ? null : n)}>${unsafeHTML(`<ha-icon icon="mdi:${n}"></ha-icon>`)}</button>`)}',
+            '      </div>`;',
+            '  }',
+            '',
+            '  /** The colour of a device marker while it is active (null: the warm default). */',
+            '  private fp3dActiveColor(value: string | null | undefined, onChange: (v: string | null) => void) {',
+            '    return html`<div class="fp3d-field fp3d-wide">',
+            '      ${this.t("active_color" as I18nKey)}',
+            '      <span class="fp3d-icon-row fp3d-color-row">',
+            '        <input type="color" .value=${value ?? "#ffb547"} ?disabled=${!this.isAdmin} @change=${(e: Event) => onChange((e.target as HTMLInputElement).value)} />',
+            '        ${value ? html`<button type="button" class="fp3d-btn" ?disabled=${!this.isAdmin} @click=${() => onChange(null)}>${this.t("active_color_reset" as I18nKey)}</button>` : nothing}',
+            '      </span>',
+            '    </div>`;',
+            '  }',
+            '',
+            '  /** How the marker of a device or furniture item shows in 3D. */',
+        ].join('\n'),
+        'icon picks',
+    );
+}
+
 /** Sensor markers with a symbol by what they report, the humidity next to the temperature (frontend/vendor-ext/sensor-look.ts). */
 function sensorLook(name: string, code: string): string {
     if (name !== 'markers.ts') {
@@ -1024,6 +1183,29 @@ function boatGear(name: string, code: string): string {
     if (name === 'alerts.ts') {
         // an open deck hatch in the rain: the warning of an open window, with the hatch's contact
         code = `import { hatchOpen as fp3dHatchOpen } from "${kinds}";\n${code}`;
+        // a plan without areas (ioBroker): a smoke, gas or water sensor placed in a room warns for that room; the
+        // house's rain sensor is no leak, even when it reports as a water sensor
+        code = replaceRequired(
+            code,
+            '  const ids = Object.keys(hass.states);',
+            [
+                '  const known = new Set(rooms.flatMap((r) => r.sensors));',
+                '  for (const floor of building.floors) {',
+                '    for (const pl of floor.placements) {',
+                '      const id = pl.entity_id;',
+                '      if (known.has(id) || id === building.settings.rain_entity || !id.startsWith("binary_sensor.") || !CLASS_KIND[String(hass.states[id]?.attributes.device_class)]) continue;',
+                '      const room = floor.rooms.find((r) => r.points.length >= 3 && pointInPolygon([pl.x, pl.z], r.points));',
+                '      if (!room) continue;',
+                '      known.add(id);',
+                '      const at = rooms.find((r) => r.floorId === floor.id && r.roomId === room.id);',
+                '      if (at) at.sensors.push(id);',
+                '      else rooms.push({ floorId: floor.id, roomId: room.id, sensors: [id] });',
+                '    }',
+                '  }',
+                '  const ids = Object.keys(hass.states);',
+            ].join('\n'),
+            'alerts: placed sensors',
+        );
         code = replaceRequired(
             code,
             '  /** Haushalt Pro: the fridges with door sensors (their doors may not stand open too long). */',
@@ -1649,12 +1831,16 @@ function homeMore(name: string, code: string): string {
                 '  price_forecast?: string | null;',
                 "  /** The flow at the house's water meter (l/min); without one, how fast the water meter counts. */",
                 '  water_flow?: string | null;',
-                '  /** false: no air at open windows, no mould in cold corners. */',
+                '  /** false: no air at open windows (and no mould, unless `mould` says otherwise). */',
                 '  home_air?: boolean;',
+                '  /** false: no mould in cold corners; missing: as `home_air`. */',
+                '  mould?: boolean;',
                 '  /** false: no price glow round the house. */',
                 '  price_glow?: boolean;',
                 '  /** false: in the "Technik" view rooms without a problem keep their colour (else green). */',
                 '  health_green?: boolean;',
+                '  /** true: the badges of devices with a low battery or out of reach show always, not only in the "Technik" view. */',
+                '  health_badges?: boolean;',
             ].join('\n'),
             'home: settings',
         );
@@ -1758,6 +1944,17 @@ function homeMore(name: string, code: string): string {
             [
                 '  /** The home looks (home-fx.ts): air at windows, mould, water, sound, the lawn, the price glow, device badges. */',
                 '  private fp3dHome = new Fp3dHomeFx();',
+                '  /** Tooltips of the room pins ("Technik": the devices of the room). */',
+                '  private fp3dRoomTips = new Map<string, string>();',
+                '  fp3dSetRoomTips(tips: Map<string, string>): void {',
+                '    this.fp3dRoomTips = tips;',
+                '    for (const fv of this.floors) for (const rp of fv.roomPins) this.fp3dRoomTip(rp.pin);',
+                '  }',
+                '  private fp3dRoomTip(pin: HTMLElement): void {',
+                '    const tip = this.fp3dRoomTips.get(pin.dataset.room ?? "");',
+                '    if (tip) pin.title = tip;',
+                '    else pin.removeAttribute("title");',
+                '  }',
                 '  private fp3dHomeMoving = false;',
                 '  private fp3dHomeClock = 0;',
                 '',
@@ -1831,6 +2028,12 @@ function homeMore(name: string, code: string): string {
         );
         code = replaceRequired(
             code,
+            '    } else pin.classList.remove("fp3d-pin-info");\n  }',
+            '    } else pin.classList.remove("fp3d-pin-info");\n    this.fp3dRoomTip(pin);\n  }',
+            'home: room pin tooltips',
+        );
+        code = replaceRequired(
+            code,
             '    this.fp3dSkyFrame();',
             ['    this.fp3dSkyFrame();', '    this.fp3dHomeFrame();'].join('\n'),
             'home: every frame',
@@ -1843,7 +2046,7 @@ function homeMore(name: string, code: string): string {
         );
     }
     if (name === 'components/view3d.ts') {
-        code = `import { healthColor as fp3dHealthColor, healthReport as fp3dHealthReport, homeScene as fp3dHomeScene, homeWatched as fp3dHomeWatched, type HealthReport as Fp3dHealthReport } from "${root}/frontend/vendor-ext/home-view.ts";
+        code = `import { healthColor as fp3dHealthColor, healthReport as fp3dHealthReport, homeScene as fp3dHomeScene, gearMarkers as fp3dGearMarkers, homeWatched as fp3dHomeWatched, type HealthReport as Fp3dHealthReport } from "${root}/frontend/vendor-ext/home-view.ts";
 import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTone as fp3dPriceTone, roomActivity as fp3dRoomActivity, slotsFromHistory as fp3dSlotsFromHistory, startOfDay as fp3dStartOfDay, type PriceSlot as Fp3dPriceSlot } from "${root}/frontend/vendor-ext/home-data.ts";\n${code}`;
         code = replaceRequired(
             code,
@@ -1886,6 +2089,8 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
                 '  private fp3dHomeSync(hass: HomeAssistant, b: Building, openings: Map<string, { open: number; tilt: number; open2: number; tilt2: number; sensed?: boolean }>, markers: { id: string; floorId: string; roomId: string | null; x: number; y: number; z: number }[], own: Alert[]): Alert[] {',
                 '    const v = this.viewer;',
                 '    if (!v) return [];',
+                '    // furniture with a sensor of its own (the contact of a hatch, a tank): its badges, and it counts in "Technik"',
+                '    markers = [...markers, ...fp3dGearMarkers(b, new Set(markers.map((m) => m.id)))];',
                 '    const now = this.now();',
                 '    const t = (k: string, vars?: Record<string, string>) => translate(hass, k as I18nKey, vars);',
                 '    const time = (ms: number) => new Date(ms).toLocaleTimeString(hass.language, { hour: "2-digit", minute: "2-digit" });',
@@ -1911,7 +2116,7 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
                 '      tOut,',
                 '      leaks: own.filter((a) => a.kind === "water" && !!a.roomId && !!a.floorId).map((a) => ({ entity: a.entity, roomId: a.roomId as string, floorId: a.floorId as string })),',
                 '      priceHistory: this.fp3dPriceRows?.slots ?? [],',
-                '      health: this.heatMode === "health",',
+                '      health: this.heatMode === "health" || b.settings.health_badges === true,',
                 '      meter: this.fp3dMeter,',
                 '      fmt: (n, d) => formatNumber(hass, n, d),',
                 '      time,',
@@ -2037,14 +2242,18 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
             code,
             '    v.setRoomInfo(info);',
             [
-                '    // the "Technik" view: rooms by the health of their devices; "Bewegung": by today\'s motion',
+                '    // the "Technik" view: rooms by the health of their devices (the room pins list them); "Bewegung": by today\'s motion',
+                '    const tips = new Map<string, string>();',
                 '    if (this.heatMode === "health" || this.heatMode === "motion") {',
                 '      tint = new Map();',
                 '      if (this.heatMode === "health" && this.fp3dHealthRep) {',
                 '        for (const [id, r] of this.fp3dHealthRep.rooms) {',
-                '          if (r.unreach || r.low || this.building?.settings.health_green !== false) tint.set(id, fp3dHealthColor(r));',
+                '          // rooms without a problem: green with "✓ n OK", or (only problems) as they are, without a word',
+                '          const all = this.building?.settings.health_green !== false;',
+                '          if (r.unreach || r.low || all) tint.set(id, fp3dHealthColor(r));',
                 '          const parts = [r.unreach ? `⚠ ${r.unreach}` : "", r.low ? `🔋 ${r.low}` : ""].filter(Boolean);',
-                '          info.set(id, parts.length ? parts.join(" · ") : `✓ ${r.ok}`);',
+                '          if (parts.length || all) info.set(id, parts.length ? parts.join(" · ") : `✓ ${r.ok} OK`);',
+                '          tips.set(id, r.devices.map((d) => `${d.problem === "unreach" ? "⚠" : d.problem === "battery" ? "🔋" : "✓"} ${d.name}${d.battery !== null ? ` · ${Math.round(d.battery)} %` : ""}`).join("\\n"));',
                 '        }',
                 '      }',
                 '      if (this.heatMode === "motion" && this.fp3dMotionRep) {',
@@ -2057,6 +2266,7 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
                 '      }',
                 '    }',
                 '    v.setRoomInfo(info);',
+                '    v.fp3dSetRoomTips(tips);',
             ].join('\n'),
             'home: view tints',
         );
@@ -2280,12 +2490,20 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
                 '                ${this.t("home_air_show" as I18nKey)}</label',
                 '              >',
                 '              <label class="fp3d-check fp3d-wide"',
+                '                ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${(s.mould ?? s.home_air) !== false} @change=${(e: Event) => set({ mould: (e.target as HTMLInputElement).checked })} />',
+                '                ${this.t("mould_show" as I18nKey)}</label',
+                '              >',
+                '              <label class="fp3d-check fp3d-wide"',
                 '                ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${s.price_glow !== false} @change=${(e: Event) => set({ price_glow: (e.target as HTMLInputElement).checked ? undefined : false })} />',
                 '                ${this.t("price_glow" as I18nKey)}</label',
                 '              >',
                 '              <label class="fp3d-check fp3d-wide"',
                 '                ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${s.health_green !== false} @change=${(e: Event) => set({ health_green: (e.target as HTMLInputElement).checked ? undefined : false })} />',
                 '                ${this.t("health_green" as I18nKey)}</label',
+                '              >',
+                '              <label class="fp3d-check fp3d-wide"',
+                '                ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${s.health_badges === true} @change=${(e: Event) => set({ health_badges: (e.target as HTMLInputElement).checked || undefined })} />',
+                '                ${this.t("health_badges" as I18nKey)}</label',
                 '              >',
                 '              ${((c: { health_stale_min?: number | null }) => html`<label class="fp3d-field fp3d-wide"',
                 '                  >${this.t("health_stale" as I18nKey)}',
@@ -2327,7 +2545,10 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
                 'Das Auto steht hier, solange der Datenpunkt „da“ meldet (an, home, anwesend, geparkt oder eine Zahl über 0, z. B. ein Tracker oder ein Sensor in der Garage); dann parkt es rückwärts ein, sonst fährt es weg und nur die Markierung bleibt. Ohne Datenpunkt steht es immer da. Breite, Länge und Höhe wie beim Möbel.',
             home_health_low_one: '1 Batterie schwach',
             home_last_update: 'Letztes Update {time}',
-            health_green: 'Technik-Ansicht: Räume ohne Problem grün färben (sonst bleiben sie, wie sie sind)',
+            health_green: 'Technik-Ansicht: auch Räume ohne Problem zeigen (grün, „✓ n OK“) – sonst nur Probleme',
+            health_badges: 'Batterie- und Funkprobleme immer am Gerät zeigen (🔋, ⚠), nicht nur in der Technik-Ansicht',
+            active_color: 'Farbe, wenn aktiv',
+            active_color_reset: 'Standard',
             health_stale: 'Nicht erreichbar nach … Minuten ohne Update',
             health_stale_auto: 'wie das Gerät es meldet',
             health_stale_hint:
@@ -2348,7 +2569,8 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
             price_entity: 'Strompreis (sonst Tarif aus Energie)',
             price_forecast: 'Preisvorschau (JSON, z. B. Tibber)',
             water_flow: 'Wasser-Durchfluss (Sensor, l/min)',
-            home_air_show: 'Luft an offenen Fenstern und Schimmelrisiko zeigen',
+            home_air_show: 'Luft an offenen Fenstern zeigen',
+            mould_show: 'Schimmelrisiko zeigen (dunkle Ecken an Außenwänden, „Lüften“)',
             price_glow: 'Haus im Strompreis leuchten lassen',
             home_hint:
                 'Unwetterwarnung: Stufe 1–4 (oder Wörter wie „Unwetter“) färbt Rahmen und Banner. Strompreis: Das Haus leuchtet grün, wenn er im Vergleich zu heute günstig ist, rot, wenn teuer; mit einer Preisvorschau steht die günstigste Stunde in der Energieleiste. Wasser: Läuft es länger als 30 Minuten, erscheint eine Warnung.',
@@ -2394,7 +2616,11 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
                 'The car stands here while the datapoint says it is there (on, home, present, parked or a number above 0, e.g. a tracker or a sensor in the garage); then it reverses into its place, else it drives away and only the marking stays. Without a datapoint it is always there. Width, length and height as for any furniture.',
             home_health_low_one: '1 battery low',
             home_last_update: 'Last update {time}',
-            health_green: '"Technik" view: colour rooms without a problem green (else they stay as they are)',
+            health_green: '"Health" view: also show rooms without a problem (green, "✓ n OK") – else only problems',
+            health_badges:
+                'Always show battery and reachability problems at the device (🔋, ⚠), not only in the "Health" view',
+            active_color: 'Colour when active',
+            active_color_reset: 'Default',
             health_stale: 'Unreachable after … minutes without an update',
             health_stale_auto: 'as the device reports it',
             health_stale_hint:
@@ -2415,7 +2641,8 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
             price_entity: 'Electricity price (else the energy tariff)',
             price_forecast: 'Price forecast (JSON, e.g. Tibber)',
             water_flow: 'Water flow (sensor, l/min)',
-            home_air_show: 'Show air at open windows and the mould risk',
+            home_air_show: 'Show air at open windows',
+            mould_show: 'Show the mould risk (dark corners at outer walls, "air the room")',
             price_glow: 'Let the house glow in the electricity price',
             home_hint:
                 'Weather warning: level 1–4 (or words like "severe") colours the frame and the banner. Electricity price: the house glows green when it is cheap compared with today, red when dear; with a price forecast the cheapest hour shows in the energy bar. Water: when it runs longer than 30 minutes, a warning shows.',
@@ -3015,6 +3242,24 @@ function deviceDatapoint(name: string, code: string): string {
             [
                 '    const auto = kind ? defaultHeight(kind, this.floor?.height ?? 2.5, light ? mount : null) : 1;',
                 '    const fp3dDatapoint = this.hass?.states[pl.entity_id]?.attributes.iobroker_id as string | undefined;',
+                '    const fp3dReach = this.hass?.states[pl.entity_id]?.attributes.iobroker_reach as "report" | "never" | number | undefined;',
+                '    const fp3dSetReach = (reach: "report" | "never" | number | null) => window.dispatchEvent(new CustomEvent("iobroker-reach", { detail: { entityId: pl.entity_id, reach } }));',
+                '    // the battery of the device: found (type-detector, else by name and role) or chosen here; it counts for the whole device',
+                '    const fp3dAttrs = this.hass?.states[pl.entity_id]?.attributes ?? {};',
+                '    const fp3dBattery = fp3dAttrs.iobroker_battery_id as string | null | undefined;',
+                '    const fp3dBatteryOwn = fp3dAttrs.iobroker_battery_own as string | undefined;',
+                '    const fp3dBatteryFrom = fp3dAttrs.iobroker_battery_from as string | undefined;',
+                '    const fp3dSetBattery = (detail: { pick?: boolean; battery?: string | null }) =>',
+                '      window.dispatchEvent(',
+                '        new CustomEvent("iobroker-battery", {',
+                '          detail: {',
+                '            entityId: pl.entity_id,',
+                '            current: fp3dBattery ?? null,',
+                '            device: fp3dAttrs.health_device ? Object.values(this.hass?.states ?? {}).filter((s) => s.attributes.health_device === fp3dAttrs.health_device).map((s) => s.entity_id) : [],',
+                '            ...detail,',
+                '          },',
+                '        }),',
+                '      );',
                 '    return html`<section>',
                 '      <div class="fp3d-h3row"><h3>${this.t("device")}</h3>',
             ].join('\n'),
@@ -3032,7 +3277,48 @@ function deviceDatapoint(name: string, code: string): string {
                 '            ${admin',
                 '              ? html`<button class="fp3d-btn" @click=${() => window.dispatchEvent(new CustomEvent("iobroker-datapoint", { detail: { entityId: pl.entity_id } }))}>${this.t("datapoint_change")}</button>`',
                 '              : nothing}',
-                '          </p>`',
+                '          </p>',
+                '          <div class="fp3d-form">',
+                '            <label class="fp3d-field fp3d-wide"',
+                '              >${this.t("device_reach" as I18nKey)}',
+                '              <select',
+                '                ?disabled=${!admin}',
+                '                @change=${(e: Event) => {',
+                '                  const v = (e.target as HTMLSelectElement).value;',
+                '                  fp3dSetReach(v === "minutes" ? 15 : v === "report" || v === "never" ? v : null);',
+                '                }}',
+                '              >',
+                '                ${(["", "report", "minutes", "never"] as const).map(',
+                '                  (k) => html`<option value=${k} ?selected=${k === (typeof fp3dReach === "number" ? "minutes" : (fp3dReach ?? ""))}>${this.t(`device_reach_${k || "house"}` as I18nKey)}</option>`,',
+                '                )}',
+                '              </select></label',
+                '            >',
+                '            ${typeof fp3dReach === "number" && admin ? this.num(this.t("device_reach_min" as I18nKey), fp3dReach, (v) => fp3dSetReach(Math.round(Math.min(10080, Math.max(1, v)))), 1, 1) : nothing}',
+                '            <label class="fp3d-check fp3d-wide"',
+                '              ><input',
+                '                type="checkbox"',
+                '                ?disabled=${!admin}',
+                '                .checked=${!!this.hass?.states[pl.entity_id]?.attributes.iobroker_reach_connected}',
+                '                @change=${(e: Event) => window.dispatchEvent(new CustomEvent("iobroker-reach", { detail: { entityId: pl.entity_id, connected: (e.target as HTMLInputElement).checked } }))}',
+                '              />',
+                '              ${this.t("device_reach_connected" as I18nKey)}</label',
+                '            >',
+                '            <div class="fp3d-field fp3d-wide">',
+                '              ${this.t("device_battery" as I18nKey)}',
+                '              <span class="fp3d-datapoint">',
+                '                ${fp3dBattery ? html`<code>${fp3dBattery}</code>` : html`<span>${this.t((fp3dBatteryOwn === "none" ? "device_battery_none" : "device_battery_missing") as I18nKey)}</span>`}',
+                '                ${fp3dBatteryFrom ? html`<small class="fp3d-sub">(${this.t(`device_battery_${fp3dBatteryFrom}` as I18nKey)})</small>` : nothing}',
+                '              </span>',
+                '              ${admin',
+                '                ? html`<span class="fp3d-datapoint">',
+                '                    <button class="fp3d-btn" @click=${() => fp3dSetBattery({ pick: true })}>${this.t("device_battery_pick" as I18nKey)}</button>',
+                '                    ${fp3dBatteryOwn !== "none" ? html`<button class="fp3d-btn" @click=${() => fp3dSetBattery({ battery: "none" })}>${this.t("device_battery_no" as I18nKey)}</button>` : nothing}',
+                '                    ${fp3dBatteryFrom === "own" ? html`<button class="fp3d-btn" @click=${() => fp3dSetBattery({ battery: null })}>${this.t("device_battery_auto" as I18nKey)}</button>` : nothing}',
+                '                  </span>`',
+                '                : nothing}',
+                '            </div>',
+                '          </div>',
+                '          <p class="fp3d-sub">${this.t("device_reach_hint" as I18nKey)}</p>`',
                 '        : nothing}',
                 '      <div class="fp3d-form">',
             ].join('\n'),
@@ -3062,13 +3348,13 @@ function deviceDatapoint(name: string, code: string): string {
         code = replaceRequired(
             code,
             '  marker_height: "Höhe des Symbols (m)",',
-            '  marker_height: "Höhe des Symbols (m)",\n  datapoint: "Datenpunkt",\n  datapoint_change: "Ändern …",\n  datapoint_add: "+ Datenpunkt aus ioBroker",',
+            '  marker_height: "Höhe des Symbols (m)",\n  datapoint: "Datenpunkt",\n  datapoint_change: "Ändern …",\n  datapoint_add: "+ Datenpunkt aus ioBroker",\n  device_reach: "Nicht erreichbar (Technik)",\n  device_reach_house: "Standard (⚙ Wetter & Warnungen)",\n  device_reach_report: "Wie das Gerät meldet",\n  device_reach_minutes: "Nach … Minuten ohne Update",\n  device_reach_never: "Nie (z. B. 12-V-Gerät, das abgeschaltet wird)",\n  device_reach_min: "Minuten ohne Update",\n  device_reach_connected: "Nur prüfen, solange sein Adapter verbunden ist (z. B. NMEA: Instrumente aus = normal)",\n  device_battery: "Batterie (Technik)",\n  device_battery_detector: "gefunden vom type-detector",\n  device_battery_guess: "vermutet nach Name und Rolle",\n  device_battery_own: "selbst gewählt",\n  device_battery_missing: "keine gefunden",\n  device_battery_none: "keine Batterie",\n  device_battery_pick: "Wählen …",\n  device_battery_no: "Keine Batterie",\n  device_battery_auto: "Automatisch",\n  device_reach_hint: "Gilt für das ganze Gerät, auch seine anderen Datenpunkte. Batteriegeräte schlafen zwischen zwei Meldungen: „Nach … Minuten“ mit etwas mehr als ihrem Sendeabstand. Geräte am Bordnetz, die mit ihm abgeschaltet werden: „Nie“ – dann zählt auch ein getrennter Adapter nicht. Die Batterie sucht zuerst der type-detector, sonst Name und Rolle; findet keiner die richtige, wähle sie hier (eine Zahl: Ladung in %, true/false: Batterie schwach).",',
             'datapoint de',
         );
         code = replaceRequired(
             code,
             '  marker_height: "Marker height (m)",',
-            '  marker_height: "Marker height (m)",\n  datapoint: "Datapoint",\n  datapoint_change: "Change …",\n  datapoint_add: "+ Datapoint from ioBroker",',
+            '  marker_height: "Marker height (m)",\n  datapoint: "Datapoint",\n  datapoint_change: "Change …",\n  datapoint_add: "+ Datapoint from ioBroker",\n  device_reach: "Unreachable (Technik)",\n  device_reach_house: "Default (⚙ Weather & warnings)",\n  device_reach_report: "As the device reports",\n  device_reach_minutes: "After … minutes without an update",\n  device_reach_never: "Never (e.g. a 12 V device that is switched off)",\n  device_reach_min: "Minutes without an update",\n  device_reach_connected: "Check only while its adapter is connected (e.g. NMEA: instruments off = normal)",\n  device_battery: "Battery (Health)",\n  device_battery_detector: "found by the type-detector",\n  device_battery_guess: "guessed by name and role",\n  device_battery_own: "chosen here",\n  device_battery_missing: "none found",\n  device_battery_none: "no battery",\n  device_battery_pick: "Choose …",\n  device_battery_no: "No battery",\n  device_battery_auto: "Automatic",\n  device_reach_hint: "Counts for the whole device, also its other datapoints. Battery devices sleep between their reports: after … minutes with a little more than their interval. Devices on the on-board supply that are switched off with it: never – then a disconnected adapter does not count either.",',
             'datapoint en',
         );
     }
@@ -3515,6 +3801,7 @@ const patches: Plugin = {
         code = wheelOverLabels(name, code);
         code = sensorLook(name, code);
         code = editorDevices(name, code);
+        code = markerLooks(name, code);
         code = solarText(name, code);
         code = sunArcFloor(name, code);
         code = keepFloor(name, code);

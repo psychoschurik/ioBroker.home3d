@@ -97,6 +97,60 @@ export function sensorText(st: SensorState | undefined, text: string, language =
  * The symbol of a device in the floor plan of the editor as an SVG path (24 × 24, filled): its own symbol, else the
  * one of the sensor; null: the usual symbol of its kind (only symbols of mdi-paths.ts can be drawn at once).
  */
+/** Symbols offered under "Eigenes Symbol" (Material Design names without "mdi:"); any other name can be typed. */
+export const ICON_PICKS: readonly string[] = [
+    'water',
+    'water-alert',
+    'water-percent',
+    'thermometer',
+    'fire',
+    'smoke-detector-variant',
+    'gas-cylinder',
+    'motion-sensor',
+    'door',
+    'door-open',
+    'window-closed-variant',
+    'window-open-variant',
+    'lightbulb',
+    'power-plug',
+    'power-socket-eu',
+    'fan',
+    'battery',
+    'battery-alert',
+    'flash',
+    'solar-power',
+    'weather-rainy',
+    'weather-windy',
+    'anchor',
+    'sail-boat',
+    'ferry',
+    'engine',
+    'pump',
+    'gauge',
+    'lock',
+    'bell-alert',
+    'alert',
+    'car',
+    'wifi',
+    'speaker',
+    'television',
+    'washing-machine',
+];
+
+/**
+ * A marker's own colour while active: null when it is not "#rrggbb", else the writing that reads on it (dark on a
+ * light colour, white on a dark one).
+ */
+export function markerInk(color: string | null | undefined): '#2a1a00' | '#fff' | null {
+    if (!color || !/^#[0-9a-f]{6}$/i.test(color)) {
+        return null;
+    }
+    const [r, g, b] = [1, 3, 5]
+        .map(i => parseInt(color.slice(i, i + 2), 16) / 255)
+        .map(v => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18 ? '#2a1a00' : '#fff';
+}
+
 export function sensorPath(icon: string | null | undefined, st: SensorState | undefined): string | null {
     const own = icon ? bundledPath(icon) : null;
     if (own) {

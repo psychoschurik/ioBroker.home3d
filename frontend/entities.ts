@@ -63,6 +63,20 @@ function validateMappings(mappings: Mapping[], objects: Record<string, StateObje
                 fail('else der Bedingung muss Text sein.');
             }
         }
+        if (
+            m.reach !== undefined &&
+            m.reach !== 'report' &&
+            m.reach !== 'never' &&
+            !(Number.isInteger(m.reach) && m.reach >= 1 && m.reach <= 10080)
+        ) {
+            fail(`„Nicht erreichbar“: report, never oder 1 bis 10080 Minuten: ${m.entity_id}`);
+        }
+        if (m.reach_connected !== undefined && typeof m.reach_connected !== 'boolean') {
+            fail(`reach_connected muss true oder false sein: ${m.entity_id}`);
+        }
+        if (m.battery !== undefined && (typeof m.battery !== 'string' || !/^[^\s*?"'`]{1,300}$/.test(m.battery))) {
+            fail(`„Batterie“ muss ein Datenpunkt oder none sein: ${m.entity_id}`);
+        }
         for (const binding of Object.values(m.attributes || {})) {
             if (typeof binding === 'object' && binding?.id && !objects[binding.id]) {
                 fail(`Attribut-Datenpunkt fehlt: ${binding.id}`);
@@ -189,6 +203,9 @@ function entities(
             iobroker_id: m.state,
             iobroker_role: objects[m.state]?.common?.role || '',
             iobroker_type: objects[m.state]?.common?.type || '',
+            ...(m.reach !== undefined ? { iobroker_reach: m.reach } : {}),
+            ...(m.reach_connected ? { iobroker_reach_connected: true } : {}),
+            ...(m.battery ? { iobroker_battery_own: m.battery } : {}),
         };
         for (const [key, binding] of Object.entries(m.attributes || {})) {
             attributes[key] =

@@ -18,6 +18,8 @@ export interface HealthIds {
     /** The adapter instance: its connection indicator and whether it runs. */
     connection?: string;
     alive?: string;
+    /** Where the battery came from: the type-detector, a guess by name and role, or chosen at the device. */
+    detected?: 'detector' | 'guess' | 'own';
 }
 
 const LOWBAT = /^(lowbat|low_bat|lowbattery|low_battery|battery_low|batterylow|bat_low|batlow|lowbatt)$/i;
@@ -49,6 +51,19 @@ export function deviceOf(id: string): string | null {
         return null;
     }
     return parts.slice(0, 3).join('.');
+}
+
+/**
+ * The device one level deeper when `device` (an object of `type`) is only a folder of devices and datapoint `id` lies
+ * below one more level: `shelly.0.ble` holds the Bluetooth sensors `shelly.0.ble.<mac>`.
+ */
+export function folderDevice(id: string, device: string, type: string | undefined): string {
+    if (type !== 'folder') {
+        return device;
+    }
+    const n = device.split('.').length + 1;
+    const parts = id.split('.');
+    return parts.length > n ? parts.slice(0, n).join('.') : device;
 }
 
 const parentOf = (id: string): string => id.slice(0, id.lastIndexOf('.'));
@@ -209,10 +224,81 @@ export function healthStateIds(health: ReadonlyMap<string, HealthIds>): string[]
 /** At most this many devices are read (a plan with very many devices stays quick to open). */
 const MAX_DEVICES = 400;
 
+/** The part of the type-detector this file needs (loaded on demand). */
+export interface Detector {
+    detect(options: {
+        objects: Record<string, never>;
+        id: string;
+        ignoreEnums?: boolean;
+        ignoreCache?: boolean;
+    }): { states: { name: string; id: string }[] }[] | null;
+}
+
+const DETECTED: Record<string, 'lowbat' | 'battery' | 'unreach' | 'reach'> = {
+    LOWBAT: 'lowbat',
+    BATTERY: 'battery',
+    UNREACH: 'unreach',
+    CONNECTED: 'reach',
+};
+
+type Indicators = Partial<Pick<HealthIds, 'lowbat' | 'battery' | 'unreach' | 'reach'>>;
+
+/**
+ * The health datapoints the type-detector of ioBroker finds for datapoint `id` among `objects` (the states of its
+ * device with the device and its channels): the indicators LOWBAT, BATTERY, UNREACH and CONNECTED of the control the
+ * datapoint belongs to.
+ */
+export function detectHealth(detector: Detector, id: string, objects: Record<string, StateObject>): Indicators {
+    let controls: { states: { name: string; id: string }[] }[] | null = null;
+    try {
+        controls = detector.detect({
+            objects: objects as unknown as Record<string, never>,
+            id,
+            ignoreEnums: true,
+            ignoreCache: true,
+        });
+    } catch {
+        return {};
+    }
+    const control = controls?.find(c => c.states.some(s => s.id === id)) ?? controls?.[0];
+    const out: Indicators = {};
+    for (const s of control?.states ?? []) {
+        const kind = DETECTED[s.name];
+        if (kind && s.id && objects[s.id] && !out[kind]) {
+            out[kind] = s.id;
+        }
+    }
+    return out;
+}
+
+/** The type-detector of ioBroker, loaded once when it is first needed. */
+let detectorLoad: Promise<Detector | null> | null = null;
+function loadDetector(): Promise<Detector | null> {
+    detectorLoad ??= import('@iobroker/type-detector')
+        .then(m => new m.ChannelDetector() as unknown as Detector)
+        .catch(() => null);
+    return detectorLoad;
+}
+
+/** The parents of datapoint `id` from the three-part device on (the device, its channels). */
+function parents(id: string): string[] {
+    const parts = id.split('.');
+    const out: string[] = [];
+    for (let n = 3; n < parts.length; n++) {
+        out.push(parts.slice(0, n).join('.'));
+    }
+    return out;
+}
+
 /**
  * Finds the health datapoints of the mapped datapoints. `list(prefix)` gives the state objects below a device,
- * `get(ids)` the objects of some IDs (for the adapter's indicators); both are asked once per device or instance
- * (`cache` keeps them between calls).
+ * `get(ids)` the objects of some IDs (the device and its channels, the adapter's indicators, a chosen battery); both
+ * are asked once per device or instance (`cache` keeps them between calls).
+ *
+ * The battery and reachability come from the type-detector first, then from the names and roles of the device's
+ * states (`pickHealth`). `own` (mapped datapoint → its `battery` setting) wins: the chosen datapoint (a number: the
+ * charge, true/false: low battery) or `none`; it counts for the whole device. `detected` says where the battery came
+ * from. `detector`: the type-detector to use (undefined: the one of ioBroker, loaded on demand; null: none).
  */
 export async function findHealth(
     ids: readonly string[],
@@ -220,18 +306,74 @@ export async function findHealth(
     list: (prefix: string) => Promise<Record<string, StateObject>>,
     get: (ids: string[]) => Promise<Record<string, StateObject>>,
     cache: Map<string, Record<string, StateObject>> = new Map(),
+    own: ReadonlyMap<string, string> = new Map(),
+    detector?: Detector | null,
 ): Promise<Map<string, HealthIds>> {
     const out = new Map<string, HealthIds>();
-    const targets = new Map<string, { target: string; device: string; prefix: string }>();
+    const found = new Map<string, { target: string; device: string; solo: boolean }>();
     for (const id of ids) {
         const target = aliasTarget(objects[id]) ?? id;
         const device = deviceOf(target);
         if (device) {
-            targets.set(id, { target, device, prefix: scanPrefix(target, device) });
+            found.set(id, { target, device, solo: false });
+        } else if (own.has(id)) {
+            // no device of an adapter (a script's datapoint): only the battery chosen for it
+            found.set(id, { target, device: target, solo: true });
         }
     }
-    const devices = [...new Set([...targets.values()].map(t => t.device))];
-    const prefixes = [...new Set([...targets.values()].map(t => t.prefix))].slice(0, MAX_DEVICES);
+    const objectOf = (id: string): StateObject | undefined => cache.get(`#${id}`)?.[id];
+    // The objects of the devices and their channels (is it a folder? the type-detector needs them), of the adapters'
+    // indicators and of the chosen batteries, asked together; a folder of devices (Shelly's "ble" with its Bluetooth
+    // sensors) puts the device one level deeper, asked again then.
+    const real = [...found.values()].filter(t => !t.solo);
+    const instances = [...new Set(real.map(t => t.device.split('.').slice(0, 2).join('.')))];
+    let ask = [
+        ...new Set([
+            ...real.flatMap(t => parents(t.target)),
+            ...instances.flatMap(i => [`${i}.info.connection`, `system.adapter.${i}.alive`]),
+            ...[...own.values()].filter(b => b !== 'none'),
+        ]),
+    ];
+    for (let round = 0; round < 4; round++) {
+        const missing = ask.filter(i => !cache.has(`#${i}`));
+        if (missing.length) {
+            let got: Record<string, StateObject> = {};
+            try {
+                got = await get(missing);
+            } catch {
+                // without the objects: the first three parts are the device, the adapter is not watched
+            }
+            for (const i of missing) {
+                cache.set(`#${i}`, got[i] ? { [i]: got[i] } : {});
+            }
+        }
+        ask = [];
+        for (const t of real) {
+            const deeper = folderDevice(t.target, t.device, objectOf(t.device)?.type);
+            if (deeper !== t.device) {
+                t.device = deeper;
+                ask.push(deeper);
+            }
+        }
+        if (!ask.length) {
+            break;
+        }
+    }
+    // a battery chosen at one datapoint counts for its whole device
+    const chosen = new Map<string, string>();
+    for (const [id, t] of found) {
+        const b = own.get(id);
+        if (b && !chosen.has(t.device)) {
+            chosen.set(t.device, b);
+        }
+    }
+    const targets = new Map<string, { target: string; device: string; prefix: string | null }>();
+    for (const [id, { target, device, solo }] of found) {
+        targets.set(id, { target, device, prefix: solo ? null : scanPrefix(target, device) });
+    }
+    const prefixes = [
+        ...new Set([...targets.values()].map(t => t.prefix).filter((p): p is string => p !== null)),
+    ].slice(0, MAX_DEVICES);
     await Promise.all(
         prefixes
             .filter(d => !cache.has(d))
@@ -243,34 +385,55 @@ export async function findHealth(
                 }
             }),
     );
-    const instances = [...new Set(devices.map(d => d.split('.').slice(0, 2).join('.')))];
-    const indicators = instances.flatMap(i => [`${i}.info.connection`, `system.adapter.${i}.alive`]);
-    const missing = indicators.filter(i => !cache.has(`#${i}`));
-    if (missing.length) {
-        let found: Record<string, StateObject> = {};
-        try {
-            found = await get(missing);
-        } catch {
-            // without the objects the adapter is not watched
-        }
-        for (const i of missing) {
-            cache.set(`#${i}`, found[i] ? { [i]: found[i] } : {});
-        }
-    }
+    const det = detector === undefined ? (prefixes.length ? await loadDetector() : null) : detector;
     for (const [id, { target, device, prefix }] of targets) {
-        const objs = cache.get(prefix);
+        const objs = prefix === null ? {} : cache.get(prefix);
         if (!objs) {
             continue;
         }
         const h = pickHealth(target, device, objs);
-        const inst = device.split('.').slice(0, 2).join('.');
-        if (Object.keys(cache.get(`#${inst}.info.connection`) ?? {}).length) {
-            h.connection = `${inst}.info.connection`;
+        if (h.battery || h.lowbat) {
+            h.detected = 'guess';
         }
-        if (Object.keys(cache.get(`#system.adapter.${inst}.alive`) ?? {}).length) {
-            h.alive = `system.adapter.${inst}.alive`;
+        if (det && prefix !== null) {
+            // the type-detector sees the states with their device and channels
+            const withParents: Record<string, StateObject> = { ...objs };
+            for (const p of parents(target)) {
+                const o = objectOf(p);
+                if (o) {
+                    withParents[p] = o;
+                }
+            }
+            const d = detectHealth(det, target, withParents);
+            if (d.battery || d.lowbat) {
+                delete h.battery;
+                delete h.lowbat;
+                h.detected = 'detector';
+            }
+            Object.assign(h, d);
         }
-        if (h.lowbat || h.battery || h.unreach || h.reach || h.connection || h.alive) {
+        const choice = chosen.get(device);
+        if (choice) {
+            delete h.battery;
+            delete h.lowbat;
+            h.detected = 'own';
+            const o = choice === 'none' ? undefined : objectOf(choice);
+            if (o?.common.type === 'boolean') {
+                h.lowbat = choice;
+            } else if (o) {
+                h.battery = choice;
+            }
+        }
+        if (prefix !== null) {
+            const inst = device.split('.').slice(0, 2).join('.');
+            if (Object.keys(cache.get(`#${inst}.info.connection`) ?? {}).length) {
+                h.connection = `${inst}.info.connection`;
+            }
+            if (Object.keys(cache.get(`#system.adapter.${inst}.alive`) ?? {}).length) {
+                h.alive = `system.adapter.${inst}.alive`;
+            }
+        }
+        if (h.lowbat || h.battery || h.unreach || h.reach || h.connection || h.alive || h.detected === 'own') {
             out.set(id, h);
         }
     }

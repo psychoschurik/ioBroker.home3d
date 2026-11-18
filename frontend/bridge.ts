@@ -1,7 +1,7 @@
 // Entry of the page: connects the 3D frontend to ioBroker over the socket of the web adapter.
 // Values come as push (subscribeState) and only for the datapoints that are mapped to devices.
 import { element as $ } from './dom.js';
-import type { Hass, CallWS, ProtocolMessage, ProtocolRecord, StateObject, StateValue } from './types.js';
+import type { Hass, CallWS, Mapping, ProtocolMessage, ProtocolRecord, StateObject, StateValue } from './types.js';
 import './mdi-icon.js';
 import './vendor/home3d.js';
 import { historyDuringPeriod, historyEnabled, statisticsDuringPeriod, timeTravelHistory } from './history.js';
@@ -104,6 +104,7 @@ async function follow(): Promise<void> {
         prefix => io.statesUnder(prefix),
         list => io.getObjects(list),
         healthCache,
+        new Map(store.data.mappings.filter(m => m.battery).map(m => [m.state, m.battery as string])),
     ).catch(() => new Map<string, HealthIds>());
     const ids = [...new Set([...mapped, ...healthStateIds(health)])];
     const next = new Set(ids);
@@ -124,29 +125,56 @@ async function follow(): Promise<void> {
 }
 /** The device health (battery, reachability, adapter) as attributes of the entities; mapped attributes win. */
 function withHealth(list: ReturnType<typeof entities>): ReturnType<typeof entities> {
-    const minutes = store.data.health_stale_min ?? null;
+    const house = store.data.health_stale_min ?? null;
     // with "unreachable after X minutes": every mapped datapoint of a device is a sign of its life
     const own = new Map<string, string[]>();
-    if (minutes) {
-        for (const [id, h] of health) {
-            own.set(h.device, [...(own.get(h.device) ?? []), id]);
+    // a device's own setting ("nicht erreichbar" at one of its datapoints) counts for all of its datapoints
+    const chosen = new Map<string, Mapping>();
+    const set = (m: Mapping): boolean => m.reach !== undefined || !!m.reach_connected;
+    for (const m of store.data.mappings) {
+        const h = health.get(m.state);
+        if (h) {
+            own.set(h.device, [...(own.get(h.device) ?? []), m.state]);
+            if (set(m) && !chosen.has(h.device)) {
+                chosen.set(h.device, m);
+            }
         }
     }
     const now = Date.now();
     for (const m of store.data.mappings) {
-        const h = health.get(m.state);
         const e = list[m.entity_id];
-        if (h && e) {
-            const a = healthAttributes(h, states, now, {
-                staleMs: minutes ? minutes * 60_000 : null,
-                own: own.get(h.device),
-            });
-            // a player that is off is just not connected (a TV's cast session)
-            if (m.entity_id.startsWith('media_player.')) {
-                delete a.unreachable;
-            }
-            e.attributes = { ...a, ...e.attributes };
+        // without health datapoints of its own a device is judged by its updates when its setting asks for it
+        const h =
+            health.get(m.state) ?? (m.reach === 'never' || typeof m.reach === 'number' ? { device: m.state } : null);
+        if (!h || !e) {
+            continue;
         }
+        const setting = set(m) ? m : chosen.get(h.device);
+        const reach = setting?.reach;
+        const minutes = reach === undefined ? house : typeof reach === 'number' ? reach : null;
+        const a = healthAttributes(h, states, now, {
+            staleMs: minutes ? minutes * 60_000 : null,
+            own: own.get(h.device) ?? [m.state],
+        });
+        // a player that is off is just not connected (a TV's cast session); "never": a device switched off on purpose
+        // (12 V), also when its adapter loses the connection then
+        if (reach === 'never' || m.entity_id.startsWith('media_player.')) {
+            delete a.unreachable;
+        }
+        if (reach === 'never') {
+            delete a.iobroker_adapter;
+        }
+        // checked only while its adapter is connected: switched off with the boat, its values are not stale then
+        if (setting?.reach_connected && a.iobroker_adapter === 'disconnected') {
+            delete a.iobroker_adapter;
+            delete a.unreachable;
+        }
+        // the editor shows which battery counts and where it came from
+        a.iobroker_battery_id = h.battery ?? h.lowbat ?? null;
+        if (h.detected) {
+            a.iobroker_battery_from = h.detected;
+        }
+        e.attributes = { ...a, ...e.attributes };
     }
     return list;
 }

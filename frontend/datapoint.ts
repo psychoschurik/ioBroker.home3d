@@ -75,6 +75,93 @@ export function setupDatapoints(o: DatapointOptions): void {
         })().catch(fail);
     });
 
+    // the editor's device form: when the device counts as unreachable (null: as set for the house)
+    window.addEventListener('iobroker-reach', ev => {
+        const detail =
+            (ev as CustomEvent<{ entityId?: string; reach?: Mapping['reach'] | null; connected?: boolean }>).detail ??
+            {};
+        const { entityId, reach, connected } = detail;
+        void (async () => {
+            const mappings = strip((await o.callWS({ type: 'iobroker/mappings/get' })) as Mapping[]);
+            const m = mappings.find(x => x.entity_id === entityId);
+            if (!m) {
+                throw new Error(`Kein ioBroker-Gerät: ${entityId}`);
+            }
+            const next: Mapping = { ...m };
+            if ('reach' in detail) {
+                if (reach === null || reach === undefined) {
+                    delete next.reach;
+                } else {
+                    next.reach = reach;
+                }
+            }
+            if ('connected' in detail) {
+                if (connected) {
+                    next.reach_connected = true;
+                } else {
+                    delete next.reach_connected;
+                }
+            }
+            await o.callWS({
+                type: 'iobroker/mappings/set',
+                mappings: mappings.map(x => (x.entity_id === m.entity_id ? next : x)),
+            });
+            await o.refresh();
+            o.setStatus(`${m.name || m.entity_id} · „nicht erreichbar“ gespeichert`);
+        })().catch(fail);
+    });
+
+    // the editor's device form: the battery of the device – a datapoint chosen in the object browser, "none", or null
+    // (found automatically again); a choice counts for the whole device, so others of the same device are dropped
+    window.addEventListener('iobroker-battery', ev => {
+        const detail =
+            (
+                ev as CustomEvent<{
+                    entityId?: string;
+                    battery?: string | null;
+                    pick?: boolean;
+                    current?: string | null;
+                    device?: string[];
+                }>
+            ).detail ?? {};
+        void (async () => {
+            const mappings = strip((await o.callWS({ type: 'iobroker/mappings/get' })) as Mapping[]);
+            const m = mappings.find(x => x.entity_id === detail.entityId);
+            if (!m) {
+                throw new Error(`Kein ioBroker-Gerät: ${detail.entityId}`);
+            }
+            const name = m.name || m.entity_id;
+            let battery = detail.battery ?? null;
+            if (detail.pick) {
+                const start = m.battery && m.battery !== 'none' ? m.battery : (detail.current ?? m.state);
+                const id = await pickOne(o, start, `Batterie für ${name}`);
+                if (!id) {
+                    return;
+                }
+                const obj = (await o.io.getObjects([id]))[id];
+                if (obj?.type !== 'state') {
+                    throw new Error(`${id} ist kein Datenpunkt.`);
+                }
+                battery = id;
+            }
+            const same = new Set(detail.device ?? []);
+            const next = mappings.map(x => {
+                if (x.entity_id !== m.entity_id && !(same.has(x.entity_id) && x.battery !== undefined)) {
+                    return x;
+                }
+                const y: Mapping = { ...x };
+                delete y.battery;
+                if (battery && x.entity_id === m.entity_id) {
+                    y.battery = battery;
+                }
+                return y;
+            });
+            await o.callWS({ type: 'iobroker/mappings/set', mappings: next });
+            await o.refresh();
+            o.setStatus(`${name} · Batterie: ${battery === 'none' ? 'keine' : (battery ?? 'automatisch')}`);
+        })().catch(fail);
+    });
+
     // the editor's house settings: the position from a datapoint (GPS on a boat), or again from the system settings
     window.addEventListener('iobroker-position', ev => {
         const clear = !!(ev as CustomEvent<{ clear?: boolean }>).detail?.clear;

@@ -16,7 +16,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 | `frontend/iobroker.ts` | `IoBroker`: socket-client wrapper, implements `IoAccess` (objects/states) and `FileAccess` (files of `home3d.0`) |
 | `frontend/store.ts` | `Store`: plans, history, images, mappings; handles every `callWS` message of the 3D frontend |
 | `frontend/entities.ts` | Mapping ioBroker datapoints ↔ devices of the 3D frontend, validation, actions (`execute`) |
-| `frontend/health.ts` | Battery, low battery, reachability and adapter state of the mapped devices: found once per device below its datapoint, subscribed, given to the entities as attributes; a battery device counts as unreachable only after 48 h without a message (it sleeps), or, with `health_stale_min`, after that many minutes without an update of any of its datapoints |
+| `frontend/health.ts` | Battery, low battery, reachability and adapter state of the mapped devices: found once per device below its datapoint (the type-detector first, then by name and role; a folder of devices such as `shelly.0.ble` puts the device one level deeper), subscribed, given to the entities as attributes; a battery device counts as unreachable only after 48 h without a message (it sleeps), or, with `health_stale_min`, after that many minutes without an update of any of its datapoints |
 | `frontend/history.ts`, `sun.ts`, `more-info.ts`, `mdi-icon.ts` | `history/history_during_period`, `home3d/timetravel/history` and `recorder/statistics_during_period` (energy) from the history adapters (beside `Store.call()`); `sun.sun` from the system position; detail dialog with history curve; `<ha-icon>` drawn with `@mdi/js` (full set loaded on demand) |
 | `frontend/device-dialog.ts`, `object-tree.ts`, `entity-picker.ts` | "Geräte verbinden" dialog with object tree |
 | `frontend/datapoint.ts` | Datapoints chosen at the device in the editor (events `iobroker-datapoint`, `iobroker-add-devices` from the patched editor): object browser, change or add mappings |
@@ -53,6 +53,11 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
   `entity_picture` of a media player such as a YouTube thumbnail); links of the upstream frontend are rewritten to `help.html` in `tasks.ts`.
 - A mapping may have a condition `when: { id, values, else }`: its state counts only while datapoint `id` has one of
   `values`, else the device shows `else` (default "off"); `id` is subscribed like the state.
+- A mapping may have `reach` (`report`, `never` or minutes) and `reach_connected` (checked only while its adapter is
+  connected): when its device counts as unreachable in "Technik"; set at one datapoint, it counts for the whole
+  device (`withHealth` in `bridge.ts`); missing: `health_stale_min` of the house.
+- A mapping may have `battery`: the datapoint of its device's battery (number: %, boolean: low) or `none`; it wins
+  over the type-detector and the guess (`findHealth`) and counts for the whole device.
 - Writes to datapoints only through `execute()` (type, min/max and `write` are checked before the first write).
 - `Store.call()` serializes all requests, reloads `data.json` before changes (stale check against other browsers)
   and rolls back memory if a write fails. Events are sent only after success.

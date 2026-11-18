@@ -57,6 +57,23 @@ export interface Mapping extends Binding {
     entity_id: string;
     state: string;
     when?: Condition;
+    /**
+     * When the device counts as unreachable ("Technik"): as the device reports, after this many minutes without an
+     * update (a battery device that sleeps between its reports), or never (a 12 V device switched off with the boat).
+     * Missing: as set for the house (`health_stale_min`). Counts for the whole device, also its other datapoints.
+     */
+    reach?: 'report' | 'never' | number;
+    /**
+     * Checked only while its adapter is connected: a lost connection is normal for it (NMEA instruments switched off
+     * with the boat), its values are not stale then. A stopped adapter still counts. Also for the whole device.
+     */
+    reach_connected?: boolean;
+    /**
+     * The battery of its device in "Technik": a datapoint (a number: the charge in %, true/false: low battery) or
+     * `none` (no battery, e.g. on the on-board supply); missing: found by the type-detector or by name and role.
+     * Set at one datapoint, it counts for the whole device.
+     */
+    battery?: string;
     name?: string;
     area_id?: string;
     attributes?: Record<string, any>;

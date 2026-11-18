@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { entities, execute, validateMappings, wmoCondition } from '../frontend/entities';
 import { mappedIds } from '../frontend/store';
 import { historyDuringPeriod, loggedBy, statisticsDuringPeriod, timeTravelHistory, type HistoryAccess } from '../frontend/history';
-import { sensorIcon, sensorShow, sensorText } from '../frontend/vendor-ext/sensor-look';
+import { ICON_PICKS, markerInk, sensorIcon, sensorShow, sensorText } from '../frontend/vendor-ext/sensor-look';
+import * as mdi from '@mdi/js';
 import type { IoAccess, Mapping, StateObject } from '../frontend/model';
 
 const object = (type: string, extra: Record<string, unknown> = {}): StateObject =>
@@ -289,4 +290,16 @@ test('a condition: the dishwasher runs only while the shared plug says the dishw
     assert.deepEqual(mappedIds([dishwasher]), ['ll.state', 'll.appliance']);
     assert.deepEqual(validateMappings([dishwasher], objects), [dishwasher]);
     assert.throws(() => validateMappings([{ ...dishwasher, when: { id: 'll.gone', values: [] } }], objects));
+});
+
+test('own marker colours: the writing reads on them, the offered symbols exist', () => {
+    assert.equal(markerInk('#ffb547'), '#2a1a00');
+    assert.equal(markerInk('#1565c0'), '#fff');
+    assert.equal(markerInk('#d32f2f'), '#fff');
+    assert.equal(markerInk('red'), null);
+    assert.equal(markerInk('#fff;color:red'), null);
+    assert.equal(markerInk(null), null);
+    const known = mdi as unknown as Record<string, string>;
+    const missing = ICON_PICKS.filter(n => !known[`mdi${n.replace(/(^|-)([a-z0-9])/g, (_, _d: string, c: string) => c.toUpperCase())}`]);
+    assert.deepEqual(missing, []);
 });

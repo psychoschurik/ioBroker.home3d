@@ -37,7 +37,7 @@ import {
     warningLevel,
     warningText,
 } from '../frontend/vendor-ext/home-data';
-import { healthReport, homeScene, homeWatched, type BuildingLike, type HomeInput } from '../frontend/vendor-ext/home-view';
+import { gearMarkers, healthReport, homeScene, homeWatched, type BuildingLike, type HomeInput } from '../frontend/vendor-ext/home-view';
 
 const st = (state: string, attributes: Record<string, unknown> = {}, last_changed?: string): StateLike => ({
     state,
@@ -372,6 +372,20 @@ test('home: open window while heating, mould, water, garden', () => {
     assert.equal(warn?.text, 'home_window_heat(30)');
     assert.equal(out.scene.moulds[0]?.id, 'living');
     assert.equal(out.scene.moulds[0].level, 2);
+    // the mould risk switched off on its own: the air at the window stays
+    const quiet = house();
+    quiet.settings = { ...quiet.settings, mould: false };
+    const noMould = homeScene(
+        input(quiet, states, {
+            openings: new Map([['w1', { open: 1, tilt: 0, open2: 0, tilt2: 0 }]]),
+            contacts: new Map([['w1', 'binary_sensor.w1']]),
+            climate: (_f, r) => (r.id === 'living' ? { t: 20, rh: 65 } : { t: null, rh: null }),
+            tOut: 0,
+            wind: { to: [0, 1], speed: 6 },
+        }),
+    );
+    assert.equal(noMould.scene.moulds.length, 0);
+    assert.equal(noMould.scene.airs.length, 1);
     assert.equal(out.scene.streams[0]?.id, 'sh');
     assert.equal(out.scene.sprinklers[0]?.on, true);
     assert.equal(out.scene.mowers[0]?.phase, 'mowing');
@@ -470,6 +484,23 @@ test('cars: present by their datapoint, in the garage or outside', () => {
     assert.ok(homeWatched({ states }, b, () => [], false).includes('binary_sensor.car'));
 });
 
+test('gear with a sensor of its own gets a spot for its badge, once per sensor', () => {
+    const b = house();
+    b.floors[0].furniture.push(
+        { id: 'h1', type: 'hatch', x: 2, z: 2, w: 0.6, d: 0.6, h: 0.06, rotation: 0, gear_entity: 'binary_sensor.hatch' },
+        // a second hatch on the same contact, a placed device and one without a sensor
+        { id: 'h2', type: 'hatch', x: 3, z: 2, w: 0.6, d: 0.6, h: 0.06, rotation: 0, gear_entity: 'binary_sensor.hatch' },
+        { id: 'h3', type: 'hatch', x: 6, z: 2, w: 0.6, d: 0.6, h: 0.06, rotation: 0, gear_entity: 'binary_sensor.placed' },
+        { id: 'h4', type: 'hatch', x: 6, z: 3, w: 0.6, d: 0.6, h: 0.06, rotation: 0, gear_entity: 'none' },
+    );
+    const m = gearMarkers(b, new Set(['binary_sensor.placed']));
+    assert.deepEqual(
+        m.map(x => [x.id, x.roomId, x.x]),
+        [['binary_sensor.hatch', 'living', 2]],
+    );
+    near(m[0].y, 0.26, 1e-9);
+});
+
 test('health report: one device per physical device, per room', () => {
     const b = house();
     const states: Record<string, StateLike> = {
@@ -492,6 +523,17 @@ test('health report: one device per physical device, per room', () => {
         ],
     );
     assert.equal(r.items[1].health.battery, 10);
-    assert.deepEqual(r.rooms.get('living'), { unreach: 0, low: 1, ok: 0 });
-    assert.deepEqual(r.rooms.get('bath'), { unreach: 1, low: 0, ok: 0 });
+    // each room knows its devices (the tooltip of its pin)
+    assert.deepEqual(r.rooms.get('living'), {
+        unreach: 0,
+        low: 1,
+        ok: 0,
+        devices: [{ name: 'SENSOR.T', problem: 'battery', battery: 10 }],
+    });
+    assert.deepEqual(r.rooms.get('bath'), {
+        unreach: 1,
+        low: 0,
+        ok: 0,
+        devices: [{ name: 'SENSOR.DOOR', problem: 'unreach', battery: null }],
+    });
 });

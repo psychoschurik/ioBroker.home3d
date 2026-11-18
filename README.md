@@ -204,6 +204,21 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Datenpunkt ohne Wert macht ein Gerät, das seinen Zustand selbst meldet, nicht mehr „nicht erreichbar“
 - (bluefox) Technik: einstellbar, ob Räume ohne Problem grün werden oder ihre Farbe behalten; ein Hinweis am Schild zeigt
   Gerät, Grund und letztes Update; die Liste steht rechts unten und verdeckt die Etagen nicht mehr
+- (bluefox) Technik: „Nicht erreichbar“ pro Gerät im Editor (am Gerät unter seinem Datenpunkt): wie im Haus
+  eingestellt, wie das Gerät meldet, nach … Minuten ohne Update oder nie; dazu „nur prüfen, solange sein Adapter
+  verbunden ist“ für Geräte am Bordnetz wie NMEA, deren Instrumente mit dem Boot abgeschaltet werden. Räume ohne
+  Problem zeigen „✓ n OK“; ein Tooltip am Raumschild nennt die Geräte des Raums
+- (bluefox) Das Schimmelrisiko lässt sich getrennt von der Luft an offenen Fenstern ausschalten
+- (bluefox) Technik: Ist „auch Räume ohne Problem zeigen“ aus, erscheinen nur noch Räume mit einem Problem, ohne „✓ n OK“
+- (bluefox) Batterie- und Funkprobleme lassen sich immer am Gerät zeigen, nicht nur in der Ansicht „Technik“; Luken
+  und Tanks mit eigenem Sensor bekommen das Schild auch und zählen in „Technik“ mit
+- (bluefox) Rauch-, Gas- und Wassersensoren warnen für den Raum, in dem sie platziert sind, auch ohne Raumzuordnung
+  (der Regensensor des Hauses nicht, auch wenn er als Wassersensor meldet)
+- (bluefox) Pro Gerät im Editor: „Farbe, wenn aktiv“ (3D und Grundriss) und eine Auswahl an Symbolen unter
+  „Eigenes Symbol“
+- (bluefox) Batterie in „Technik“: zuerst sucht der type-detector, sonst Name und Rolle; im Editor am Gerät lässt
+  sich der Batterie-Datenpunkt selbst wählen oder „Keine Batterie“ setzen (gilt für das ganze Gerät)
+- (bluefox) Shelly-Bluetooth-Sensoren (`shelly.0.ble.<MAC>`) sind je ein eigenes Gerät und zählen in „Technik“ einzeln
 - (bluefox) Das Mausrad zoomt die 3D-Ansicht auch, wenn der Zeiger auf einem Sensor oder Schild steht
 - (bluefox) Datenpunkt-Felder der Einstellungen zeigen unter dem Namen die ioBroker-ID des gewählten Datenpunkts
 

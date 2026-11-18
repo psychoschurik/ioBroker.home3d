@@ -156,3 +156,74 @@ test('health: found once per device, also through an alias', async () => {
     assert.equal(lists.length, 1);
     assert.equal(gets.length, 1);
 });
+
+test('health: Bluetooth sensors in a folder are devices of their own', async () => {
+    const folder = { _id: 'shelly.0.ble', type: 'folder', common: { name: 'Bluetooth' }, native: {} } as unknown as StateObject;
+    const dev = (id: string): StateObject => ({ _id: id, type: 'device', common: { name: id }, native: {} }) as unknown as StateObject;
+    const tree: Record<string, StateObject> = {};
+    for (const mac of ['7c:aa', '7c:bb']) {
+        tree[`shelly.0.ble.${mac}.window`] = obj(`shelly.0.ble.${mac}.window`, { role: 'sensor.window', type: 'number' });
+        tree[`shelly.0.ble.${mac}.battery`] = obj(`shelly.0.ble.${mac}.battery`, { role: 'value.battery', type: 'number', unit: '%' });
+    }
+    const all: Record<string, StateObject> = { 'shelly.0.ble': folder, 'shelly.0.ble.7c:aa': dev('shelly.0.ble.7c:aa'), 'shelly.0.ble.7c:bb': dev('shelly.0.ble.7c:bb') };
+    const lists: string[] = [];
+    const gets: string[][] = [];
+    const list = (prefix: string): Promise<Record<string, StateObject>> => {
+        lists.push(prefix);
+        return Promise.resolve(Object.fromEntries(Object.entries(tree).filter(([id]) => id.startsWith(`${prefix}.`))));
+    };
+    const get = (ids: string[]): Promise<Record<string, StateObject>> => {
+        gets.push(ids);
+        return Promise.resolve(Object.fromEntries(ids.filter(i => all[i]).map(i => [i, all[i]])));
+    };
+    const cache = new Map<string, Record<string, StateObject>>();
+    const ids = ['shelly.0.ble.7c:aa.window', 'shelly.0.ble.7c:bb.window'];
+    const found = await findHealth(ids, {}, list, get, cache);
+    assert.deepEqual(
+        ids.map(i => [found.get(i)?.device, found.get(i)?.battery]),
+        [
+            ['shelly.0.ble.7c:aa', 'shelly.0.ble.7c:aa.battery'],
+            ['shelly.0.ble.7c:bb', 'shelly.0.ble.7c:bb.battery'],
+        ],
+    );
+    // each sensor is read on its own, not the whole folder
+    assert.deepEqual(lists.sort(), ['shelly.0.ble.7c:aa', 'shelly.0.ble.7c:bb']);
+    // the device, its channels and the adapter in one request
+    assert.equal(gets.length, 1);
+    await findHealth(ids, {}, list, get, cache);
+    assert.equal(gets.length, 1);
+    assert.equal(lists.length, 2);
+});
+
+test('health: the type-detector finds the battery first, a chosen one wins for the whole device', async () => {
+    const device = { _id: 'zigbee.0.bb', type: 'device', common: { name: 'Contact' }, native: {} } as unknown as StateObject;
+    const tree: Record<string, StateObject> = {
+        'zigbee.0.bb.opened': obj('zigbee.0.bb.opened', { role: 'sensor.window', type: 'boolean', read: true }),
+        'zigbee.0.bb.temp': obj('zigbee.0.bb.temp', { role: 'value.temperature', type: 'number', read: true }),
+        // a name no guess knows, a role the type-detector knows
+        'zigbee.0.bb.power_level': obj('zigbee.0.bb.power_level', { role: 'value.battery', type: 'number', unit: '%', read: true }),
+        'zigbee.0.bb.voltage_low': obj('zigbee.0.bb.voltage_low', { role: 'indicator.lowbat', type: 'boolean', read: true }),
+        'zigbee.0.bb.supply': obj('zigbee.0.bb.supply', { role: 'state', type: 'boolean', read: true }),
+    };
+    const all: Record<string, StateObject> = { 'zigbee.0.bb': device, ...tree };
+    const list = (prefix: string): Promise<Record<string, StateObject>> =>
+        Promise.resolve(Object.fromEntries(Object.entries(tree).filter(([id]) => id.startsWith(`${prefix}.`))));
+    const get = (ids: string[]): Promise<Record<string, StateObject>> =>
+        Promise.resolve(Object.fromEntries(ids.filter(i => all[i]).map(i => [i, all[i]])));
+    const ids = ['zigbee.0.bb.opened', 'zigbee.0.bb.temp'];
+    const auto = await findHealth(ids, {}, list, get);
+    const h = auto.get('zigbee.0.bb.opened');
+    assert.equal(h?.detected, 'detector');
+    assert.equal(h?.lowbat, 'zigbee.0.bb.voltage_low');
+    // chosen at one datapoint: counts for the other one of the device too
+    const own = await findHealth(ids, {}, list, get, new Map(), new Map([['zigbee.0.bb.temp', 'zigbee.0.bb.supply']]));
+    for (const id of ids) {
+        assert.deepEqual([own.get(id)?.detected, own.get(id)?.lowbat, own.get(id)?.battery], ['own', 'zigbee.0.bb.supply', undefined]);
+    }
+    // no battery at all (on the on-board supply)
+    const none = await findHealth(ids, {}, list, get, new Map(), new Map([['zigbee.0.bb.opened', 'none']]));
+    assert.deepEqual([none.get('zigbee.0.bb.temp')?.detected, none.get('zigbee.0.bb.temp')?.lowbat, none.get('zigbee.0.bb.temp')?.battery], ['own', undefined, undefined]);
+    // without the type-detector the guess by name and role
+    const guess = await findHealth(ids, {}, list, get, new Map(), new Map(), null);
+    assert.equal(guess.get('zigbee.0.bb.opened')?.detected, 'guess');
+});

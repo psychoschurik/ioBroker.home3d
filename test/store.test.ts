@@ -197,6 +197,27 @@ test('mappings are validated against the objects of their datapoints only', asyn
     );
     assert.equal(store.data.mappings[0].state, 'lamp.power');
 });
+test('the own "unreachable" setting of a device is checked and given to its entity', async () => {
+    const { store } = await fixture();
+    for (const reach of ['report', 'never', 15] as const) {
+        await store.call({ type: 'iobroker/mappings/set', mappings: [{ ...mapping, reach, reach_connected: true }] });
+    }
+    assert.equal(store.data.mappings[0].reach, 15);
+    assert.equal(store.data.mappings[0].reach_connected, true);
+    for (const reach of [0, 1.5, 20000, 'sometimes']) {
+        await assert.rejects(
+            store.call({ type: 'iobroker/mappings/set', mappings: [{ ...mapping, reach }] }),
+            /nicht erreichbar/i,
+        );
+    }
+    await assert.rejects(
+        store.call({ type: 'iobroker/mappings/set', mappings: [{ ...mapping, reach_connected: 'yes' }] }),
+        /reach_connected/,
+    );
+    const list = entities(store.data.mappings, { 'lamp.power': { val: true } } as never, {});
+    assert.equal(list['light.living'].attributes.iobroker_reach, 15);
+    assert.equal(list['light.living'].attributes.iobroker_reach_connected, true);
+});
 test('device actions scale brightness and reject out-of-range values before any write', async () => {
     const { io, writes } = await fixture();
     await execute([mapping], 'light', 'turn_on', { entity_id: mapping.entity_id, brightness: 127.5 }, io);

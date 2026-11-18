@@ -93,6 +93,8 @@ export interface FurnitureLike {
     water?: string | null;
     water_house?: boolean;
     car_color?: string | null;
+    /** A boat's gear: the sensor of a hatch, a tank … */
+    gear_entity?: string | null;
 }
 
 export interface OutdoorLike {
@@ -117,8 +119,10 @@ export interface HomeSettings {
     price_entity?: string | null;
     price_forecast?: string | null;
     water_flow?: string | null;
-    /** false: no air at open windows and no mould. */
+    /** false: no air at open windows (and no mould, unless `mould` says otherwise). */
     home_air?: boolean;
+    /** false: no mould in cold corners; missing: as `home_air`. */
+    mould?: boolean;
     /** false: no price glow round the house. */
     price_glow?: boolean;
 }
@@ -332,6 +336,7 @@ export function homeScene(input: HomeInput): HomeOutput {
     const cars: CarState[] = [];
     const alerts: HomeAlert[] = [];
     const air = b.settings.home_air !== false;
+    const mould = (b.settings.mould ?? b.settings.home_air) !== false;
     // the water at the house's meter: a flow sensor, else how fast the meter counts
     let houseFlow = 0;
     const flowId = b.settings.water_flow;
@@ -424,7 +429,7 @@ export function homeScene(input: HomeInput): HomeOutput {
                 }
             }
             // mould: how damp the coldest corner gets
-            const cl = air ? input.climate(floor, room) : { t: null, rh: null };
+            const cl = mould ? input.climate(floor, room) : { t: null, rh: null };
             if (cl.t !== null && cl.rh !== null) {
                 const m = mouldRisk(cl.t, cl.rh, input.tOut);
                 if (m.level > 0) {
@@ -724,9 +729,45 @@ export function homeScene(input: HomeInput): HomeOutput {
     };
 }
 
+/**
+ * Furniture with a sensor of its own (the contact of a hatch, the level of a tank): its spot, so that its battery and
+ * reachability show at the item and count in its room. Ids in `taken` (placed devices) are left out.
+ */
+export function gearMarkers(b: BuildingLike, taken: ReadonlySet<string>): MarkerLike[] {
+    const out: MarkerLike[] = [];
+    const seen = new Set(taken);
+    for (const floor of b.floors) {
+        for (const f of floor.furniture) {
+            const id = f.gear_entity;
+            if (!id || id === 'none' || seen.has(id)) {
+                continue;
+            }
+            seen.add(id);
+            const room = floor.rooms.find(r => r.points.length >= 3 && pointIn([f.x, f.z], r.points));
+            out.push({
+                id,
+                floorId: floor.id,
+                roomId: room?.id ?? null,
+                x: f.x,
+                y: (f.mount_y ?? 0) + f.h + 0.2,
+                z: f.z,
+            });
+        }
+    }
+    return out;
+}
+
+/** The devices of a room in the "Technik" view. */
+export interface HealthRoom {
+    unreach: number;
+    low: number;
+    ok: number;
+    devices: { name: string; problem: 'unreach' | 'battery' | null; battery: number | null }[];
+}
+
 export interface HealthReport {
-    /** Per room: devices out of reach and with a low battery. */
-    rooms: Map<string, { unreach: number; low: number; ok: number }>;
+    /** Per room: devices out of reach, with a low battery and fine, and which they are. */
+    rooms: Map<string, HealthRoom>;
     /** The devices with a problem (unreachable first). */
     items: { id: string; name: string; room: string; problem: 'unreach' | 'battery'; health: Health }[];
     /** Devices that report a battery or their reachability. */
@@ -792,7 +833,7 @@ export function healthReport(
             adapter: g.health.adapter ?? h.adapter,
         };
     }
-    const rooms = new Map<string, { unreach: number; low: number; ok: number }>();
+    const rooms = new Map<string, HealthRoom>();
     const items: HealthReport['items'] = [];
     let known = 0;
     for (const g of groups.values()) {
@@ -807,7 +848,8 @@ export function healthReport(
         const roomId =
             g.ids.map(x => placed.get(x)).find(Boolean) ?? (area ? roomOfArea.get(area)?.id : undefined) ?? null;
         if (roomId) {
-            const r = rooms.get(roomId) ?? { unreach: 0, low: 0, ok: 0 };
+            const r = rooms.get(roomId) ?? { unreach: 0, low: 0, ok: 0, devices: [] };
+            r.devices.push({ name: name(id), problem: p, battery: g.health.battery });
             if (p === 'unreach') {
                 r.unreach++;
             } else if (p === 'battery') {
