@@ -2929,6 +2929,10 @@ function treesMore(name: string, code: string): string {
             'trees: dispose',
         );
     }
+    if (name === 'components/library.ts') {
+        // the pictures of cars were empty before: a new key draws every picture once again
+        code = replaceRequired(code, '|${THUMB_PX}|1`;', '|${THUMB_PX}|2`;', 'trees and cars: pictures drawn again');
+    }
     if (name === 'viewer/preview.ts') {
         // the library's pictures: trees (in summer) and cars (in their first colour) come from their own builders
         code = `import { buildTree as fp3dPrevTree, disposeTrees as fp3dPrevDispose, isTreeKind as fp3dPrevIsTree } from "${root}/frontend/vendor-ext/trees.ts";\nimport { buildCar as fp3dPrevCar, CAR_COLORS as fp3dPrevCarColors, isCarKind as fp3dPrevIsCar } from "${root}/frontend/vendor-ext/cars.ts";\n${code}`;
