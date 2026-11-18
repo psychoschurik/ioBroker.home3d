@@ -227,6 +227,7 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   mit dem Verlauf, wenn ein History-Adapter ihn aufzeichnet
 - (bluefox) Darf der Benutzer die Dateien von `home3d.0` nicht schreiben (z. B. auf einer Demo-Seite), läuft die Seite
   nur zum Ansehen: wie im Kiosk, ohne Editor, „Projekte“ und „Geräte verbinden“; `?readonly` erzwingt das
+- (bluefox) Die Hinweiszeile des Editors nennt, wie man die Ansicht verschiebt: mit der rechten Maustaste oder zwei Fingern
 
 ### 0.4.0 (2026-11-15)
 

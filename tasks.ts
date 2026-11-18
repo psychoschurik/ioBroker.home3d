@@ -198,6 +198,36 @@ function wheelOverLabels(name: string, code: string): string {
 }
 
 /**
+ * The editor's hint line says how to move the view: on a full plan every press hits something that would be dragged,
+ * but the right (or middle) mouse button and two fingers always move the view.
+ */
+function panHint(name: string, code: string): string {
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            'this.t(`hint_${this._tool}` as I18nKey)}</p>',
+            'this.t(`hint_${this._tool}` as I18nKey)}${floor && !this._fixedHint ? ` · ${this.t("hint_pan")}` : ""}</p>',
+            'pan hint',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  hint_empty: "Lege zuerst eine Etage an.",',
+            '  hint_empty: "Lege zuerst eine Etage an.",\n  hint_pan: "rechte Maustaste oder zwei Finger: Ansicht verschieben",',
+            'pan hint de',
+        );
+        code = replaceRequired(
+            code,
+            '  hint_empty: "Add a floor first.",',
+            '  hint_empty: "Add a floor first.",\n  hint_pan: "right mouse button or two fingers: move the view",',
+            'pan hint en',
+        );
+    }
+    return code;
+}
+
+/**
  * Per device: the colour of its marker while active (3D pin and the editor's floor plan) and a row of symbols to pick
  * from under "Eigenes Symbol" (sensor-look.ts: ICON_PICKS, markerInk).
  */
@@ -3831,6 +3861,7 @@ const patches: Plugin = {
         code = keepEditorView(name, code);
         code = tvAppLogo(name, code);
         code = wheelOverLabels(name, code);
+        code = panHint(name, code);
         code = sensorLook(name, code);
         code = editorDevices(name, code);
         code = markerLooks(name, code);
