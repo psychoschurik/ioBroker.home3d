@@ -57,6 +57,8 @@ export interface GearState {
     mast: boolean;
     /** A hatch: how far it opens (°). */
     angle?: number;
+    /** The sensor behind it: a tap opens its details with the history. */
+    entity?: string | null;
 }
 
 /** Where the gear is in the scene. */

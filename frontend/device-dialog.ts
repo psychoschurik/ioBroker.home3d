@@ -2,6 +2,7 @@ import { element as $ } from './dom.js';
 import type { DeviceDialogOptions, Mapping } from './types.js';
 import type { TreeItem } from './object-tree.js';
 import { ObjectTree } from './object-tree.js';
+import { t } from './lang.js';
 export function setupDeviceDialog({
     callWS,
     refresh,
@@ -34,7 +35,7 @@ export function setupDeviceDialog({
             checked ? selected.add(item.id) : selected.delete(item.id);
         }
         $('mapping-result').textContent =
-            mode === 'single' ? 'Mit Auswählen übernehmen.' : `${selected.size} neue Datenpunkte ausgewählt.`;
+            mode === 'single' ? t('choose_apply') : t('selected_new', { n: selected.size });
     });
     tree.onRows = items => {
         if (mode === 'single') {
@@ -74,11 +75,11 @@ export function setupDeviceDialog({
     };
     function filters(items: TreeItem[]): void {
         for (const [id, key, label] of [
-            ['role-filter', 'role', 'Alle Rollen'],
-            ['room-filter', 'room', 'Alle Räume'],
+            ['role-filter', 'role', 'all_roles'],
+            ['room-filter', 'room', 'all_rooms'],
         ] as const) {
             const select = $(id);
-            select.replaceChildren(new Option(label, ''));
+            select.replaceChildren(new Option(t(label), ''));
             for (const value of [
                 ...new Set(items.map(i => i[key]).filter((value): value is string => Boolean(value))),
             ].sort()) {
@@ -115,16 +116,16 @@ export function setupDeviceDialog({
             id.textContent = m.state;
             text.append(id);
             const remove = document.createElement('button');
-            remove.textContent = 'Entfernen';
-            remove.setAttribute('aria-label', `${m.name || m.state} aus Zuordnungen entfernen`);
+            remove.textContent = t('remove');
+            remove.setAttribute('aria-label', t('remove_aria', { name: m.name || m.state }));
             remove.onclick = () => {
                 mappings = mappings.filter(x => x.entity_id !== m.entity_id);
                 selectedList();
                 tree.setItems(mappingItems(), selected);
             };
             const change = document.createElement('button');
-            change.textContent = 'Ändern';
-            change.setAttribute('aria-label', `Datenpunkt von ${m.name || m.state} ändern`);
+            change.textContent = t('change');
+            change.setAttribute('aria-label', t('change_aria', { name: m.name || m.state }));
             change.onclick = async () => {
                 // a modal <dialog> is always on top of the page: hide it while the object browser is open
                 dialog.close();
@@ -134,8 +135,10 @@ export function setupDeviceDialog({
                         mappings = mappings.map(x => (x.entity_id === m.entity_id ? next : x));
                         selectedList();
                         tree.setItems(mappingItems(), selected);
-                        $('mapping-result').textContent =
-                            `${m.name || m.state}: ${next.state} – mit Übernehmen speichern.`;
+                        $('mapping-result').textContent = t('changed_apply', {
+                            name: m.name || m.state,
+                            id: next.state,
+                        });
                     }
                 } catch (e) {
                     $('mapping-result').textContent = (e as Error).message;
@@ -153,8 +156,8 @@ export function setupDeviceDialog({
         selected = new Set();
         single = null;
         tree.expanded.clear();
-        $('mapping-title').textContent = isSingle ? 'Datenpunkt auswählen' : 'Geräte verbinden';
-        $('mapping-save').textContent = isSingle ? 'Auswählen' : 'Übernehmen';
+        $('mapping-title').textContent = t(isSingle ? 'mapping_title_single' : 'mapping_title');
+        $('mapping-save').textContent = t(isSingle ? 'choose' : 'apply');
         $('mapping-save').disabled = isSingle;
         $('mapping-advanced').hidden = isSingle;
         $('configured').hidden = isSingle;
@@ -162,15 +165,13 @@ export function setupDeviceDialog({
         $('object-browser').hidden = isSingle;
         $('fixed-options').replaceChildren();
         $('mapping-result').textContent = '';
-        $('mapping-description').textContent = isSingle
-            ? 'Objektbaum öffnen oder nach Name und Objekt-ID suchen. Passende, bereits verbundene Datenpunkte werden angezeigt.'
-            : 'Datenpunkte im Objektbaum auswählen und übernehmen. Bestehende Zuordnungen bleiben erhalten.';
+        $('mapping-description').textContent = t(isSingle ? 'mapping_hint_single' : 'mapping_hint');
     }
     $('mapping-open').onclick = async () => {
         try {
             configure(false);
             dialog.showModal();
-            $('mapping-result').textContent = 'Objekte werden geladen …';
+            $('mapping-result').textContent = t('loading_objects');
             [mappings, candidates] = await Promise.all([
                 callWS({ type: 'iobroker/mappings/get' }),
                 callWS({ type: 'iobroker/discover' }),
@@ -179,7 +180,7 @@ export function setupDeviceDialog({
             const items = mappingItems();
             filters(items);
             tree.setItems(items, selected);
-            $('mapping-result').textContent = `${candidates.length} Datenpunkte verfügbar.`;
+            $('mapping-result').textContent = t('available', { n: candidates.length });
         } catch (e) {
             $('mapping-result').textContent = e.message;
         }
@@ -224,9 +225,9 @@ export function setupDeviceDialog({
                 }
             }
             tree.setItems(mappingItems(), selected);
-            $('mapping-result').textContent = `${selected.size} neue Datenpunkte ausgewählt.${
-                missing.length ? ` Ohne passende Geräteart übersprungen: ${missing.join(', ')}` : ''
-            }`;
+            $('mapping-result').textContent =
+                t('selected_new', { n: selected.size }) +
+                (missing.length ? t('skipped_kind', { ids: missing.join(', ') }) : '');
         } catch (e) {
             $('mapping-result').textContent = e.message;
         }
@@ -244,7 +245,7 @@ export function setupDeviceDialog({
         try {
             const value = JSON.parse($('mapping-json').value);
             if (!Array.isArray(value)) {
-                throw Error('Eine Liste wird erwartet.');
+                throw Error(t('list_expected'));
             }
             mappings = value;
             selectedList();
@@ -264,7 +265,7 @@ export function setupDeviceDialog({
             }
             const parsed = JSON.parse($('mapping-json').value);
             if (!Array.isArray(parsed)) {
-                throw Error('Zuordnungen müssen eine Liste sein.');
+                throw Error(t('mappings_list_short'));
             }
             const known = new Set(parsed.map(m => m.entity_id));
             const additions = candidates
@@ -275,7 +276,7 @@ export function setupDeviceDialog({
                 mappings: [...parsed, ...additions],
             });
             await refresh();
-            $('mapping-result').textContent = `${result.saved} Geräte verbunden.`;
+            $('mapping-result').textContent = t('saved_devices', { n: result.saved });
             dialog.close();
         } catch (e) {
             $('mapping-result').textContent = e.message;

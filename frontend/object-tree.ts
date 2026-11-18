@@ -1,3 +1,5 @@
+import { t } from './lang.js';
+
 export interface TreeItem {
     id: string;
     path: string;
@@ -102,10 +104,10 @@ export class ObjectTree {
         this.host.replaceChildren();
         const tree = document.createElement('div');
         tree.setAttribute('role', 'tree');
-        tree.setAttribute('aria-label', 'ioBroker Objektbaum');
+        tree.setAttribute('aria-label', t('tree_aria'));
         const header = document.createElement('div');
         header.className = 'object-head';
-        for (const text of ['Objekt-ID / Name', 'Rolle / Typ', 'Wert']) {
+        for (const text of [t('col_id'), t('col_role'), t('col_value')]) {
             const cell = document.createElement('span');
             cell.textContent = text;
             header.append(cell);
@@ -125,7 +127,7 @@ export class ObjectTree {
                 const button = document.createElement('button');
                 button.className = 'tree-expand';
                 button.textContent = expanded ? '▾' : '▸';
-                button.setAttribute('aria-label', `${node.id} ${expanded ? 'zuklappen' : 'aufklappen'}`);
+                button.setAttribute('aria-label', t(expanded ? 'collapse' : 'expand', { id: node.id }));
                 button.onclick = () => {
                     this.expanded.has(node.id) ? this.expanded.delete(node.id) : this.expanded.add(node.id);
                     this.render();
@@ -142,7 +144,7 @@ export class ObjectTree {
                 input.type = 'checkbox';
                 input.checked = Boolean(node.item.disabled) || this.selected.has(node.item.id);
                 input.disabled = Boolean(node.item.disabled);
-                input.setAttribute('aria-label', `${node.item.label} (${node.item.path}) auswählen`);
+                input.setAttribute('aria-label', t('select_aria', { name: node.item.label ?? '', id: node.item.path }));
                 input.onchange = () => {
                     this.onSelect(node.item!, input.checked);
                     this.render();
@@ -169,10 +171,10 @@ export class ObjectTree {
             meta.textContent = node.item
                 ? `${node.item.role || '—'} / ${node.item.type || 'state'}`
                 : depth === 0
-                  ? 'Adapter'
+                  ? t('adapter')
                   : depth === 1
-                    ? 'Instanz'
-                    : 'Gerät / Kanal';
+                    ? t('instance')
+                    : t('device_channel');
             const value = document.createElement('span');
             value.className = 'object-value';
             value.textContent = node.item?.value === undefined ? '—' : display(node.item.value).slice(0, 100);
@@ -182,12 +184,12 @@ export class ObjectTree {
         if (!filtered.length) {
             const p = document.createElement('p');
             p.className = 'tree-empty';
-            p.textContent = 'Keine passenden Datenpunkte. Suche oder Filter ändern.';
+            p.textContent = t('no_match');
             tree.append(p);
         }
         if (rows.length > this.limit) {
             const more = document.createElement('button');
-            more.textContent = `Weitere anzeigen (${rows.length - this.limit})`;
+            more.textContent = t('show_more', { n: rows.length - this.limit });
             more.onclick = () => {
                 this.limit += 250;
                 this.render();

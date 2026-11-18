@@ -221,6 +221,12 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Shelly-Bluetooth-Sensoren (`shelly.0.ble.<MAC>`) sind je ein eigenes Gerät und zählen in „Technik“ einzeln
 - (bluefox) Das Mausrad zoomt die 3D-Ansicht auch, wenn der Zeiger auf einem Sensor oder Schild steht
 - (bluefox) Datenpunkt-Felder der Einstellungen zeigen unter dem Namen die ioBroker-ID des gewählten Datenpunkts
+- (bluefox) Russisch: die 3D-Oberfläche, der Rahmen und die Hilfe; Kopfzeile, „Geräte verbinden“, Details, Projekte und
+  Meldungen sprechen jetzt Deutsch, Englisch oder Russisch nach der Systemsprache, die Hilfe gibt es in allen drei
+- (bluefox) Ein Klick auf Tank, Ruder, Antrieb, Luke oder Positionslicht eines Boots öffnet die Details seines Sensors,
+  mit dem Verlauf, wenn ein History-Adapter ihn aufzeichnet
+- (bluefox) Darf der Benutzer die Dateien von `home3d.0` nicht schreiben (z. B. auf einer Demo-Seite), läuft die Seite
+  nur zum Ansehen: wie im Kiosk, ohne Editor, „Projekte“ und „Geräte verbinden“; `?readonly` erzwingt das
 
 ### 0.4.0 (2026-11-15)
 

@@ -13,6 +13,7 @@ import { IoBroker, NAMESPACE } from './iobroker.js';
 import { Store, mappedIds, DATA_FILE } from './store.js';
 import { entities } from './entities.js';
 import { findHealth, healthAttributes, healthStateIds, type HealthIds } from './health.js';
+import { lang, setLanguage, t, translatePage } from './lang.js';
 // Shop onboarding and telemetry are not supported in ioBroker.
 try {
     localStorage.setItem('home3d.news.fun_gifts_2026', 'never');
@@ -34,6 +35,8 @@ let objects: Record<string, StateObject> = {},
     // the battery, reachability and adapter datapoints of the mapped devices (see health.ts)
     health = new Map<string, HealthIds>(),
     language = 'de',
+    // the user may not write the project (a demo page), or ?readonly: view only, as in the kiosk, no editor
+    readOnly = false,
     systemPosition: { lat: number; lon: number } | null = null,
     historyInstances: string[] = [],
     hass: Hass | undefined,
@@ -48,11 +51,25 @@ let objects: Record<string, StateObject> = {},
 function setStatus(text: string): void {
     $('status').textContent = text;
 }
+/** The frame in the page's language; the help in it too (German: help.html). */
+function showLanguage(): void {
+    translatePage();
+    $('help-link').setAttribute('href', lang() === 'de' ? 'help.html' : `help-${lang()}.html`);
+}
+// until the system's language is known: the one of the last visit, else the browser's
+let lastLanguage: string | null = null;
+try {
+    lastLanguage = localStorage.getItem('home3d-lang');
+} catch {
+    // no storage: the browser's language
+}
+setLanguage(lastLanguage || navigator.language);
+showLanguage();
 const io = new IoBroker();
 const store = new Store(io, io, () => io.legacy());
 io.conn.registerConnectionHandler(connected => {
     if (!connected) {
-        setStatus('Offline · Verbindung zu ioBroker getrennt');
+        setStatus(t('offline'));
     } else if (hass) {
         render();
         void store.sync().catch(() => {});
@@ -188,7 +205,8 @@ function render(): void {
     const position = place();
     hass = {
         language,
-        user: { is_admin: true, name: 'ioBroker' },
+        // not an admin: the 3D frontend shows no editor and saves nothing
+        user: { is_admin: !readOnly, name: 'ioBroker' },
         // the sun lights the rooms; ioBroker has none, it is calculated from the position of the system
         states: {
             ...withHealth(entities(store.data.mappings, states, objects)),
@@ -242,11 +260,11 @@ function render(): void {
         $('app').append(element);
     }
     element.hass = hass;
-    setStatus(`Verbunden · ${Object.keys(hass.states).length} Geräte`);
+    setStatus(t('connected', { n: Object.keys(hass.states).length }));
 }
 store.onEvent((type, payload) => {
     if (type === 'iobroker/mappings') {
-        void follow().catch(e => setStatus(`Fehler · ${e.message}`));
+        void follow().catch(e => setStatus(t('error', { error: e.message })));
         return;
     }
     for (const s of subscriptions) {
@@ -265,6 +283,13 @@ store.onEvent((type, payload) => {
 async function start(): Promise<void> {
     await io.ready();
     language = await io.language();
+    setLanguage(language);
+    showLanguage();
+    readOnly = new URLSearchParams(location.search).has('readonly') || !(await io.canWrite(DATA_FILE));
+    store.readOnly = readOnly;
+    if (readOnly) {
+        document.documentElement.classList.add('kiosk', 'read-only');
+    }
     systemPosition = await io.location();
     historyInstances = await io.historyInstances();
     await store.load();
@@ -308,8 +333,19 @@ $('project-open').onclick = async () => {
         const { openProjects } = await import('./react/index.js');
         await openProjects({ callWS, socket: io.conn, language, namespace: NAMESPACE });
     } catch (e) {
-        setStatus(`Fehler · ${(e as Error).message}`);
+        setStatus(t('error', { error: (e as Error).message }));
     }
 };
 setupMoreInfo({ callWS, getHass: () => hass });
-start().catch(e => setStatus(`Fehler · ${e?.message || e}`));
+start().catch(e => {
+    const text = t('error', { error: e?.message || e });
+    setStatus(text);
+    // in the kiosk the status line is hidden: the page says it itself (e.g. a demo user who may not read the project)
+    if (!element && document.documentElement.classList.contains('kiosk')) {
+        const p = document.createElement('p');
+        p.setAttribute('role', 'alert');
+        p.className = 'start-error';
+        p.textContent = text;
+        $('app').replaceChildren(p);
+    }
+});

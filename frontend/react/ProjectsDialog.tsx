@@ -22,6 +22,7 @@ import { projectFileName, readProject, type Project, type ProjectFile } from '..
 import type { PlanList } from '../store.js';
 import type { CallWS } from '../types.js';
 import { iobTheme } from './host.js';
+import { t } from '../lang.js';
 
 export interface ProjectContext {
     callWS: CallWS;
@@ -56,7 +57,12 @@ function download(name: string, text: string): void {
 }
 const summary = (p: Project): string => {
     const rooms = p.building.floors.reduce((n, f) => n + f.rooms.length, 0);
-    return `${p.building.floors.length} Etagen, ${rooms} Räume, ${Object.keys(p.images).length} Bilder, ${p.mappings.length} Geräte`;
+    return t('project_summary', {
+        floors: p.building.floors.length,
+        rooms,
+        images: Object.keys(p.images).length,
+        devices: p.mappings.length,
+    });
 };
 
 export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose: () => void }): JSX.Element {
@@ -79,7 +85,7 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
     }, [ctx]);
     const label = (id: string): string => {
         const p = plans.find(x => x.id === id);
-        return p?.name || (id === 'main' ? 'Hauptgrundriss' : 'Grundriss');
+        return p?.name || t(id === 'main' ? 'main_plan' : 'plan');
     };
     const shownName = fileName ?? projectFileName(plans.length ? label(plan) : null);
 
@@ -103,7 +109,7 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
     const exportDownload = (): Promise<void> =>
         run(async () => {
             download(target().endsWith('.json') ? target() : `${target()}.json`, await exported());
-            setNotice({ severity: 'success', text: `„${label(plan)}“ heruntergeladen.` });
+            setNotice({ severity: 'success', text: t('downloaded', { name: label(plan) }) });
         });
     const exportStore = (): Promise<void> =>
         run(async () => {
@@ -112,7 +118,7 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
             await ctx.socket.writeFile64(ctx.namespace, `${PROJECT_FOLDER}/${name}`, bytes.buffer);
             setNotice({
                 severity: 'success',
-                text: `Gespeichert in ioBroker: ${ctx.namespace}/${PROJECT_FOLDER}/${name}`,
+                text: t('saved_in', { path: `${ctx.namespace}/${PROJECT_FOLDER}/${name}` }),
             });
         });
 
@@ -139,7 +145,7 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
             const [adapter, ...rest] = path.split('/');
             const r = await ctx.socket.readFile(adapter, rest.join('/'), true);
             if (!r?.file) {
-                throw new Error(`Datei leer: ${path}`);
+                throw new Error(t('file_empty', { path }));
             }
             loaded(fileText(r.file, r.mimeType), path);
         });
@@ -154,10 +160,10 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
             setProject(null);
             setNotice({
                 severity: res.skipped.length ? 'info' : 'success',
-                text: `Grundriss „${res.name}“ angelegt: ${res.images} Bilder, ${res.devices} Geräte. Oben im Grundriss-Menü auswählbar.`,
+                text: t('imported', { name: res.name, images: res.images, devices: res.devices }),
                 details: [
-                    ...res.renamed.map(r => `Umbenannt (gab es schon): ${r.from} → ${r.to}`),
-                    ...res.skipped.map(s => `Übersprungen: ${s.id} – ${s.reason}`),
+                    ...res.renamed.map(r => t('renamed', { from: r.from, to: r.to })),
+                    ...res.skipped.map(s => t('skipped', { id: s.id, reason: s.reason })),
                 ],
             });
         });
@@ -170,24 +176,23 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
                 maxWidth="sm"
                 fullWidth
             >
-                <DialogTitle>Projekte</DialogTitle>
+                <DialogTitle>{t('projects_dialog')}</DialogTitle>
                 <DialogContent>
                     <Typography
                         variant="body2"
                         color="text.secondary"
                         sx={{ mb: 2 }}
                     >
-                        Ein Projekt ist ein Grundriss mit seinen Bildern und den verbundenen ioBroker-Datenpunkten. Beim
-                        Import entsteht ein neuer Grundriss; der offene bleibt unverändert.
+                        {t('projects_intro')}
                     </Typography>
-                    <Typography variant="subtitle1">Exportieren</Typography>
+                    <Typography variant="subtitle1">{t('export')}</Typography>
                     <Stack
                         spacing={2}
                         sx={{ mt: 1, mb: 3 }}
                     >
                         <TextField
                             select
-                            label="Grundriss"
+                            label={t('plan')}
                             // until the list is loaded, MUI knows no option for it
                             value={plans.some(p => p.id === plan) ? plan : ''}
                             onChange={e => {
@@ -201,12 +206,12 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
                                     key={p.id}
                                     value={p.id}
                                 >
-                                    {`${p.icon ? `${p.icon} ` : ''}${label(p.id)} · ${p.floors} Etagen, ${p.rooms} Räume`}
+                                    {`${p.icon ? `${p.icon} ` : ''}${label(p.id)} · ${t('plan_summary', { floors: p.floors, rooms: p.rooms })}`}
                                 </MenuItem>
                             ))}
                         </TextField>
                         <TextField
-                            label="Dateiname"
+                            label={t('file_name')}
                             value={shownName}
                             onChange={e => setFileName(e.target.value)}
                             size="small"
@@ -220,14 +225,14 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
                                 disabled={busy || !plans.length}
                                 onClick={() => void exportDownload()}
                             >
-                                Herunterladen
+                                {t('download')}
                             </Button>
                             <Button
                                 variant="outlined"
                                 disabled={busy || !plans.length}
                                 onClick={() => void exportStore()}
                             >
-                                In ioBroker speichern
+                                {t('save_iobroker')}
                             </Button>
                         </Stack>
                     </Stack>
@@ -236,7 +241,7 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
                         variant="subtitle1"
                         sx={{ mt: 2 }}
                     >
-                        Importieren
+                        {t('import')}
                     </Typography>
                     <Stack
                         direction="row"
@@ -248,14 +253,14 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
                             disabled={busy}
                             onClick={() => setPicking(true)}
                         >
-                            Aus ioBroker wählen …
+                            {t('from_iobroker')}
                         </Button>
                         <Button
                             variant="outlined"
                             disabled={busy}
                             onClick={() => input.current?.click()}
                         >
-                            Vom Computer …
+                            {t('from_computer')}
                         </Button>
                         <input
                             ref={input}
@@ -286,7 +291,7 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
                                 spacing={1}
                             >
                                 <TextField
-                                    label="Name des neuen Grundrisses"
+                                    label={t('new_plan_name')}
                                     value={name}
                                     onChange={e => setName(e.target.value)}
                                     size="small"
@@ -297,7 +302,7 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
                                     disabled={busy}
                                     onClick={() => void importProject()}
                                 >
-                                    Importieren
+                                    {t('import')}
                                 </Button>
                             </Stack>
                         </Box>
@@ -319,7 +324,7 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
                     ) : null}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={onClose}>Schließen</Button>
+                    <Button onClick={onClose}>{t('close')}</Button>
                 </DialogActions>
             </Dialog>
             {picking ? (
@@ -328,7 +333,7 @@ export function ProjectsDialog({ ctx, onClose }: { ctx: ProjectContext; onClose:
                     theme={iobTheme()}
                     themeType="dark"
                     lang={ctx.language as ioBroker.Languages}
-                    title="Projektdatei wählen"
+                    title={t('project_file')}
                     dialogName="home3d-projects"
                     imagePrefix="../"
                     filterFiles={['json']}

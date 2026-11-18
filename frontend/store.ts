@@ -14,6 +14,7 @@ import type {
 } from './model.js';
 import { validateMappings, discover, execute, nameOf } from './entities.js';
 import { freeEntityId, plainMapping, projectFile, readProject, renamed, usedBy } from './project.js';
+import { t } from './lang.js';
 
 declare const __HOME3D_VERSION__: string | undefined;
 const version = typeof __HOME3D_VERSION__ === 'string' ? __HOME3D_VERSION__ : 'dev';
@@ -110,11 +111,11 @@ function error(code: string, message: string): never {
 }
 export function checkBuilding(b: ProtocolRecord): Building {
     if (!b || b.version !== 1 || !Array.isArray(b.floors) || !b.settings || !Array.isArray(b.presence)) {
-        error('invalid_building', 'Ungültiger Grundriss.');
+        error('invalid_building', t('bad_plan'));
     }
     for (const f of b.floors) {
         if (!f || typeof f.id !== 'string' || !Array.isArray(f.rooms) || !Array.isArray(f.furniture)) {
-            error('invalid_building', 'Ungültiges Stockwerk.');
+            error('invalid_building', t('bad_floor'));
         }
     }
     return structuredClone(b) as Building;
@@ -158,6 +159,8 @@ export class Store {
     io: IoAccess;
     files: FileAccess;
     data: StorageData = initial();
+    /** The user may not write the files of the project: every change is refused, nothing is written. */
+    readOnly = false;
     private legacy?: () => Promise<string | null | undefined>;
     private tail: Promise<unknown> = Promise.resolve();
     private listeners = new Set<StoreListener>();
@@ -194,7 +197,7 @@ export class Store {
         }
         const d = JSON.parse(text);
         if (!d?.plans?.main) {
-            error('bad_data', `${DATA_FILE} ist beschädigt.`);
+            error('bad_data', t('file_broken', { file: DATA_FILE }));
         }
         return {
             version: 2,
@@ -218,6 +221,11 @@ export class Store {
             const stored = await this.read();
             if (stored) {
                 this.data = stored;
+                return;
+            }
+            if (this.readOnly) {
+                // nothing to show yet, and nothing may be written
+                this.data = initial();
                 return;
             }
             const old = this.legacy ? await this.legacy().catch(() => null) : null;
@@ -309,7 +317,7 @@ export class Store {
     private async writeImage(id: string, url: unknown): Promise<void> {
         const match = typeof url === 'string' ? /^data:(image\/(?:png|jpeg|webp|gif));base64,(.*)$/s.exec(url) : null;
         if (typeof id !== 'string' || ['__proto__', 'constructor', 'prototype'].includes(id) || !match) {
-            error('invalid_image', 'Nur PNG, JPEG, WebP oder GIF als Data-URL.');
+            error('invalid_image', t('image_type'));
         }
         const name = `images/${fileKey(id)}.${IMAGE_TYPES[match[1]]}`;
         await this.files.writeBinary(name, base64ToBytes(match[2]));
@@ -321,11 +329,11 @@ export class Store {
     }
     private async readImage(id: string): Promise<string> {
         if (!Object.hasOwn(this.data.images, id)) {
-            error('not_found', 'Bild fehlt.');
+            error('not_found', t('image_missing'));
         }
         const url = await this.files.readDataUrl(this.data.images[id]);
         if (!url) {
-            error('not_found', 'Bild fehlt.');
+            error('not_found', t('image_missing'));
         }
         return url;
     }
@@ -362,6 +370,9 @@ export class Store {
     call(m: ProtocolMessage): Promise<any> {
         return this.serialize(async () => {
             if (m && MUTATING.has(String(m.type).replace(/^home3d\//, ''))) {
+                if (this.readOnly) {
+                    error('read_only', t('read_only'));
+                }
                 await this.reload();
             }
             const before = structuredClone(this.data);
@@ -394,7 +405,7 @@ export class Store {
         };
         const active = (): Plan => {
             if (!p || p.deleted_at) {
-                error('not_found', 'Grundriss nicht vorhanden.');
+                error('not_found', t('plan_missing'));
             }
             return p;
         };
@@ -422,13 +433,13 @@ export class Store {
                 return save({});
             case 'iobroker/timetravel/set':
                 if (m.instance != null && !(typeof m.instance === 'string' && INSTANCE.test(m.instance))) {
-                    error('invalid_instance', 'Ungültige Instanz für die Zeitreise.');
+                    error('invalid_instance', t('bad_instance'));
                 }
                 this.data.timetravel_instance = m.instance || null;
                 return save({});
             case 'iobroker/health/set':
                 if (m.minutes != null && m.minutes !== '' && !staleMinutes(m.minutes)) {
-                    error('invalid_minutes', 'Minuten für „nicht erreichbar“: 1 bis 10080.');
+                    error('invalid_minutes', t('bad_minutes'));
                 }
                 this.data.health_stale_min = staleMinutes(m.minutes);
                 return save({});
@@ -446,7 +457,7 @@ export class Store {
             case 'building/save': {
                 const target = active();
                 if (m.base_revision !== undefined && m.base_revision !== target.revision) {
-                    error('stale_plan', 'Inzwischen anderswo gespeichert. Bitte neu laden.');
+                    error('stale_plan', t('stale'));
                 }
                 target.building = checkBuilding(m.building);
                 changed(target);
@@ -480,7 +491,7 @@ export class Store {
             case 'plans/delete': {
                 const target = active();
                 if (id === 'main') {
-                    error('main_plan', 'Der Hauptgrundriss bleibt erhalten.');
+                    error('main_plan', t('main_plan_stays'));
                 }
                 target.deleted_at = Date.now() / 1000;
                 plansChanged();
@@ -495,7 +506,7 @@ export class Store {
                 return save({});
             case 'plans/order': {
                 if (!Array.isArray(m.plans) || m.plans.some(k => !Object.hasOwn(this.data.plans, k))) {
-                    error('bad_request', 'Ungültige Reihenfolge.');
+                    error('bad_request', t('bad_order'));
                 }
                 this.data.plans = Object.fromEntries(
                     [...new Set([...m.plans, ...Object.keys(this.data.plans)])].map(k => [k, this.data.plans[k]]),
@@ -576,7 +587,7 @@ export class Store {
                             ['main', '__proto__', 'constructor', 'prototype'].includes(entry.id) ||
                             Object.hasOwn(next, entry.id)
                         ) {
-                            error('invalid_backup', 'Ungültige Grundriss-ID.');
+                            error('invalid_backup', t('bad_plan_id'));
                         }
                         next[entry.id] = {
                             ...plan(checkBuilding(entry.building), entry.name),
@@ -607,7 +618,7 @@ export class Store {
                     skipped: [
                         ...(m.packs || []).map((p: { id: string }) => ({
                             id: p.id,
-                            reason: 'Shop-Pakete werden in ioBroker nicht unterstützt.',
+                            reason: t('no_shop'),
                         })),
                         ...(devices?.skipped || []).map(d => ({ id: d.entity_id, reason: d.reason })),
                     ],
@@ -685,7 +696,7 @@ export class Store {
                     renamed: renamedDevices,
                     skipped: [
                         ...devices.skipped.map(d => ({ id: d.entity_id, reason: d.reason })),
-                        ...brokenImages.map(id => ({ id, reason: 'Bild nicht lesbar.' })),
+                        ...brokenImages.map(id => ({ id, reason: t('image_unreadable') })),
                     ],
                 });
             }
@@ -729,7 +740,7 @@ export class Store {
             case 'assist_pipeline/pipeline/list':
                 return { pipelines: [], preferred_pipeline: null };
             default:
-                error('not_supported', `Noch nicht für ioBroker implementiert: ${m.type}`);
+                error('not_supported', t('not_implemented', { type: String(m.type) }));
         }
     }
 }

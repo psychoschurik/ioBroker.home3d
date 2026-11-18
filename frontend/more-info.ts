@@ -4,6 +4,7 @@
 // device), the on/off times for contacts, motion, water and smoke.
 import type { CallWS, Hass } from './types.js';
 import { sensorIcon } from './vendor-ext/sensor-look.js';
+import { t } from './lang.js';
 
 interface Row {
     s: string;
@@ -20,11 +21,11 @@ interface Options {
     getHass: () => Hass | undefined;
 }
 
-const RANGES: { label: string; ms: number }[] = [
-    { label: '6 h', ms: 6 * 3600e3 },
-    { label: '24 h', ms: 24 * 3600e3 },
-    { label: '7 Tage', ms: 7 * 24 * 3600e3 },
-    { label: '30 Tage', ms: 30 * 24 * 3600e3 },
+const RANGES: { label: () => string; ms: number }[] = [
+    { label: () => '6 h', ms: 6 * 3600e3 },
+    { label: () => '24 h', ms: 24 * 3600e3 },
+    { label: () => t('days', { n: 7 }), ms: 7 * 24 * 3600e3 },
+    { label: () => t('days', { n: 30 }), ms: 30 * 24 * 3600e3 },
 ];
 const COLORS = ['#f5a623', '#4fc3f7'];
 const STYLE = `
@@ -47,31 +48,31 @@ const text = (v: unknown, fallback = ''): string =>
 function binaryText(e: Entity, state = e.state): string {
     const on = state === 'on';
     if (state === 'unavailable' || state === 'unknown') {
-        return 'nicht erreichbar';
+        return t('unreachable');
     }
     switch (text(e.attributes.device_class)) {
         case 'door':
         case 'window':
         case 'opening':
         case 'garage_door':
-            return on ? 'offen' : 'geschlossen';
+            return on ? t('open') : t('closed');
         case 'moisture':
-            return on ? 'Wasser erkannt' : 'trocken';
+            return on ? t('water') : t('dry');
         case 'smoke':
         case 'heat':
-            return on ? 'Rauch / Feuer!' : 'kein Rauch';
+            return on ? t('smoke') : t('no_smoke');
         case 'gas':
         case 'carbon_monoxide':
-            return on ? 'Gas erkannt' : 'kein Gas';
+            return on ? t('gas') : t('no_gas');
         case 'motion':
         case 'occupancy':
         case 'presence':
-            return on ? 'Bewegung' : 'keine Bewegung';
+            return on ? t('motion') : t('no_motion');
         case 'plug':
         case 'power':
-            return on ? 'Strom da' : 'kein Strom';
+            return on ? t('power') : t('no_power');
         default:
-            return on ? 'an' : 'aus';
+            return on ? t('on') : t('off');
     }
 }
 
@@ -108,9 +109,9 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
         const d = document.createElement('dialog');
         d.className = 'mi';
         d.setAttribute('aria-labelledby', 'mi-title');
-        d.innerHTML = `<div class="mi-head"><span class="mi-icon"></span><div class="mi-name"><h2 id="mi-title"></h2><small></small></div><button class="mi-close" aria-label="Schließen">✕</button></div>
+        d.innerHTML = `<div class="mi-head"><span class="mi-icon"></span><div class="mi-name"><h2 id="mi-title"></h2><small></small></div><button class="mi-close" aria-label="${t('close')}">✕</button></div>
 <div class="mi-now"><span class="mi-value"></span><span class="mi-since"></span></div><div class="mi-actions"></div>
-<div class="mi-ranges" role="group" aria-label="Zeitraum"></div><div class="mi-chart"></div><div class="mi-legend"></div><div class="mi-list"></div>`;
+<div class="mi-ranges" role="group" aria-label="${t('range')}"></div><div class="mi-chart"></div><div class="mi-legend"></div><div class="mi-list"></div>`;
         d.querySelector('.mi-close')!.addEventListener('click', () => d.close());
         // a click on the backdrop closes it
         d.addEventListener('click', e => e.target === d && d.close());
@@ -151,7 +152,7 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
                 value += ` · ${fmt(h, 0)}<small>%</small>`;
             }
         } else if (domain(e.entity_id) === 'light' && on && typeof e.attributes.brightness === 'number') {
-            value = `an · ${fmt(e.attributes.brightness / 2.55, 0)}<small>%</small>`;
+            value = `${t('on')} · ${fmt(e.attributes.brightness / 2.55, 0)}<small>%</small>`;
         } else if (['binary_sensor', 'light', 'switch', 'fan'].includes(domain(e.entity_id))) {
             value = esc(binaryText(e));
         } else {
@@ -160,7 +161,7 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
         dialog.querySelector('.mi-value')!.innerHTML = value;
         const since = e.last_changed ? new Date(e.last_changed).getTime() : 0;
         dialog.querySelector('.mi-since')!.textContent =
-            since > 0 ? `seit ${dateFmt(since, Date.now() - since > 20 * 3600e3)}` : '';
+            since > 0 ? t('since', { time: dateFmt(since, Date.now() - since > 20 * 3600e3) }) : '';
     }
 
     function actions(e: Entity): void {
@@ -170,8 +171,8 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
             return;
         }
         for (const [label, service] of [
-            ['Ein', 'turn_on'],
-            ['Aus', 'turn_off'],
+            [t('turn_on'), 'turn_on'],
+            [t('turn_off'), 'turn_off'],
         ]) {
             const b = document.createElement('button');
             b.textContent = label;
@@ -194,7 +195,7 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
         box.innerHTML = '';
         for (const r of RANGES) {
             const b = document.createElement('button');
-            b.textContent = r.label;
+            b.textContent = r.label();
             b.setAttribute('aria-pressed', String(r === range));
             b.addEventListener('click', () => {
                 range = r;
@@ -247,7 +248,7 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
         if (!logged) {
             return;
         }
-        chart.innerHTML = '<div class="mi-empty">Verlauf wird geladen …</div>';
+        chart.innerHTML = `<div class="mi-empty">${t('history_loading')}</div>`;
         const end = Date.now();
         const start = end - range.ms;
         let rows: Record<string, Row[]>;
@@ -262,14 +263,14 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
                     no_attributes: true,
                 })) ?? {};
         } catch (err) {
-            chart.innerHTML = `<div class="mi-empty">Verlauf nicht lesbar: ${esc((err as Error).message)}</div>`;
+            chart.innerHTML = `<div class="mi-empty">${esc(t('history_error', { error: (err as Error).message }))}</div>`;
             return;
         }
         if (ticket !== loading || current !== e.entity_id) {
             return;
         }
         if (!ids.some(id => rows[id]?.length)) {
-            chart.innerHTML = '<div class="mi-empty">Keine Werte in diesem Zeitraum.</div>';
+            chart.innerHTML = `<div class="mi-empty">${t('history_empty')}</div>`;
             return;
         }
         if (numeric(e)) {
@@ -396,7 +397,7 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
             svg += `<text x="${x(t)}" y="${H - 6}" text-anchor="${k === 0 ? 'start' : k === 4 ? 'end' : 'middle'}">${dateFmt(t, multiDay)}</text>`;
         }
         const count = rows.filter((r, i) => r.s === 'on' && (i === 0 || rows[i - 1].s !== 'on')).length;
-        svg += `<text x="${pad.l}" y="24" style="font-size:12px">${esc(binaryText(e, 'on'))}: ${count}× im Zeitraum</text></svg>`;
+        svg += `<text x="${pad.l}" y="24" style="font-size:12px">${esc(t('times_in_range', { what: binaryText(e, 'on'), n: count }))}</text></svg>`;
         chart.innerHTML = svg;
         chart.onpointermove = null;
         chart.onpointerleave = null;

@@ -147,6 +147,19 @@ export class IoBroker implements IoAccess, FileAccess {
     getHistory(id: string, options: ioBroker.GetHistoryOptions): Promise<ioBroker.GetHistoryResult> {
         return this.conn.getHistory(id, options);
     }
+    /**
+     * Whether this user may change the project: write `data.json` of home3d.0, as the server evaluates the file's
+     * rights for the user. Not listed (no file yet): the server decides on the first save. Refused: read-only.
+     */
+    async canWrite(file: string): Promise<boolean> {
+        try {
+            const entry = (await this.conn.readDir(NAMESPACE, '')).find(e => e.file === file);
+            return entry?.acl?.write !== false;
+        } catch (e) {
+            // no folder yet: written on the first save; no right to list the files: read-only
+            return notFound(e);
+        }
+    }
     // Files of home3d.0
     async readText(name: string): Promise<string | null> {
         try {

@@ -1395,7 +1395,7 @@ function boatGear(name: string, code: string): string {
                 '              label = value ? fp3dTr("gear_hatch_open") : "";',
                 '            }',
                 '            const base = f.type === "nav_light" ? (f.gear_y ?? fp3dLightY(kind)) : f.type === "tank" ? (f.mount_y ?? 0) : 0;',
-                '            return { id: f.id, floor: fl.id, type: f.type as Fp3dGearType, x: f.x, z: f.z, rotation: f.rotation, w: f.w, d: f.d, h: f.h, base, variant: kind, value, label, warn, mast: !!f.gear_mast, angle: f.gear_angle ?? FP3D_HATCH_ANGLE };',
+                '            return { id: f.id, floor: fl.id, type: f.type as Fp3dGearType, x: f.x, z: f.z, rotation: f.rotation, w: f.w, d: f.d, h: f.h, base, variant: kind, value, label, warn, mast: !!f.gear_mast, angle: f.gear_angle ?? FP3D_HATCH_ANGLE, entity: ent };',
                 '          }),',
                 '      ),',
                 '    );',
@@ -1404,9 +1404,41 @@ function boatGear(name: string, code: string): string {
             ].join('\n'),
             'gear from the sensors',
         );
+        code = replaceRequired(
+            code,
+            '  private onDeviceHold(entityId: string, x: number, y: number): void {\n',
+            [
+                '  private onDeviceHold(entityId: string, x: number, y: number): void {',
+                "    // a sensor's details (the gear of a boat): a long press opens them as a tap does",
+                '    if (entityId.startsWith("detect:")) return this.onDeviceTap(entityId, x, y);',
+                '',
+            ].join('\n'),
+            'hold on the gear of a boat',
+        );
     }
     if (name === 'viewer/viewer3d.ts') {
         code = `import { buildGear as fp3dBuildGear, disposeGear as fp3dDisposeGear, gearKey as fp3dGearKey, spinners as fp3dSpinners, type GearScene as Fp3dGearScene, type GearState as Fp3dGear } from "${root}/frontend/vendor-ext/boat-gear.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  private pick(x: number, y: number, devices = true): { entity: string } | { floorId: string; roomId: string | null } | null {\n    const ray = this.rayAt(x, y);\n',
+            [
+                '  private pick(x: number, y: number, devices = true): { entity: string } | { floorId: string; roomId: string | null } | null {',
+                '    const ray = this.rayAt(x, y);',
+                '    // the gear of a boat lies apart (a tank is seen through berths and floors): a tap on it opens its sensor',
+                '    // with its history ("detect:": the details, never switched)',
+                '    if (devices && !this.furnish && this.fp3dGearGroup) {',
+                '      for (const hit of ray.intersectObject(this.fp3dGearGroup, true)) {',
+                '        let o: typeof hit.object | null = hit.object;',
+                '        while (o && o.userData.fp3dGear === undefined) o = o.parent;',
+                '        const id: unknown = o?.userData.fp3dGear;',
+                '        const ent = this.fp3dGear.find((g) => g.id === id)?.entity;',
+                '        if (ent) return { entity: `detect:${ent}` };',
+                '      }',
+                '    }',
+                '',
+            ].join('\n'),
+            'tap on the gear of a boat',
+        );
         code = replaceRequired(
             code,
             "  /** Pool Pro: the pools' water colour, movement, heating shimmer and cover; an empty list clears them. */\n  setPools(",
@@ -3721,10 +3753,10 @@ const patches: Plugin = {
         let code = await readFile(file, 'utf8');
         const name = file.slice(src.length + 1);
         if (name === 'components/entity-picker.ts') {
-            code = (await readFile(join(root, 'frontend/entity-picker.ts'), 'utf8')).replace(
-                './picker-styles.js',
-                '../styles.ts',
-            );
+            code = (await readFile(join(root, 'frontend/entity-picker.ts'), 'utf8'))
+                .replace('./picker-styles.js', '../styles.ts')
+                // a copy of its own in this bundle: it reads the language from <html lang>, set by the page
+                .replace("from './lang.js'", `from "${root}/frontend/lang.ts"`);
         }
         if (name === 'styles.ts') {
             const colors: Record<string, string> = {
@@ -3858,6 +3890,8 @@ const patches: Plugin = {
         if (name === 'i18n.ts') {
             // the language files lie next to the bundle at runtime, not in the sources
             code = replaceRequired(code, 'new URL(`./lang/', 'new URL(/* @vite-ignore */ `./lang/', 'language files');
+            // Russian: our own language file (frontend/public/vendor/lang/ru.json)
+            code = replaceRequired(code, '"pt", "tr"] as const;', '"pt", "tr", "ru"] as const;', 'Russian');
         }
         if (name === 'api.ts') {
             // a full backup restores the device mappings too (not part of the backup of the 3D frontend)

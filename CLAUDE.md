@@ -23,6 +23,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 | `frontend/project.ts` | Project files (one plan + its images + the mappings it uses): format, reading, naming |
 | `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
 | `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D), `sensor-look.ts` (sensor symbols and texts, also in the editor's floor plan), `mdi-paths.ts` (the symbols drawn at once, without the whole @mdi/js set), `solar-text.ts` (the power written on the solar modules), `sea.ts` (the sea with waves around a boat), `anchor.ts` (a boat's anchor with its chain as a catenary), `boat-gear.ts` + `boat-kinds.ts` (tanks, rudder, propeller, navigation lights, deck hatches), `porthole.ts` (rounded outlines and plates of the window style "porthole"), `editor-keep.ts` (the editor's view kept across the 3D view), `app-logo.ts` (a TV app's logo when it shows no picture), `weather-data.ts` (wind, fog, pressure trend), `sky-shade.ts` (cloud shadows and wet surfaces in every themed material and the sea), `wind-vane.ts` (windex, windsock, flag), `home-data.ts` (pure: health, mould, price, warnings, mower lanes, water flow), `home-view.ts` (the home looks and their alerts from plan and states, the "Technik" report), `home-fx.ts` (draws them: air, water, sprinklers, mower, sound rings, flood, price glow, cars), `cars.ts` (saloon, hatchback, van) |
+| `frontend/lang.ts` | Texts of the frame (header, dialogs, status and error messages) in de/en/ru: `t(key, vars)`, `translatePage()` for `data-i18n*` in `index.html`; the language from the system (`setLanguage`), kept in `<html lang>` and localStorage `home3d-lang` (the help opens `help-en.html`/`help-ru.html` by it) |
 | `frontend/model.ts` | Types |
 | `src-www/src/` | Upstream 3D frontend (MIT), unchanged except names; patched at build time in `tasks.ts` |
 | `www/` | Served by web; completely generated and gitignored: `index.html`, `bridge.js`, `chunks/`, `vendor/home3d*.js`, the public files, `licenses/page-licenses.md` |
@@ -61,11 +62,16 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 - Writes to datapoints only through `execute()` (type, min/max and `write` are checked before the first write).
 - `Store.call()` serializes all requests, reloads `data.json` before changes (stale check against other browsers)
   and rolls back memory if a write fails. Events are sent only after success.
+- Read-only: if the user may not write `data.json` (`IoBroker.canWrite`: `readDir` of `home3d.0`, the server evaluates
+  `acl.write`) or the URL has `?readonly`, the page runs as in the kiosk, `hass.user.is_admin` is false (no editor) and
+  `Store.readOnly` refuses every change in `MUTATING` and writes nothing, not even on the first start.
 - `crypto.randomUUID`/`crypto.subtle` are not available on plain http; use `uuid()` / the FNV hash in `entities.ts`.
 - All page links are relative (web serves the page under `/home3d/`, possibly behind a proxy).
 - Pro add-ons: only those whose backend this page brings are unlocked (`SERVED` in `tasks.ts`: weather, time travel, energy, household — shown as "Energie" and "Haushalt", without "Pro");
   buttons of the others are removed (`proButtons`).
 - Do not mention the former upstream project name anywhere; keep the MIT copyright in LICENSE/NOTICE.
+- Texts of the frame only through `t()` of `frontend/lang.ts` (de, en and ru for every key); texts of the 3D view as
+  keys of its i18n (de/en patched in `tasks.ts`, other languages in `frontend/public/vendor/lang/<code>.json`, Russian included).
 - Own 3D styles: `looks()` in `tasks.ts` patches `looks.ts`, `theme.ts`, `fold.ts`, `viewer3d.ts`, `panel.ts` and `i18n.ts`;
   code that is new goes to `frontend/vendor-ext/` and is imported by the patch, not into `src-www/`.
 - React/MUI only in `frontend/react/`, imported with `import()`: the 3D view starts without React. A native modal

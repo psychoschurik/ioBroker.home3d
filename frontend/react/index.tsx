@@ -4,6 +4,7 @@ import { DialogSelectID } from '@iobroker/gui-components';
 import type { Connection } from '@iobroker/socket-client';
 import { iobTheme, show } from './host.js';
 import { ProjectsDialog, type ProjectContext } from './ProjectsDialog.js';
+import { t } from '../lang.js';
 
 export type { ProjectContext };
 
@@ -37,7 +38,7 @@ export function selectObjects(options: {
                 themeType="dark"
                 lang={options.language as ioBroker.Languages}
                 dialogName="home3d-objects"
-                title={options.title ?? 'Datenpunkte auswählen'}
+                title={options.title ?? t('choose_datapoints')}
                 imagePrefix="../"
                 types={['state']}
                 multiSelect={options.multiSelect ?? true}

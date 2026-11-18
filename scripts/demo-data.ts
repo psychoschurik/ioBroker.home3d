@@ -82,7 +82,7 @@ export async function demoData(file?: string): Promise<string> {
     return JSON.stringify({
         objects: {
             ...house.objects,
-            'system.config': { type: 'config', common: { language: 'de' }, native: {} },
+            'system.config': { type: 'config', common: { language: process.env.DEMO_LANG || 'de' }, native: {} },
             'home3d.0': { type: 'meta', common: { name: '3D Home', type: 'meta.user' }, native: {} },
         },
         states: Object.fromEntries(Object.entries(house.values).map(([id, val]) => [id, { val }])),

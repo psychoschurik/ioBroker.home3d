@@ -75,6 +75,26 @@ test('first start writes data.json with the main plan', async () => {
     assert.equal(data.version, 2);
     assert.equal(data.plans.main.revision, 0);
 });
+test('read-only (the user may not write the project): reads work, every change is refused, nothing is written', async () => {
+    const { store, files } = await fixture();
+    const before = new Map(files.files);
+    store.readOnly = true;
+    const got = await store.call({ type: 'home3d/building/get' });
+    assert.equal(got.revision, 0);
+    await assert.rejects(
+        store.call({ type: 'home3d/building/save', base_revision: 0, building: empty() }),
+        (e: Error & { code?: string }) => e.code === 'read_only' && /Nur ansehen/.test(e.message),
+    );
+    await assert.rejects(store.call({ type: 'iobroker/mappings/set', mappings: [] }), /Nur ansehen/);
+    await assert.rejects(store.call({ type: 'home3d/history/snapshot' }), /Nur ansehen/);
+    assert.deepEqual(files.files, before);
+    // no data.json yet: shown empty, not created
+    const empty2 = new Store(store.io, memoryFiles());
+    empty2.readOnly = true;
+    await empty2.load();
+    assert.equal((empty2.files as ReturnType<typeof memoryFiles>).files.size, 0);
+    assert.ok(empty2.data.plans.main);
+});
 test('unreachable after minutes without an update: saved for all plans, checked, cleared', async () => {
     const { store, files } = await fixture();
     const saved = (): unknown => JSON.parse(new TextDecoder().decode(files.files.get('data.json'))).health_stale_min;

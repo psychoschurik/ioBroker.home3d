@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3D Home · Help</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="help-page">
+<img src="assets/connected-home.svg" alt="Connected home" width="240">
+<p class="eyebrow">IOBROKER · 3D HOME</p>
+<h1>Your floor plan. Your datapoints.</h1>
+<a href="index.html">← Back to the app</a><p class="help-langs"><a href="help.html?de" lang="de">Deutsch</a> · <a href="help-en.html" lang="en">English</a> · <a href="help-ru.html" lang="ru">Русский</a></p>
+
+<h2 id="guide">1. Connect devices</h2>
+<p>“Connect devices” opens the ioBroker object tree. Expand adapters, instances and channels, or search by object ID and name. The role and room filters narrow the selection. Mark datapoints and connect them with “Apply”. Devices that are already connected are locked against being selected twice.</p>
+
+<h2>2. Edit the floor plan</h2>
+<p>In the editor, create floors, rooms, doors and furniture. Assign the rooms to the ioBroker rooms. With the selection symbol ▤, pick an already connected datapoint in the object tree. The choice is limited to the matching kind of device.</p>
+
+<h2>3. View and control</h2>
+<p>In the 3D view, open a room and operate its devices. Values arrive immediately on every change over the connection of the web adapter. Complex devices may need additional mappings for brightness, temperature or position; these are under “Advanced mappings”.</p>
+
+<h2>Boats</h2>
+<p>Under ⚙ → House: “Heading from a compass” turns the plan with the boat, “Position” takes the GPS for the position of the sun, “Sea around the boat” puts water at the waterline, with waves from a wave height and a wave length sensor. The furniture piece “Anchor” (Outside) belongs at the front on the bow roller; unturned, its chain runs to the top of the floor plan. With the chain counter and the water depth it sits in the roller (below 0.3 m of chain), hangs on the chain or lies on the bottom. The distance to the anchor (GPS) tightens the chain, and the alarm radius appears as a circle on the water. With the sensor “Speed” (log or SOG) the water flows past the hull, with a bow wave and a wake.</p>
+<p>In the editor under Furniture → “Boat”: <b>Tank</b> (choose the contents, the level in % and optionally the litres; yellow when a supply runs low or a black water tank gets full), <b>Rudder</b> (on the rudder stock, with the rudder angle in °, positive = starboard), <b>Drive with propeller</b> (under the engine, with the rpm) and <b>Navigation light</b> (anchor light, steaming light, port, starboard, bicolour light, stern light; with its switch; height above the floor, e.g. 18 m for the masthead, and the mast as well if you like). Rudder and propeller hang below the floor they stand on. A click on a tank, rudder, drive, hatch or navigation light opens the details of its sensor with the history, when a history adapter records it.</p>
+<p>The <b>Hatch</b> (square with rounded corners, or round) belongs on the deck. With a contact (open/closed) its tinted lid stands at its opening angle (default 70°) on two gas struts; unturned, the hinge is at the top of the floor plan. If it rains while the hatch is open, you get the same warning as for open windows.</p>
+<p><b>Windows that open upwards:</b> A top-hung window has its own opening angle and can also open inwards. The window style “Porthole / rounded” draws the frame and sash rounded – round when the window is as wide as it is high, otherwise with rounded ends – and opens upwards as a flap (default 60°). Tilted, both open at most about 26°.</p>
+
+<h2>Wind and weather</h2>
+<p>Under ⚙ → Weather &amp; warnings you can choose sensors for wind (kn, km/h or m/s), wind direction (where it comes from, 0 = north), gusts and air pressure. Without them, or when a sensor reports nothing for an hour, the wind and air pressure of the weather entity apply. The <b>Wind indicator</b> (Furniture → Outside: windex at the masthead, windsock or flag) turns with the wind and shows the wind, direction and Beaufort above it; gusts make it swing, and the windsock stands horizontal from 15 kn.</p>
+<p>On the sea the waves run with the wind, with whitecaps from 4 Bft; gusts ruffle the water, and rain makes rings. In the natural styles (e.g. “Homely”) the deck and roofs get wet in the rain, and with sun and broken clouds, cloud shadows drift with the wind over the sea, the deck and the roofs. If the weather effect “Fog” is on, fog also comes from the visibility or from how close the temperature is to the dew point. If the air pressure falls by 3 hPa or more within 3 hours, a warning appears at the top (from 6 hPa a storm warning) and the sky gets darker.</p>
+
+<h2>Around the house</h2>
+<p><b>Views</b> (Show): “Health” colours the rooms by their devices – red when one of them is unreachable, yellow for a low battery (20 % or less) – and shows badges at the devices and a list at the bottom right. With the mouse over a badge (or when you tap it), the tooltip tells which device it is, why, and when it last reported something. A device’s battery, LOWBAT, UNREACH and availability datapoints are found automatically next to its datapoint, as is whether its adapter is running and connected. Battery devices that sleep between two reports (e.g. Shelly H&amp;T) only count as unreachable after 48 hours without a report. Under ⚙ → Weather &amp; warnings you can set “Unreachable after … minutes without an update” instead (e.g. 15 for sensors that send every 5 minutes; contacts that only send on a change need more) and switch off that rooms without a problem appear (green, with “✓ n OK”) – then “Health” shows only problems. With “Always show battery and reachability problems at the device”, 🔋 and ⚠ also appear at the device outside “Health”, as well as at a hatch or a tank with its own sensor. Per device you can set this differently in the editor at the device (below its datapoint): as the device reports, after … minutes without an update, or never, plus “Check only while its adapter is connected” – e.g. for NMEA values whose instruments are switched off with the boat. This counts for the whole device, also for its other datapoints. Below that you see the battery that counts and where it comes from: found by the type-detector, guessed by name and role, or chosen here. If it is wrong, pick the right datapoint with “Choose …” (a number: charge in %, true/false: battery low) or “No battery” for devices on the on-board power supply; “Automatic” searches by itself again. “✓ 3 OK” at a room means: three devices there are fine; with the mouse over the room label you see which. A smoke, gas or water sensor warns for the room it is placed in: the room flashes red and the warning appears at the top. At the device in the editor you choose a symbol from the row under “Own symbol” (or type a Material Design name), and with “Colour when active” the colour it glows in while it is active. “Motion” colours the rooms by how often a motion sensor triggered there today (from the history).</p>
+<p><b>Air the room:</b> From a room’s temperature and humidity (and the outside temperature of the weather entity), the humidity in the coldest corner at the outer walls is estimated; from 70 % the corners turn dark, from 80 % (mould) “Air the room” appears. Switch it off under ⚙ → Weather &amp; warnings → “Show the mould risk” (the air at open windows has its own switch). Open windows with a contact show the air: on the windward side it flows in, on the other side it flows out. If the room is heating (a thermostat in the room or a radiator with a thermostat), red warmth escapes, and after 10 minutes a warning appears.</p>
+<p><b>Garden</b> (Furniture → Outside): The <b>Robot mower</b> stands at its charging station; with its status (Worx code, Husqvarna activity or text) it drives lanes over the lawn while mowing and leaves stripes. The <b>Sprinkler</b> sprays while its valve is open; with a soil moisture sensor the lawn turns yellowish when it is dry.</p>
+<p><b>Cars</b> (Furniture → Vehicles): saloon, hatchback and van, in any colour you like. With an “At home” datapoint (tracker, sensor in the garage, on/off) the car reverses into its place when it arrives and drives away when it leaves; then its marking stays.</p>
+<p><b>Under ⚙ → Weather &amp; warnings:</b> “Severe weather warning” (level 1–4 or words like “severe”, e.g. from the DWD adapter) colours the frame and the banner. “Electricity price” (else the tariff from Energy) makes the house glow green when it is cheap compared with the rest of the day, red when it is dear; with a “Price forecast” (a JSON list with start time and price, e.g. from Tibber) the cheapest hour appears in the energy bar. “Water flow” (else the water meter from Energy): if water runs for more than 30 minutes, a warning appears. Shower, bath and washbasin show running water with their own sensor or valve or, if chosen, while the water meter counts. If a water detector reports a leak, the water rises in the room.</p>
+<p>Speakers and TVs that are playing send out rings according to their volume, noise sensors (dB) from 50 dB.</p>
+
+<h2>Time travel</h2>
+<p>Time travel shows the house at an earlier point in time. The values come from the history adapters of ioBroker (history, influxdb, sql, recorder). Automatically it reads each datapoint from the instance that records it, otherwise from the default history of the system settings. In the editor under ⚙ → House → “Time travel reads from” you can prefer an instance, e.g. <code>recorder.0</code>: the recorder adapter chooses the important datapoints itself. Whatever the chosen instance does not record still comes from the history that records it.</p>
+
+<h2>Tablet and VIS</h2>
+<p>For a wall tablet: <code>index.html?kiosk</code> (“Kiosk ↗” in the header) shows the 3D view without the two bars at the top. The editor, “Projects” and “Connect devices” cannot be reached there. In the editor, “Kiosk ↗” opens the plan you are editing this way in a new tab. If the logged-in user may not write the files of <code>home3d.0</code> (on a demo page, for example), the page only shows: as in the kiosk, without the editor, “Projects” and “Connect devices”; switching follows the rights of the datapoints. <code>index.html?readonly</code> forces this for users with write rights too.</p>
+<p>To embed it as an iframe in VIS: <code>/home3d/index.html?view=card</code> on the same web instance as VIS shows only the 3D card, without the header, the floor bar and the editor; it fills the iframe.</p>
+
+<h2 id="project">Storage and permissions</h2>
+<p>Floor plans, restore points, images and device mappings are stored as files in the ioBroker file storage under <code>home3d.0</code> (<code>data.json</code>, <code>history/</code>, <code>images/</code>). Login and permissions come from the web adapter: to save floor plans you need write permission on files; to switch devices, write permission on the datapoints.</p>
+
+<h2>Availability</h2>
+<p>This ioBroker version does not support a shop connection, Pro packages, Home Assistant voice pipelines or location services. Links to them lead here.</p>
+
+<h2 id="help">Troubleshooting</h2>
+<p>“Offline” in the header: is the web instance running, and is its socket connection (integrated or via ws/socketio) active? Errors while saving: check the file permissions of the logged-in user. For device problems, check the object ID, the role and the write permission in ioBroker.</p>
+</main>
+</body>
+</html>

@@ -2,6 +2,7 @@
 // The file is an export file of the 3D frontend (`format: "home3d"`) with an `iobroker` part, so the plan import of
 // the editor still reads its building; our import also takes plain export files of the 3D frontend.
 import type { Building, Mapping, ProtocolRecord } from './model.js';
+import { t } from './lang.js';
 
 export const PROJECT_FORMAT = 'home3d';
 export const PROJECT_VERSION = 1;
@@ -121,13 +122,13 @@ export function readProject(data: unknown): Project {
         try {
             d = JSON.parse(d);
         } catch {
-            fail('not_json', 'Die Datei ist kein JSON.');
+            fail('not_json', t('not_json'));
         }
     }
     const file = d as Partial<ProjectFile> & ProtocolRecord;
     const building = (file?.format === PROJECT_FORMAT ? file.building : file) as Building | undefined;
     if (!building || building.version !== 1 || !Array.isArray(building.floors) || !building.settings) {
-        fail('not_plan', 'Die Datei enthält keinen 3D-Home-Grundriss.');
+        fail('not_plan', t('no_project'));
     }
     const extra: Partial<ProjectFile['iobroker']> =
         file.format === PROJECT_FORMAT && file.iobroker && typeof file.iobroker === 'object' ? file.iobroker : {};

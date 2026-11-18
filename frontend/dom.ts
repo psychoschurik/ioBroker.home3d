@@ -21,6 +21,7 @@ interface Elements {
     'mapping-close': HTMLElement;
     'project-open': HTMLButtonElement;
     'object-browser': HTMLButtonElement;
+    'help-link': HTMLAnchorElement;
 }
 export function element<K extends keyof Elements>(id: K): Elements[K] {
     const node = document.getElementById(id);

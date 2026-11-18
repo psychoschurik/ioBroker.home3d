@@ -5,6 +5,7 @@ import type { Connection } from '@iobroker/socket-client';
 import { discover, withDatapoint } from './entities.js';
 import type { RoomObject } from './model.js';
 import type { CallWS, Mapping, StateObject } from './types.js';
+import { t } from './lang.js';
 
 interface Access {
     getObjects(ids: string[]): Promise<Record<string, StateObject>>;
@@ -39,19 +40,19 @@ const strip = (list: Mapping[]): Mapping[] => list.map(({ _meta, ...m }) => m);
 
 /** Another datapoint for a mapping, chosen in the object browser (null: cancelled). */
 export async function pickDatapoint(o: DatapointOptions, m: Mapping): Promise<Mapping | null> {
-    const id = await pickOne(o, m.state, `Datenpunkt für ${m.name || m.entity_id}`);
+    const id = await pickOne(o, m.state, t('datapoint_for', { name: m.name || m.entity_id }));
     if (!id || id === m.state) {
         return null;
     }
     const obj = (await o.io.getObjects([id]))[id];
     if (obj?.type !== 'state') {
-        throw new Error(`${id} ist kein Datenpunkt.`);
+        throw new Error(t('not_datapoint', { id }));
     }
     return withDatapoint(m, id, obj);
 }
 
 export function setupDatapoints(o: DatapointOptions): void {
-    const fail = (e: unknown): void => o.setStatus(`Fehler · ${(e as Error).message || e}`);
+    const fail = (e: unknown): void => o.setStatus(t('error', { error: (e as Error).message || String(e) }));
 
     // the editor's device form: another datapoint for the device
     window.addEventListener('iobroker-datapoint', ev => {
@@ -60,7 +61,7 @@ export function setupDatapoints(o: DatapointOptions): void {
             const mappings = strip((await o.callWS({ type: 'iobroker/mappings/get' })) as Mapping[]);
             const m = mappings.find(x => x.entity_id === entityId);
             if (!m) {
-                throw new Error(`Kein ioBroker-Gerät: ${entityId}`);
+                throw new Error(t('no_device', { id: String(entityId) }));
             }
             const next = await pickDatapoint(o, m);
             if (!next) {
@@ -85,7 +86,7 @@ export function setupDatapoints(o: DatapointOptions): void {
             const mappings = strip((await o.callWS({ type: 'iobroker/mappings/get' })) as Mapping[]);
             const m = mappings.find(x => x.entity_id === entityId);
             if (!m) {
-                throw new Error(`Kein ioBroker-Gerät: ${entityId}`);
+                throw new Error(t('no_device', { id: String(entityId) }));
             }
             const next: Mapping = { ...m };
             if ('reach' in detail) {
@@ -107,7 +108,7 @@ export function setupDatapoints(o: DatapointOptions): void {
                 mappings: mappings.map(x => (x.entity_id === m.entity_id ? next : x)),
             });
             await o.refresh();
-            o.setStatus(`${m.name || m.entity_id} · „nicht erreichbar“ gespeichert`);
+            o.setStatus(t('reach_saved', { name: m.name || m.entity_id }));
         })().catch(fail);
     });
 
@@ -128,19 +129,19 @@ export function setupDatapoints(o: DatapointOptions): void {
             const mappings = strip((await o.callWS({ type: 'iobroker/mappings/get' })) as Mapping[]);
             const m = mappings.find(x => x.entity_id === detail.entityId);
             if (!m) {
-                throw new Error(`Kein ioBroker-Gerät: ${detail.entityId}`);
+                throw new Error(t('no_device', { id: String(detail.entityId) }));
             }
             const name = m.name || m.entity_id;
             let battery = detail.battery ?? null;
             if (detail.pick) {
                 const start = m.battery && m.battery !== 'none' ? m.battery : (detail.current ?? m.state);
-                const id = await pickOne(o, start, `Batterie für ${name}`);
+                const id = await pickOne(o, start, t('battery_for', { name }));
                 if (!id) {
                     return;
                 }
                 const obj = (await o.io.getObjects([id]))[id];
                 if (obj?.type !== 'state') {
-                    throw new Error(`${id} ist kein Datenpunkt.`);
+                    throw new Error(t('not_datapoint', { id }));
                 }
                 battery = id;
             }
@@ -158,7 +159,12 @@ export function setupDatapoints(o: DatapointOptions): void {
             });
             await o.callWS({ type: 'iobroker/mappings/set', mappings: next });
             await o.refresh();
-            o.setStatus(`${name} · Batterie: ${battery === 'none' ? 'keine' : (battery ?? 'automatisch')}`);
+            o.setStatus(
+                t('battery_saved', {
+                    name,
+                    battery: battery === 'none' ? t('battery_none') : (battery ?? t('battery_auto')),
+                }),
+            );
         })().catch(fail);
     });
 
@@ -166,13 +172,13 @@ export function setupDatapoints(o: DatapointOptions): void {
     window.addEventListener('iobroker-position', ev => {
         const clear = !!(ev as CustomEvent<{ clear?: boolean }>).detail?.clear;
         void (async () => {
-            const id = clear ? null : await pickOne(o, o.getPositionId(), 'Position (GPS)');
+            const id = clear ? null : await pickOne(o, o.getPositionId(), t('position_pick'));
             if (!clear && !id) {
                 return;
             }
             await o.callWS({ type: 'iobroker/position/set', id });
             await o.refresh();
-            o.setStatus(id ? `Position aus ${id}` : 'Position aus den Systemeinstellungen');
+            o.setStatus(id ? t('position_from', { id }) : t('position_system'));
         })().catch(fail);
     });
 
@@ -182,7 +188,7 @@ export function setupDatapoints(o: DatapointOptions): void {
         void (async () => {
             await o.callWS({ type: 'iobroker/timetravel/set', instance });
             await o.refresh();
-            o.setStatus(instance ? `Zeitreise aus ${instance}` : 'Zeitreise: Verlauf automatisch');
+            o.setStatus(instance ? t('timetravel_from', { id: instance }) : t('timetravel_auto'));
         })().catch(fail);
     });
 
@@ -192,11 +198,7 @@ export function setupDatapoints(o: DatapointOptions): void {
         void (async () => {
             await o.callWS({ type: 'iobroker/health/set', minutes });
             await o.refresh();
-            o.setStatus(
-                minutes
-                    ? `Nicht erreichbar nach ${minutes} min ohne Update`
-                    : 'Nicht erreichbar: wie das Gerät es meldet',
-            );
+            o.setStatus(minutes ? t('reach_after', { n: minutes }) : t('reach_report'));
         })().catch(fail);
     });
 
@@ -208,7 +210,7 @@ export function setupDatapoints(o: DatapointOptions): void {
             const ids = await selectObjects({
                 socket: o.socket,
                 language: o.getLanguage(),
-                title: 'Datenpunkte für diesen Raum',
+                title: t('room_datapoints'),
             });
             if (!ids?.length) {
                 return;
@@ -226,7 +228,8 @@ export function setupDatapoints(o: DatapointOptions): void {
             done?.(entityIds.filter((id): id is string => !!id));
             const skipped = ids.filter((_, i) => !entityIds[i]);
             o.setStatus(
-                `${added.length} Geräte verbunden${skipped.length ? ` · übersprungen: ${skipped.join(', ')}` : ''}`,
+                t('added_devices', { n: added.length }) +
+                    (skipped.length ? t('added_skipped', { ids: skipped.join(', ') }) : ''),
             );
         })().catch(fail);
     });

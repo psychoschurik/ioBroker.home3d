@@ -8,6 +8,7 @@ import type {
     IoAccess,
     ProtocolRecord,
 } from './model.js';
+import { t } from './lang.js';
 /** Stable, short hash for entity IDs (FNV-1a, 96 bit). Works without a secure context, unlike crypto.subtle. */
 function hash(text: string): string {
     let out = '';
@@ -38,7 +39,7 @@ function fail(message: string): never {
 }
 function validateMappings(mappings: Mapping[], objects: Record<string, StateObject>): Mapping[] {
     if (!Array.isArray(mappings) || mappings.length > 10000) {
-        fail('Zuordnungen müssen eine Liste sein (max. 10000).');
+        fail(t('mappings_list'));
     }
     const seen = new Set();
     for (const m of mappings) {
@@ -49,18 +50,18 @@ function validateMappings(mappings: Mapping[], objects: Record<string, StateObje
             ) ||
             seen.has(m.entity_id)
         ) {
-            fail('Ungültige oder doppelte entity_id.');
+            fail(t('bad_entity_id'));
         }
         seen.add(m.entity_id);
         if (!objects[m.state]?.common || objects[m.state].type !== 'state') {
-            fail(`Datenpunkt fehlt: ${m.state}`);
+            fail(t('datapoint_missing', { id: m.state }));
         }
         if (m.when !== undefined) {
             if (typeof m.when?.id !== 'string' || !objects[m.when.id] || !Array.isArray(m.when.values)) {
-                fail(`Bedingung braucht einen vorhandenen Datenpunkt und eine Liste von Werten: ${m.entity_id}`);
+                fail(t('bad_when', { id: m.entity_id }));
             }
             if (m.when.else !== undefined && typeof m.when.else !== 'string') {
-                fail('else der Bedingung muss Text sein.');
+                fail(t('bad_else'));
             }
         }
         if (
@@ -69,37 +70,37 @@ function validateMappings(mappings: Mapping[], objects: Record<string, StateObje
             m.reach !== 'never' &&
             !(Number.isInteger(m.reach) && m.reach >= 1 && m.reach <= 10080)
         ) {
-            fail(`„Nicht erreichbar“: report, never oder 1 bis 10080 Minuten: ${m.entity_id}`);
+            fail(t('bad_reach', { id: m.entity_id }));
         }
         if (m.reach_connected !== undefined && typeof m.reach_connected !== 'boolean') {
-            fail(`reach_connected muss true oder false sein: ${m.entity_id}`);
+            fail(t('bad_reach_connected', { id: m.entity_id }));
         }
         if (m.battery !== undefined && (typeof m.battery !== 'string' || !/^[^\s*?"'`]{1,300}$/.test(m.battery))) {
-            fail(`„Batterie“ muss ein Datenpunkt oder none sein: ${m.entity_id}`);
+            fail(t('bad_battery', { id: m.entity_id }));
         }
         for (const binding of Object.values(m.attributes || {})) {
             if (typeof binding === 'object' && binding?.id && !objects[binding.id]) {
-                fail(`Attribut-Datenpunkt fehlt: ${binding.id}`);
+                fail(t('attribute_missing', { id: binding.id }));
             }
         }
         for (const rules of Object.values(m.actions || {})) {
             if (!Array.isArray(rules)) {
-                fail('Aktionen müssen Listen sein.');
+                fail(t('actions_list'));
             }
             for (const r of rules) {
                 const o = objects[r.id];
                 if (!o || o.type !== 'state' || o.common?.write !== true) {
-                    fail(`Datenpunkt nicht schreibbar: ${r.id}`);
+                    fail(t('not_writable', { id: r.id }));
                 }
                 if (r.field === undefined && !Object.hasOwn(r, 'value') && !r.toggle) {
-                    fail('Aktion braucht field, value oder toggle.');
+                    fail(t('bad_action'));
                 }
                 if (r.convert !== undefined && r.convert !== 'rgb_hex' && r.convert !== 'rgbw_hex') {
-                    fail('convert einer Aktion muss rgb_hex oder rgbw_hex sein.');
+                    fail(t('bad_convert'));
                 }
                 for (const key of ['scale', 'offset'] as const) {
                     if (r[key] !== undefined && !Number.isFinite(r[key])) {
-                        fail(`${key} muss eine Zahl sein.`);
+                        fail(t('not_number', { key }));
                     }
                 }
             }
@@ -119,7 +120,7 @@ function hexToRgb(value: unknown): [number, number, number] | null {
 /** [r, g, b] → "#rrggbb" (with "00" for the white channel of `rgbw_hex`). */
 function rgbToHex(value: unknown, white: boolean): string {
     if (!Array.isArray(value) || value.length < 3 || value.slice(0, 3).some(v => !Number.isFinite(Number(v)))) {
-        fail('Farbe muss [r, g, b] sein.');
+        fail(t('bad_color'));
     }
     const hex = value
         .slice(0, 3)
@@ -170,7 +171,7 @@ export function wmoCondition(value: unknown): string {
 export function transformed(value: unknown, binding: Binding, write = false): any {
     if (binding?.convert === 'wmo') {
         if (write) {
-            fail('Ein Wettercode kann nicht geschrieben werden.');
+            fail(t('weather_write'));
         }
         return wmoCondition(value);
     }
@@ -312,33 +313,33 @@ async function execute(
 ): Promise<{ written: number }> {
     const ids = Array.isArray(data.entity_id) ? data.entity_id : [data.entity_id];
     if (!ids.length || ids.some(id => typeof id !== 'string')) {
-        fail('entity_id erforderlich.');
+        fail(t('entity_required'));
     }
     const writes: [string, any][] = [];
     for (const id of ids) {
         const m = mappings.find(item => item.entity_id === id);
         if (!m || (domain !== 'homeassistant' && id.split('.')[0] !== domain)) {
-            fail(`Unbekanntes Gerät: ${id}`);
+            fail(t('unknown_device', { id }));
         }
         const rules = m.actions?.[service];
         if (!rules?.length) {
-            fail(`Aktion ${service} für ${m.name || id} nicht zugeordnet.`);
+            fail(t('no_action', { service, name: m.name || id }));
         }
         for (const r of rules) {
             if (r.field && !Object.hasOwn(data, r.field)) {
                 if (r.optional) {
                     continue;
                 }
-                fail(`Parameter ${r.field} fehlt.`);
+                fail(t('param_missing', { field: String(r.field) }));
             }
             const o = (await io.getObjects([r.id]))[r.id];
             if (o?.type !== 'state' || o.common?.write !== true) {
-                fail(`Nicht schreibbar: ${r.id}`);
+                fail(t('not_writable_short', { id: r.id }));
             }
             let value = r.toggle ? !(await io.getState(r.id))?.val : r.field ? data[r.field] : r.value;
             value = transformed(value, r, true);
             if (typeof value !== o.common.type) {
-                fail(`Falscher Werttyp für ${r.id}: erwartet ${o.common.type}.`);
+                fail(t('bad_type', { id: r.id, type: String(o.common.type) }));
             }
             if (
                 typeof value === 'number' &&
@@ -346,7 +347,7 @@ async function execute(
                     (o.common.min !== undefined && value < o.common.min) ||
                     (o.common.max !== undefined && value > o.common.max))
             ) {
-                fail(`Wert außerhalb des Bereichs: ${r.id}`);
+                fail(t('out_of_range', { id: r.id }));
             }
             writes.push([r.id, value]);
         }

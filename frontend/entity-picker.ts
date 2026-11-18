@@ -1,6 +1,7 @@
 // ioBroker picker adapter. Reuses the shell's object tree; keeps existing plan IDs stable.
 import { css, html, LitElement, nothing, type TemplateResult } from 'lit';
 import { tokens } from './picker-styles.js';
+import { t } from './lang.js';
 export interface PickerOption {
     id: string;
     label: string;
@@ -24,7 +25,7 @@ export class EntityPicker extends LitElement {
         this.fixed = [];
         this.value = null;
         this.disabled = false;
-        this.placeholder = 'Datenpunkt auswählen';
+        this.placeholder = t('choose_datapoint');
     }
     private pick(): void {
         if (this.disabled) {
@@ -81,9 +82,9 @@ export class EntityPicker extends LitElement {
                 type="button"
                 ?disabled=${this.disabled}
                 @click=${this.pick}
-                aria-label=${this.placeholder || 'Datenpunkt auswählen'}
+                aria-label=${this.placeholder || t('choose_datapoint')}
             >
-                <span>${current?.label || this.placeholder || 'Datenpunkt auswählen'}</span
+                <span>${current?.label || this.placeholder || t('choose_datapoint')}</span
                 ><b aria-hidden="true">▤</b></button
             >${id ? html`<small title=${id}>${id}</small>` : nothing}`;
     }
