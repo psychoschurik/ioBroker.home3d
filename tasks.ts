@@ -184,6 +184,19 @@ function tvAppLogo(name: string, code: string): string {
     );
 }
 
+/** The mouse wheel over a sensor, device or room label zooms the view like anywhere else on the stage. */
+function wheelOverLabels(name: string, code: string): string {
+    if (name !== 'components/view3d.ts') {
+        return code;
+    }
+    return replaceRequired(
+        code,
+        'if (!(ev.target as Element | null)?.closest?.(".fp3d-holo")) return;',
+        'if (!(ev.target as Element | null)?.closest?.(".fp3d-holo, .fp3d-labels")) return;',
+        'wheel over the labels',
+    );
+}
+
 /** Sensor markers with a symbol by what they report, the humidity next to the temperature (frontend/vendor-ext/sensor-look.ts). */
 function sensorLook(name: string, code: string): string {
     if (name !== 'markers.ts') {
@@ -967,13 +980,13 @@ function boatGear(name: string, code: string): string {
         code = replaceRequired(
             code,
             '  "anchor",\n] as const;',
-            '  "anchor",\n  "tank",\n  "rudder",\n  "propeller",\n  "nav_light",\n] as const;',
+            '  "anchor",\n  "tank",\n  "hatch",\n  "rudder",\n  "propeller",\n  "nav_light",\n] as const;',
             'gear types',
         );
         code = replaceRequired(
             code,
             '  outdoor: ["awning", "anchor"],',
-            '  outdoor: ["awning", "anchor", "tank", "rudder", "propeller", "nav_light"],',
+            '  outdoor: ["awning", "anchor", "tank", "hatch", "rudder", "propeller", "nav_light"],',
             'gear in the library',
         );
         code = replaceRequired(
@@ -986,6 +999,8 @@ function boatGear(name: string, code: string): string {
                 '  rudder: [0.12, 0.55, 1],',
                 '  propeller: [0.42, 0.35, 0.55],',
                 '  nav_light: [0.14, 0.14, 0.1],',
+                '  // a deck hatch: width, length, height of its frame',
+                '  hatch: [0.6, 0.6, 0.06],',
             ].join('\n'),
             'gear sizes',
         );
@@ -1000,8 +1015,52 @@ function boatGear(name: string, code: string): string {
                 '  gear_kind?: string | null;',
                 '  gear_y?: number | null;',
                 '  gear_mast?: boolean;',
+                '  /** A hatch: how far it opens (°, default 70). */',
+                '  gear_angle?: number | null;',
             ].join('\n'),
             'gear fields',
+        );
+    }
+    if (name === 'alerts.ts') {
+        // an open deck hatch in the rain: the warning of an open window, with the hatch's contact
+        code = `import { hatchOpen as fp3dHatchOpen } from "${kinds}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  /** Haushalt Pro: the fridges with door sensors (their doors may not stand open too long). */',
+            '  /** The contacts of the deck hatches (open in the rain: a warning). */\n  hatches?: string[];\n  /** Haushalt Pro: the fridges with door sensors (their doors may not stand open too long). */',
+            'hatches: sources type',
+        );
+        code = replaceRequired(
+            code,
+            '  return { rooms, alarms: ids.filter((id) => id.startsWith("alarm_control_panel.")), weather, outage, rain, fridges };',
+            [
+                '  const hatches = building.floors.flatMap((fl) => fl.furniture.filter((f) => f.type === "hatch" && !!f.gear_entity && f.gear_entity !== "none").map((f) => f.gear_entity as string));',
+                '  return { rooms, alarms: ids.filter((id) => id.startsWith("alarm_control_panel.")), weather, outage, rain, fridges, hatches };',
+            ].join('\n'),
+            'hatches: sources',
+        );
+        code = replaceRequired(
+            code,
+            '...(sources.fridges ?? []).flatMap((f) => f.ids)];',
+            '...(sources.fridges ?? []).flatMap((f) => f.ids), ...(sources.hatches ?? [])];',
+            'hatches: watched',
+        );
+        code = replaceRequired(
+            code,
+            [
+                '        out.push({ kind: "window_rain", entity: link.contact ?? link.tilt ?? link.contact2 ?? o.id, roomId: o.room_id, floorId: floor.id });',
+                '      }',
+            ].join('\n'),
+            [
+                '        out.push({ kind: "window_rain", entity: link.contact ?? link.tilt ?? link.contact2 ?? o.id, roomId: o.room_id, floorId: floor.id });',
+                '      }',
+                '      for (const f of floor.furniture) {',
+                '        if (f.type !== "hatch" || !f.gear_entity || f.gear_entity === "none" || !fp3dHatchOpen(hass.states[f.gear_entity]?.state)) continue;',
+                '        const room = floor.rooms.find((r) => r.points.length >= 3 && pointInPolygon([f.x, f.z], r.points));',
+                '        out.push({ kind: "window_rain", entity: f.gear_entity, roomId: room?.id ?? null, floorId: floor.id });',
+                '      }',
+            ].join('\n'),
+            'hatches: open in the rain',
         );
     }
     if (name === 'library-index.ts') {
@@ -1015,7 +1074,7 @@ function boatGear(name: string, code: string): string {
         code = replaceRequired(
             code,
             '  anchor: ["outdoor", []],',
-            '  anchor: ["boat", []],\n  tank: ["boat", []],\n  rudder: ["boat", []],\n  propeller: ["boat", []],\n  nav_light: ["boat", []],',
+            '  anchor: ["boat", []],\n  tank: ["boat", []],\n  rudder: ["boat", []],\n  propeller: ["boat", []],\n  nav_light: ["boat", []],\n  hatch: ["boat", []],',
             'gear in the library index',
         );
     }
@@ -1039,6 +1098,13 @@ function boatGear(name: string, code: string): string {
                 '      ];',
                 '    case "nav_light":',
                 '      return [circle(0, 0, Math.max(0.02, Math.min(w, d) / 2 - 0.01), "fp3d-sym-strong"), circle(0, 0, 0.015)];',
+                '    case "hatch":',
+                '      // a deck hatch: its frame, the lid and the hinge along the front edge',
+                '      return [',
+                '        rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"),',
+                '        rect(-w / 2 + 0.05, -d / 2 + 0.05, w / 2 - 0.05, d / 2 - 0.05),',
+                '        line(-w / 2 + 0.06, -d / 2 + 0.025, w / 2 - 0.06, -d / 2 + 0.025, "fp3d-sym-strong"),',
+                '      ];',
                 '    case "anchor": {',
                 '',
             ].join('\n'),
@@ -1049,16 +1115,16 @@ function boatGear(name: string, code: string): string {
         code = replaceRequired(
             code,
             '    case "anchor":\n',
-            '    case "tank":\n    case "rudder":\n    case "propeller":\n    case "nav_light":\n    case "anchor":\n',
+            '    case "tank":\n    case "rudder":\n    case "propeller":\n    case "nav_light":\n    case "hatch":\n    case "anchor":\n',
             'gear not as furniture',
         );
     }
     if (name === 'components/editor.ts') {
-        code = `import { defaultLightY as fp3dLightY, isGear as fp3dIsGear, LIGHT_KINDS as FP3D_LIGHT_KINDS, TANK_KINDS as FP3D_TANK_KINDS } from "${kinds}";\n${code}`;
+        code = `import { defaultLightY as fp3dLightY, HATCH_ANGLE as FP3D_HATCH_ANGLE, HATCH_KINDS as FP3D_HATCH_KINDS, isGear as fp3dIsGear, LIGHT_KINDS as FP3D_LIGHT_KINDS, TANK_KINDS as FP3D_TANK_KINDS } from "${kinds}";\n${code}`;
         code = replaceRequired(
             code,
             '"wifi_ap", "water_heater", "anchor"]);',
-            '"wifi_ap", "water_heater", "anchor", "tank", "rudder", "propeller", "nav_light"]);\n/** What switches a light of a boat. */\nconst FP3D_SWITCHES = (id: string) => ["switch.", "light.", "binary_sensor.", "input_boolean."].some((d) => id.startsWith(d));',
+            '"wifi_ap", "water_heater", "anchor", "tank", "hatch", "rudder", "propeller", "nav_light"]);\n/** What switches a light of a boat. */\nconst FP3D_SWITCHES = (id: string) => ["switch.", "light.", "binary_sensor.", "input_boolean."].some((d) => id.startsWith(d));',
             'gear: no state links',
         );
         code = replaceRequired(
@@ -1075,20 +1141,23 @@ function boatGear(name: string, code: string): string {
                 '  private fp3dRenderGearForm(f: Furniture) {',
                 '    const tank = f.type === "tank";',
                 '    const lamp = f.type === "nav_light";',
-                '    const kinds: readonly string[] | null = tank ? FP3D_TANK_KINDS : lamp ? FP3D_LIGHT_KINDS : null;',
+                '    const hatch = f.type === "hatch";',
+                '    const kinds: readonly string[] | null = tank ? FP3D_TANK_KINDS : lamp ? FP3D_LIGHT_KINDS : hatch ? FP3D_HATCH_KINDS : null;',
+                '    const kindKey = tank ? "tank" : lamp ? "light" : "hatch";',
                 '    const kind = f.gear_kind ?? kinds?.[0] ?? null;',
                 '    const pick = (key: "gear_entity" | "gear_liters", label: string, filter: (id: string) => boolean) =>',
                 '      this.entitySelect(label, f[key] ?? null, undefined, this.entityOptions(filter), (v) => this.updateFurniture({ [key]: v === "none" ? null : v }));',
                 '    return html`<div class="fp3d-form fp3d-links">',
                 '      ${kinds',
                 '        ? html`<label class="fp3d-field fp3d-wide"',
-                '            >${this.t(tank ? "gear_tank_kind" : "gear_light_kind")}',
+                '            >${this.t(`gear_${kindKey}_kind` as I18nKey)}',
                 '            <select ?disabled=${!this.isAdmin} @change=${(e: Event) => this.updateFurniture({ gear_kind: (e.target as HTMLSelectElement).value })}>',
-                '              ${kinds.map((k) => html`<option value=${k} ?selected=${k === kind}>${this.t(`gear_${tank ? "tank" : "light"}_${k}` as I18nKey)}</option>`)}',
+                '              ${kinds.map((k) => html`<option value=${k} ?selected=${k === kind}>${this.t(`gear_${kindKey}_${k}` as I18nKey)}</option>`)}',
                 '            </select></label',
                 '          >`',
                 '        : nothing}',
-                '      ${pick("gear_entity", this.t(`gear_entity_${f.type}` as I18nKey), lamp ? FP3D_SWITCHES : FP3D_SENSORS)}',
+                '      ${pick("gear_entity", this.t(`gear_entity_${f.type}` as I18nKey), lamp || hatch ? FP3D_SWITCHES : FP3D_SENSORS)}',
+                '      ${hatch ? this.num(this.t("gear_angle" as I18nKey), f.gear_angle ?? FP3D_HATCH_ANGLE, (v) => this.updateFurniture({ gear_angle: Math.round(Math.min(110, Math.max(5, v))) }), 5, 5) : nothing}',
                 '      ${tank ? pick("gear_liters", this.t("gear_liters"), FP3D_SENSORS) : nothing}',
                 '      ${lamp',
                 '        ? html`${this.num(this.t("gear_y"), f.gear_y ?? fp3dLightY(kind), (v) => this.updateFurniture({ gear_y: Math.round(Math.min(40, Math.max(0, v)) * 100) / 100 }), 0.1, 0)}',
@@ -1108,7 +1177,7 @@ function boatGear(name: string, code: string): string {
         );
     }
     if (name === 'components/view3d.ts') {
-        code = `import { defaultLightY as fp3dLightY, isGear as fp3dIsGear, lightOn as fp3dLightOn, tankFill as fp3dTankFill, tankWarn as fp3dTankWarn, type GearType as Fp3dGearType } from "${kinds}";\n${code}`;
+        code = `import { HATCH_ANGLE as FP3D_HATCH_ANGLE, hatchOpen as fp3dHatchOpen, defaultLightY as fp3dLightY, isGear as fp3dIsGear, lightOn as fp3dLightOn, tankFill as fp3dTankFill, tankWarn as fp3dTankWarn, type GearType as Fp3dGearType } from "${kinds}";\n${code}`;
         code = replaceRequired(
             code,
             '    v.fp3dSetAnchors(\n',
@@ -1122,7 +1191,7 @@ function boatGear(name: string, code: string): string {
                 '          .map((f) => {',
                 '            const ent = f.gear_entity && f.gear_entity !== "none" ? f.gear_entity : null;',
                 '            const n = fp3dNum(ent);',
-                '            const kind = f.gear_kind ?? (f.type === "tank" ? "water" : f.type === "nav_light" ? "anchor" : null);',
+                '            const kind = f.gear_kind ?? (f.type === "tank" ? "water" : f.type === "nav_light" ? "anchor" : f.type === "hatch" ? "square" : null);',
                 '            let value: number | null = null;',
                 '            let label = "";',
                 '            let warn = false;',
@@ -1139,9 +1208,12 @@ function boatGear(name: string, code: string): string {
                 '              label = value > 1 ? `${formatNumber(hass, value, 0)} ${fp3dTr("gear_rpm")}` : "";',
                 '            } else if (f.type === "nav_light" && ent && hass.states[ent]) {',
                 '              value = fp3dLightOn(hass.states[ent].state);',
+                '            } else if (f.type === "hatch" && ent && hass.states[ent]) {',
+                '              value = fp3dHatchOpen(hass.states[ent].state);',
+                '              label = value ? fp3dTr("gear_hatch_open") : "";',
                 '            }',
                 '            const base = f.type === "nav_light" ? (f.gear_y ?? fp3dLightY(kind)) : f.type === "tank" ? (f.mount_y ?? 0) : 0;',
-                '            return { id: f.id, floor: fl.id, type: f.type as Fp3dGearType, x: f.x, z: f.z, rotation: f.rotation, w: f.w, d: f.d, h: f.h, base, variant: kind, value, label, warn, mast: !!f.gear_mast };',
+                '            return { id: f.id, floor: fl.id, type: f.type as Fp3dGearType, x: f.x, z: f.z, rotation: f.rotation, w: f.w, d: f.d, h: f.h, base, variant: kind, value, label, warn, mast: !!f.gear_mast, angle: f.gear_angle ?? FP3D_HATCH_ANGLE };',
                 '          }),',
                 '      ),',
                 '    );',
@@ -1267,6 +1339,14 @@ function boatGear(name: string, code: string): string {
                 '  gear_stb: "Stb",',
                 '  gear_port: "Bb",',
                 '  gear_rpm: "U/min",',
+                '  furn_hatch: "Luke",',
+                '  gear_hatch_kind: "Form",',
+                '  gear_hatch_square: "Eckig (abgerundete Ecken)",',
+                '  gear_hatch_round: "Rund",',
+                '  gear_entity_hatch: "Kontakt (offen/zu)",',
+                '  gear_angle: "Öffnungswinkel (°)",',
+                '  gear_hatch_open: "Luke offen",',
+                '  gear_hint_hatch: "Eine Decksluke mit getöntem Deckel, das Scharnier an der vorderen Kante (ungedreht: im Grundriss oben). Meldet der Kontakt offen, steht der Deckel im Öffnungswinkel auf zwei Gasfedern; regnet es dabei, kommt die Warnung „offen bei Regen“. Breite und Tiefe = Größe der Luke, Höhe = Höhe des Rahmens.",',
             ].join('\n'),
             'gear de',
         );
@@ -1313,6 +1393,14 @@ function boatGear(name: string, code: string): string {
                 '  gear_stb: "stbd",',
                 '  gear_port: "port",',
                 '  gear_rpm: "rpm",',
+                '  furn_hatch: "Hatch",',
+                '  gear_hatch_kind: "Shape",',
+                '  gear_hatch_square: "Square (rounded corners)",',
+                '  gear_hatch_round: "Round",',
+                '  gear_entity_hatch: "Contact (open/shut)",',
+                '  gear_angle: "Opening angle (°)",',
+                '  gear_hatch_open: "Hatch open",',
+                '  gear_hint_hatch: "A deck hatch with a smoked lid, hinged at its front edge (unturned: at the top of the plan). While the contact reports open the lid stands at its opening angle on two gas struts; if it rains meanwhile, the warning \\u201copen in the rain\\u201d comes. Width and depth = size of the hatch, height = height of its frame.",',
             ].join('\n'),
             'gear en',
         );
@@ -1321,6 +1409,1057 @@ function boatGear(name: string, code: string): string {
             '  lib_kind_vehicle: "Vehicles",',
             '  lib_kind_vehicle: "Vehicles",\n  lib_kind_boat: "Boat",',
             'boat kind en',
+        );
+    }
+    return code;
+}
+
+/**
+ * Windows that open upwards: a top-hung window (and the new style "porthole", a rounded window or porthole) opens as
+ * a flap as far as its own angle, outwards or into the room (`flap_angle`, `flap_in`); a porthole is drawn with a
+ * rounded frame and sash (frontend/vendor-ext/porthole.ts).
+ */
+function upwardWindows(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            'export const WINDOW_STYLES = ["standard", "bars", "glass_wall", "slide"] as const;',
+            'export const WINDOW_STYLES = ["standard", "bars", "glass_wall", "slide", "porthole"] as const;',
+            'windows: porthole style',
+        );
+        code = replaceRequired(
+            code,
+            '  top_hung?: boolean;\n',
+            [
+                '  top_hung?: boolean;',
+                '  /** A top-hung window or a porthole: how far its flap opens (°; default about 26°, a porthole 60°), and whether into the room. */',
+                '  flap_angle?: number | null;',
+                '  flap_in?: boolean;',
+                '',
+            ].join('\n'),
+            'windows: flap fields',
+        );
+    }
+    if (name === 'viewer/openings.ts') {
+        code = `import { insetOutline as fp3dInset, pane as fp3dPane, plate as fp3dPlate, roundedOutline as fp3dRounded, type Pt as Fp3dPt } from "${root}/frontend/vendor-ext/porthole.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            [
+                '        const psi = topHung ? Math.max(sash.open, sash.tilt) * TOP_HUNG_ANGLE : 0;',
+                '        // sash coordinates: u from the hinge across the sash, n, y',
+                '        const sashTf: Tf = (u, n, y) => {',
+                '          if (psi) {',
+                '            const dn = n - n0;',
+                '            const dt = y - sy1;',
+                '            const x = sash.atStart ? sx0 + u : sx1 - u;',
+                '            return tf(x, n0 + dn * Math.cos(psi) + dt * Math.sin(psi), sy1 - dn * Math.sin(psi) + dt * Math.cos(psi));',
+                '          }',
+            ].join('\n'),
+            [
+                '        // its own angle opens the flap that far (tilted at most the usual 26°), outwards or into the room',
+                '        const flapMax = info.opening.flap_angle ? (Math.min(110, Math.max(5, info.opening.flap_angle)) * Math.PI) / 180 : TOP_HUNG_ANGLE;',
+                '        const psi = topHung ? Math.max(sash.open * flapMax, sash.tilt * Math.min(flapMax, TOP_HUNG_ANGLE)) : 0;',
+                '        // sash coordinates: u from the hinge across the sash, n, y',
+                '        const sashTf: Tf = (u, n, y) => {',
+                '          if (psi) {',
+                '            const inward = !!info.opening.flap_in;',
+                '            const pn = inward ? n1 : n0;',
+                '            const g = inward ? 1 : -1;',
+                '            const dn = n - pn;',
+                '            const dt = y - sy1;',
+                '            const x = sash.atStart ? sx0 + u : sx1 - u;',
+                '            return tf(x, pn + dn * Math.cos(psi) - g * dt * Math.sin(psi), sy1 + dt * Math.cos(psi) + g * dn * Math.sin(psi));',
+                '          }',
+            ].join('\n'),
+            'windows: flap angle and direction',
+        );
+        code = replaceRequired(
+            code,
+            [
+                '    } else {',
+                '      const fw = 0.06;',
+                '      const fd = 0.035;',
+                '      // fixed frame in the middle of the wall',
+            ].join('\n'),
+            [
+                '    } else if (openingStyle(info.opening, info.exterior) === "porthole") {',
+                '      // a porthole or rounded window: a plate with a rounded opening fills the frame; the sash, a rounded ring with',
+                '      // its pane, sits in the opening and opens as a flap hinged at the top, outwards or into the room',
+                '      const fd = 0.035;',
+                '      const inset = Math.min(0.06, Math.min(W, T - S) * 0.12);',
+                '      const hx0 = inset;',
+                '      const hx1 = W - inset;',
+                '      const hy0 = S + inset;',
+                '      const hy1 = T - inset;',
+                '      const put = (buf: GeoBuffer, col: Color, t: Tf, b: number) => (p: number[], q: number[], r: number[]) => {',
+                '        const fold = Math.max(p[2], q[2], r[2]) <= cut + 1e-6 ? ALWAYS : b;',
+                '        buf.tri(t(p[0], p[1], p[2]), t(q[0], q[1], q[2]), t(r[0], r[1], r[2]), col, col, col, undefined, fold);',
+                '      };',
+                '      const rect: Fp3dPt[] = [[0, S], [W, S], [W, T], [0, T]];',
+                '      fp3dPlate(rect, fp3dRounded(hx0, hx1, hy0, hy1), mid - fd, mid + fd, put(frames, frameTop, tf, bucket), put(frames, frameC, tf, bucket), false);',
+                '      const mode = info.opening.sill_board;',
+                '      if (mode === "inside" || mode === "outside") boardsOf(info, infos, frames, tf, mid, fd, frameTop, cut, bucket);',
+                '      const ajar = st.open > 0.02 || st.tilt > 0.02;',
+                '      const alert = markClosed ? !!st.sensed && !ajar : ajar;',
+                '      const sashC = alert ? shade(OPEN_WARM, 0.75) : new Color(OP.SASH);',
+                '      const sashTop = alert ? shade(OPEN_WARM, 0.95) : frameTop;',
+                '      const flap = (Math.min(110, Math.max(5, info.opening.flap_angle ?? 60)) * Math.PI) / 180;',
+                '      const psi = Math.max(st.open * flap, st.tilt * Math.min(flap, TOP_HUNG_ANGLE));',
+                '      const inward = !!info.opening.flap_in;',
+                '      const pn = inward ? mid + fd : mid - fd;',
+                '      const g = inward ? 1 : -1;',
+                '      const c = Math.cos(psi);',
+                '      const s = Math.sin(psi);',
+                '      const stf: Tf = (x, n, y) => tf(x, pn + (n - pn) * c - g * (y - hy1) * s, hy1 + (y - hy1) * c + g * (n - pn) * s);',
+                '      const sb = psi > 0.05 ? ALWAYS : bucket;',
+                '      const gap = 0.004;',
+                '      const rim = Math.min(0.04, Math.min(hx1 - hx0, hy1 - hy0) * 0.12);',
+                '      const glassLine = fp3dInset(hx0, hx1, hy0, hy1, gap + rim);',
+                '      fp3dPlate(fp3dInset(hx0, hx1, hy0, hy1, gap), glassLine, mid - fd + 0.005, mid + fd - 0.005, put(frames, sashTop, stf, sb), put(frames, sashC, stf, sb), true);',
+                '      fp3dPane(glassLine, mid, put(glass, alert ? shade(OPEN_WARM, 0.16) : OP.GLASS, stf, sb));',
+                '    } else {',
+                '      const fw = 0.06;',
+                '      const fd = 0.035;',
+                '      // fixed frame in the middle of the wall',
+            ].join('\n'),
+            'windows: porthole',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            ['              ${this.t("top_hung")}</label', '            >`', '          : nothing}', ''].join('\n'),
+            [
+                '              ${this.t("top_hung")}</label',
+                '            >`',
+                '          : nothing}',
+                '        ${window && (o.top_hung || o.style === "porthole")',
+                '          ? html`${this.num(this.t("flap_angle" as I18nKey), o.flap_angle ?? (o.style === "porthole" ? 60 : 26), (v) => this.updateOpening({ flap_angle: Math.round(Math.min(110, Math.max(5, v))) }), 5, 5)}',
+                '              <label class="fp3d-check fp3d-wide"',
+                '                ><input type="checkbox" .checked=${!!o.flap_in} ?disabled=${!admin} @change=${(ev: Event) => this.updateOpening({ flap_in: (ev.target as HTMLInputElement).checked || undefined })} />',
+                '                ${this.t("flap_in" as I18nKey)}</label',
+                '              >`',
+                '          : nothing}',
+                '',
+            ].join('\n'),
+            'windows: flap fields',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  top_hung: "Klappfenster (oben angeschlagen, öffnet nach außen)",\n  top_hung_hint: "Das Fenster hängt oben und öffnet unten nach außen – offen und gekippt sehen gleich aus.",',
+            '  top_hung: "Klappfenster (oben angeschlagen, öffnet nach oben)",\n  top_hung_hint: "Das Fenster hängt oben und klappt unten auf – nach außen oder nach innen, so weit wie sein Öffnungswinkel; gekippt höchstens etwa 26°.",\n  flap_angle: "Öffnungswinkel der Klappe (°)",\n  flap_in: "Klappe öffnet nach innen (sonst nach außen)",',
+            'windows: flap de',
+        );
+        code = replaceRequired(
+            code,
+            '  top_hung: "Top-hung (opens outwards at the bottom)",\n  top_hung_hint: "The window hangs at the top and its bottom opens outwards – open and tilted look alike.",',
+            '  top_hung: "Top-hung (opens upwards)",\n  top_hung_hint: "The window hangs at the top and its bottom swings open – outwards or into the room, as far as its opening angle; tilted at most about 26°.",\n  flap_angle: "Opening angle of the flap (°)",\n  flap_in: "Flap opens into the room (else outwards)",',
+            'windows: flap en',
+        );
+        code = replaceRequired(
+            code,
+            '  style_slide: "Schiebe (eine Scheibe fährt vor die feste)",',
+            '  style_slide: "Schiebe (eine Scheibe fährt vor die feste)",\n  style_porthole: "Bullauge / rund (Klappe nach oben)",',
+            'windows: porthole de',
+        );
+        code = replaceRequired(
+            code,
+            '  style_slide: "Sliding (one pane slides in front of the fixed one)",',
+            '  style_slide: "Sliding (one pane slides in front of the fixed one)",\n  style_porthole: "Porthole / rounded (flap opening upwards)",',
+            'windows: porthole en',
+        );
+    }
+    return code;
+}
+
+/**
+ * The home beyond its devices (home-view.ts, home-fx.ts): air at open windows, mould in cold corners, a window open
+ * while the room heats, the garden (mower, sprinklers, dry lawn), the price glow, weather warnings, the "Technik" and
+ * "Bewegung" views, sound rings and running water.
+ */
+function homeMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            ['  "nav_light",', '  "wind_vane",', '] as const;'].join('\n'),
+            [
+                '  "nav_light",',
+                '  "wind_vane",',
+                '  "robot_mower",',
+                '  "sprinkler",',
+                '  "car_sedan",',
+                '  "car_hatchback",',
+                '  "car_van",',
+                '] as const;',
+            ].join('\n'),
+            'home: furniture types',
+        );
+        code = replaceRequired(
+            code,
+            '"propeller", "nav_light", "wind_vane"],',
+            '"propeller", "nav_light", "wind_vane", "robot_mower", "sprinkler"],',
+            'home: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  vehicles: ["parking"],',
+            '  vehicles: ["parking", "car_sedan", "car_hatchback", "car_van"],',
+            'home: cars in the library',
+        );
+        code = replaceRequired(
+            code,
+            '  wind_vane: [0.8, 0.8, 0.3],',
+            [
+                '  wind_vane: [0.8, 0.8, 0.3],',
+                '  // a robot mower (its charging station stands where it is placed); a sprinkler: the circle it waters',
+                '  robot_mower: [0.55, 0.65, 0.25],',
+                '  sprinkler: [6, 6, 0.08],',
+                '  // cars: width, length, height',
+                '  car_sedan: [1.85, 4.75, 1.45],',
+                '  car_hatchback: [1.8, 4.1, 1.5],',
+                '  car_van: [2.05, 5.3, 2.3],',
+            ].join('\n'),
+            'home: sizes',
+        );
+        code = replaceRequired(
+            code,
+            '  moisture_min?: number | null;',
+            [
+                '  moisture_min?: number | null;',
+                '  /** Shower, bathtub, basin: a sensor or valve that is on while water runs here (a flow above 0 counts). */',
+                '  water?: string | null;',
+                "  /** … or the house's water meter: water runs here while the meter counts. */",
+                '  water_house?: boolean;',
+                "  /** A car's colour (#rrggbb); its presence datapoint is `entity` (without one it is always there). */",
+                '  car_color?: string | null;',
+            ].join('\n'),
+            'home: water link',
+        );
+        code = replaceRequired(
+            code,
+            '  pressure_entity?: string | null;',
+            [
+                '  pressure_entity?: string | null;',
+                '  /** An official weather warning: its level (0 … 4, a severity or a colour) and headline (attributes). */',
+                '  warning_entity?: string | null;',
+                "  /** The electricity price (else the energy settings' tariff) and a forecast of the prices ahead (a JSON list). */",
+                '  price_entity?: string | null;',
+                '  price_forecast?: string | null;',
+                "  /** The flow at the house's water meter (l/min); without one, how fast the water meter counts. */",
+                '  water_flow?: string | null;',
+                '  /** false: no air at open windows, no mould in cold corners. */',
+                '  home_air?: boolean;',
+                '  /** false: no price glow round the house. */',
+                '  price_glow?: boolean;',
+                '  /** false: in the "Technik" view rooms without a problem keep their colour (else green). */',
+                '  health_green?: boolean;',
+            ].join('\n'),
+            'home: settings',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  wind_vane: ["outdoor", []],',
+            [
+                '  wind_vane: ["outdoor", []],',
+                '  robot_mower: ["outdoor", ["garden"]],',
+                '  sprinkler: ["outdoor", ["garden"]],',
+                '  car_sedan: ["vehicle", ["garage", "garden"]],',
+                '  car_hatchback: ["vehicle", ["garage", "garden"]],',
+                '  car_van: ["vehicle", ["garage", "garden"]],',
+            ].join('\n'),
+            'home: library index',
+        );
+    }
+    if (name === 'heatmap.ts') {
+        code = replaceRequired(
+            code,
+            'export type HeatMode = "none" | "temperature" | "humidity" | "co2" | "values";',
+            'export type HeatMode = "none" | "temperature" | "humidity" | "co2" | "values" | "health" | "motion";',
+            'home: views',
+        );
+        code = replaceRequired(
+            code,
+            'export type HeatColorMode = Exclude<HeatMode, "none" | "values">;',
+            'export type HeatColorMode = Exclude<HeatMode, "none" | "values" | "health" | "motion">;',
+            'home: views without colour scale',
+        );
+    }
+    if (name === 'panel.ts') {
+        code = replaceRequired(
+            code,
+            '    this._heat = heat === "temperature" || heat === "humidity" || heat === "co2" || heat === "values" ? heat : "none";',
+            '    this._heat = heat === "temperature" || heat === "humidity" || heat === "co2" || heat === "values" || heat === "health" || heat === "motion" ? heat : "none";',
+            'home: views kept',
+        );
+        code = replaceRequired(
+            code,
+            '            ${(["none", "temperature", "humidity", "co2", "values"] as HeatMode[]).map(',
+            '            ${(["none", "temperature", "humidity", "co2", "values", "health", "motion"] as HeatMode[]).map(',
+            'home: view buttons',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            ['    case "wind_vane":', '      // a wind indicator: its post and an arrow'].join('\n'),
+            [
+                '    case "car_sedan":',
+                '    case "car_hatchback":',
+                '    case "car_van": {',
+                '      // a car from above: its body, the cabin (the van: the whole box behind the bonnet) and the wheels',
+                '      const cab = type === "car_van" ? [-d / 2 + d * 0.2, d / 2 - 0.05] : type === "car_sedan" ? [-d * 0.12, d * 0.25] : [-d * 0.08, d / 2 - 0.12];',
+                '      const wz = d / 2 - Math.max(0.55, d * 0.17);',
+                '      return [',
+                '        rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"),',
+                '        rect(-w * 0.4, cab[0], w * 0.4, cab[1]),',
+                '        ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => rect(sx * w * 0.5 - 0.06, sz * wz - 0.3, sx * w * 0.5 + 0.06, sz * wz + 0.3, "fp3d-sym-fill"))),',
+                '      ];',
+                '    }',
+                '    case "robot_mower":',
+                "      // a robot mower in its station: the body, the wheels' axle and the cutter",
+                '      return [rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"), line(-w / 2, d / 4, w / 2, d / 4), circle(0, -d / 8, Math.min(w, d) / 5)];',
+                '    case "sprinkler":',
+                '      // a sprinkler: its head and the circle it waters',
+                '      return [circle(0, 0, Math.min(w, d) / 2), circle(0, 0, 0.06, "fp3d-sym-strong"), line(0, 0, w / 2.9, -d / 2.9)];',
+                '    case "wind_vane":',
+                '      // a wind indicator: its post and an arrow',
+            ].join('\n'),
+            'home: symbols',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            ['    case "wind_vane":', '    case "tank":'].join('\n'),
+            [
+                '    case "car_sedan":',
+                '    case "car_hatchback":',
+                '    case "car_van":',
+                '    case "robot_mower":',
+                '    case "sprinkler":',
+                '    case "wind_vane":',
+                '    case "tank":',
+            ].join('\n'),
+            'home: drawn by the home looks',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { HomeFx as Fp3dHomeFx, type FloorPlace as Fp3dFloorPlace, type HomeScene as Fp3dHomeScene } from "${root}/frontend/vendor-ext/home-fx.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            [
+                "  /** Pool Pro: the pools' water colour, movement, heating shimmer and cover; an empty list clears them. */",
+                '  setPools(',
+            ].join('\n'),
+            [
+                '  /** The home looks (home-fx.ts): air at windows, mould, water, sound, the lawn, the price glow, device badges. */',
+                '  private fp3dHome = new Fp3dHomeFx();',
+                '  private fp3dHomeMoving = false;',
+                '  private fp3dHomeClock = 0;',
+                '',
+                '  fp3dSetHome(scene: Fp3dHomeScene): void {',
+                '    this.fp3dHome.set(scene, this.theme === "day" || !!this.style.natural);',
+                '    this.invalidate();',
+                '  }',
+                '',
+                '  /** The wind in the plan for the air at the windows: where it blows to (unit) and its speed (m/s); null: none known. */',
+                '  fp3dWindPlan(): { to: [number, number] | null; speed: number } | null {',
+                '    const w = this.fp3dWind;',
+                '    if (!w) return null;',
+                '    const to = this.fp3dWindTo();',
+                '    return { to: to === null ? null : [Math.sin(to), -Math.cos(to)], speed: w.speed };',
+                '  }',
+                '',
+                '  /** The tip of a "Technik" badge under the pointer (mouse: while on it; touch: on a tap). */',
+                '  private fp3dTipEl: HTMLDivElement | null = null;',
+                '  private fp3dTipBound = false;',
+                '',
+                '  private fp3dTipAt(e: PointerEvent | null): void {',
+                '    let tip: string | null = null;',
+                '    const r = this.renderer.domElement.getBoundingClientRect();',
+                '    if (e && r.width > 0 && r.height > 0) {',
+                '      tip = this.fp3dHome.tipAt(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1, this.camera);',
+                '    }',
+                '    if (!tip || !e) {',
+                '      if (this.fp3dTipEl) this.fp3dTipEl.hidden = true;',
+                '      return;',
+                '    }',
+                '    if (!this.fp3dTipEl) {',
+                '      this.fp3dTipEl = document.createElement("div");',
+                '      this.fp3dTipEl.className = "fp3d-home-tip";',
+                '      this.labels.append(this.fp3dTipEl);',
+                '    }',
+                '    const box = this.labels.getBoundingClientRect();',
+                '    const el = this.fp3dTipEl;',
+                '    el.hidden = false;',
+                '    el.textContent = tip;',
+                '    el.style.left = `${Math.min(e.clientX - box.left + 14, Math.max(0, box.width - 260))}px`;',
+                '    el.style.top = `${e.clientY - box.top + 16}px`;',
+                '  }',
+                '',
+                '  private fp3dHomeFrame(): void {',
+                '    const t = this.flowTime.value;',
+                '    const dt = Math.min(1, Math.max(0, t - this.fp3dHomeClock));',
+                '    this.fp3dHomeClock = t;',
+                '    if (!this.fp3dHome.group.parent) this.root.add(this.fp3dHome.group);',
+                '    if (!this.fp3dTipBound) {',
+                '      this.fp3dTipBound = true;',
+                '      // on the whole stage: a device symbol over its badge shows the tip too',
+                '      const c = this.renderer.domElement.parentElement ?? this.renderer.domElement;',
+                '      c.addEventListener("pointermove", (e) => {',
+                '        if (e.pointerType === "mouse" && !e.buttons) this.fp3dTipAt(e);',
+                '        else if (e.buttons) this.fp3dTipAt(null);',
+                '      });',
+                '      c.addEventListener("pointerleave", () => this.fp3dTipAt(null));',
+                '      c.addEventListener("pointerup", (e) => {',
+                '        if (e.pointerType !== "mouse") this.fp3dTipAt(e);',
+                '      });',
+                '    }',
+                '    const places = new Map<string, Fp3dFloorPlace>();',
+                '    for (const fv of this.floors) places.set(fv.floor.id, { y: fv.group.position.y, visible: fv.group.visible && fv.o >= 0.3 });',
+                '    this.fp3dHomeMoving = this.fp3dHome.frame(t, dt, places, this.lowQuality || !!this.options.safeFx);',
+                '  }',
+                '',
+                "  /** Pool Pro: the pools' water colour, movement, heating shimmer and cover; an empty list clears them. */",
+                '  setPools(',
+            ].join('\n'),
+            'home: setHome',
+        );
+        code = replaceRequired(
+            code,
+            '    this.fp3dSkyFrame();',
+            ['    this.fp3dSkyFrame();', '    this.fp3dHomeFrame();'].join('\n'),
+            'home: every frame',
+        );
+        code = replaceRequired(
+            code,
+            '|| this.fp3dSeaMoving || this.fp3dGearMoving || this.fp3dSkyMoving;',
+            '|| this.fp3dSeaMoving || this.fp3dGearMoving || this.fp3dSkyMoving || this.fp3dHomeMoving;',
+            'home: frames while it moves',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = `import { healthColor as fp3dHealthColor, healthReport as fp3dHealthReport, homeScene as fp3dHomeScene, homeWatched as fp3dHomeWatched, type HealthReport as Fp3dHealthReport } from "${root}/frontend/vendor-ext/home-view.ts";
+import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTone as fp3dPriceTone, roomActivity as fp3dRoomActivity, slotsFromHistory as fp3dSlotsFromHistory, startOfDay as fp3dStartOfDay, type PriceSlot as Fp3dPriceSlot } from "${root}/frontend/vendor-ext/home-data.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            ['      force = true;', '    }', '    let changed = force || timed;'].join('\n'),
+            [
+                '      // the home looks: mowers, sprinklers, taps, thermostats, speakers, warnings, the price; in the "Technik" view all',
+                '      this.watched = [...new Set([...this.watched, ...fp3dHomeWatched(hass, b, (a) => areaEntities(hass, a), this.heatMode === "health")])];',
+                '      force = true;',
+                '    }',
+                '    let changed = force || timed;',
+            ].join('\n'),
+            'home: watched',
+        );
+        code = replaceRequired(
+            code,
+            '    this.setAlerts([...own, ...fromModules]);',
+            [
+                '    // the home looks and their warnings (an open window while the room heats, water running long, a weather warning)',
+                '    const fp3dHomeAlerts = this.fp3dHomeSync(hass, b, openingStates, [...deviceMarkers, ...furniture.markers], own);',
+                '    this.setAlerts([...own, ...fromModules, ...fp3dHomeAlerts]);',
+            ].join('\n'),
+            'home: sync',
+        );
+        code = replaceRequired(
+            code,
+            '  /** The air pressure seen while the page is open, and from the history of its sensor (read every ten minutes). */',
+            [
+                "  /** The home looks: the water meter's flow, the price's history, the price note, the weather warning's level. */",
+                '  private fp3dMeter = new Fp3dMeterFlow();',
+                '  private fp3dPriceRows: { id: string; at: number; slots: Fp3dPriceSlot[] } | null = null;',
+                '  private fp3dPriceNote = "";',
+                '  private fp3dPriceTone = "";',
+                '  private fp3dWx = 0;',
+                '  /** The "Technik" view: the devices\' health; the "Bewegung" view: today\'s motion per room. */',
+                '  private fp3dHealthRep: Fp3dHealthReport | null = null;',
+                '  private fp3dMotionRep: { at: number; day: number; rooms: Map<string, { count: number; last: number }>; total: number; sensors: number } | null = null;',
+                '  private fp3dMotionBusy = false;',
+                '',
+                '  /** Works out the home looks, hands them to the viewer and returns their warnings. */',
+                '  private fp3dHomeSync(hass: HomeAssistant, b: Building, openings: Map<string, { open: number; tilt: number; open2: number; tilt2: number; sensed?: boolean }>, markers: { id: string; floorId: string; roomId: string | null; x: number; y: number; z: number }[], own: Alert[]): Alert[] {',
+                '    const v = this.viewer;',
+                '    if (!v) return [];',
+                '    const now = this.now();',
+                '    const t = (k: string, vars?: Record<string, string>) => translate(hass, k as I18nKey, vars);',
+                '    const time = (ms: number) => new Date(ms).toLocaleTimeString(hass.language, { hour: "2-digit", minute: "2-digit" });',
+                '    const contacts = new Map([...(this.openingLinks ?? new Map())].map(([id, e]) => [id as string, (e.contact ?? e.tilt ?? e.contact2 ?? null) as string | null]));',
+                '    const weatherId = weatherEntity(hass, this.weatherEntityId ?? b.settings.weather_entity);',
+                '    const wa = weatherId ? hass.states[weatherId]?.attributes : undefined;',
+                '    let tOut: number | null = parseFloat(String(wa?.temperature ?? ""));',
+                '    if (!Number.isFinite(tOut)) tOut = null;',
+                '    else if (String(wa?.temperature_unit ?? "").includes("F")) tOut = ((tOut as number) - 32) * (5 / 9);',
+                '    if (!this.replay) this.fp3dPriceHistory(hass, b, now);',
+                '    const out = fp3dHomeScene({',
+                '      hass,',
+                '      building: b,',
+                '      now,',
+                '      t,',
+                '      areaEntities: (a) => areaEntities(hass, a),',
+                '      climate: (f, r) => ({ t: roomClimateValue(hass, f as Floor, r as never, "temperature"), rh: roomClimateValue(hass, f as Floor, r as never, "humidity") }),',
+                '      ground: (f, x, z) => outdoorGround(f as Floor, x, z),',
+                '      openings,',
+                '      contacts,',
+                '      markers,',
+                '      wind: v.fp3dWindPlan(),',
+                '      tOut,',
+                '      leaks: own.filter((a) => a.kind === "water" && !!a.roomId && !!a.floorId).map((a) => ({ entity: a.entity, roomId: a.roomId as string, floorId: a.floorId as string })),',
+                '      priceHistory: this.fp3dPriceRows?.slots ?? [],',
+                '      health: this.heatMode === "health",',
+                '      meter: this.fp3dMeter,',
+                '      fmt: (n, d) => formatNumber(hass, n, d),',
+                '      time,',
+                '    });',
+                '    v.fp3dSetHome(out.scene);',
+                '    // the price in the energy bar: cheap or dear today, the cheapest hour ahead',
+                '    const p = out.price;',
+                '    const tone = p && p.level !== null ? fp3dPriceTone(p.level) : "";',
+                '    const note = p ? [tone ? t(`home_price_${tone}`) : "", p.cheapest ? `${t("home_cheapest")} ${time(p.cheapest.start)}–${time(p.cheapest.end)}` : ""].filter(Boolean).join(" · ") : "";',
+                '    if (note !== this.fp3dPriceNote || tone !== this.fp3dPriceTone || out.warning !== this.fp3dWx) {',
+                '      this.fp3dPriceNote = note;',
+                '      this.fp3dPriceTone = tone;',
+                '      this.fp3dWx = out.warning;',
+                '      this.requestUpdate();',
+                '    }',
+                '    if (this.heatMode === "health") {',
+                '      this.fp3dHealthRep = fp3dHealthReport(hass, b, markers, (id) => entityName(hass, id));',
+                '      this.applyTint();',
+                '      this.requestUpdate();',
+                '    }',
+                '    if (this.heatMode === "motion") this.fp3dMotionLoad(hass, b, now);',
+                '    return out.alerts as Alert[];',
+                '  }',
+                '',
+                "  /** The price's history of the last day (for cheap or dear) when no forecast is chosen; read again every half hour. */",
+                '  private fp3dPriceHistory(hass: HomeAssistant, b: Building, now: number): void {',
+                '    const id = b.settings.price_entity || b.energy?.tariff;',
+                '    const forecast = b.settings.price_forecast;',
+                '    if (!id || !hass.states[id] || (forecast && hass.states[forecast])) return;',
+                '    if (this.fp3dPriceRows && this.fp3dPriceRows.id === id && now - this.fp3dPriceRows.at < 30 * 60 * 1000) return;',
+                '    this.fp3dPriceRows = { id, at: now, slots: this.fp3dPriceRows?.id === id ? this.fp3dPriceRows.slots : [] };',
+                '    void (hass.callWS({ type: "history/history_during_period", start_time: new Date(now - 24 * 3600 * 1000).toISOString(), end_time: new Date(now).toISOString(), entity_ids: [id], minimal_response: true, no_attributes: true }) as Promise<Record<string, { s: string; lu: number }[]> | null>)',
+                '      .then((res) => {',
+                '        if (this.fp3dPriceRows?.id !== id) return;',
+                '        this.fp3dPriceRows.slots = fp3dSlotsFromHistory(res?.[id] ?? [], Date.now());',
+                '        this.syncDevices(true);',
+                '      })',
+                '      .catch(() => {});',
+                '  }',
+                '',
+                '  /** The "Bewegung" view: the motion sensors\' history since midnight, per room; read again every five minutes. */',
+                '  private fp3dMotionLoad(hass: HomeAssistant, b: Building, now: number): void {',
+                '    const day = fp3dStartOfDay(now);',
+                '    const old = this.fp3dMotionRep;',
+                '    if (this.fp3dMotionBusy || (old && old.day === day && now - old.at < 5 * 60 * 1000)) return;',
+                '    const sources = trailSources(hass, b);',
+                '    const done = (rows: Record<string, HistoryRow[]>) => {',
+                '      const live = sources.map((s) => {',
+                '        const st = hass.states[s.entity];',
+                '        return { entity: s.entity, state: st?.state, lastChanged: st?.last_changed ? Date.parse(st.last_changed) : undefined };',
+                '      });',
+                '      const events = trailEvents(rows, live, now, Math.max(60 * 1000, now - day));',
+                '      const roomOf = new Map<string, string>();',
+                '      for (const s of sources) {',
+                '        const room = b.floors.find((f) => f.id === s.floorId)?.rooms.find((r) => r.points.length >= 3 && pointInPolygon([s.x, s.z], r.points));',
+                '        if (room) roomOf.set(s.entity, room.id);',
+                '      }',
+                '      this.fp3dMotionRep = { at: now, day, rooms: fp3dRoomActivity(events, roomOf), total: events.length, sensors: sources.length };',
+                '      this.fp3dMotionBusy = false;',
+                '      this.applyTint();',
+                '      this.requestUpdate();',
+                '    };',
+                '    if (!sources.length || this.replay) {',
+                '      done({});',
+                '      return;',
+                '    }',
+                '    this.fp3dMotionBusy = true;',
+                '    void hass',
+                '      .callWS<Record<string, HistoryRow[]> | null>({ type: "history/history_during_period", start_time: new Date(day).toISOString(), entity_ids: sources.map((s) => s.entity), minimal_response: true, no_attributes: true, significant_changes_only: false })',
+                '      .then((rows) => done(rows ?? {}))',
+                '      .catch(() => done({}));',
+                '  }',
+                '',
+                '  /** The legend of the "Technik" and "Bewegung" views. */',
+                '  private fp3dRenderLegend() {',
+                '    const t = (k: string, vars?: Record<string, string>) => translate(this.hass, k as I18nKey, vars);',
+                '    if (this.heatMode === "health") {',
+                '      const r = this.fp3dHealthRep;',
+                '      const items = r?.items ?? [];',
+                '      const unreach = items.filter((i) => i.problem === "unreach").length;',
+                '      const low = items.length - unreach;',
+                '      return html`<div class="fp3d-legend fp3d-legend-health">',
+                '        <b>${t("heat_health")}</b>',
+                '        ${!r || !r.known',
+                '          ? html`<span class="fp3d-legend-none">${t("home_health_none")}</span>`',
+                '          : !items.length',
+                '            ? html`<span>✓ ${t("home_health_ok", { n: String(r.known) })}</span>`',
+                '            : html`<span>${[unreach ? `⚠ ${t("home_health_unreach", { n: String(unreach) })}` : "", low ? `🔋 ${t(low === 1 ? "home_health_low_one" : "home_health_low", { n: String(low) })}` : ""].filter(Boolean).join(" · ")}</span>',
+                '                <ul class="fp3d-health-list">',
+                '                  ${items.slice(0, 8).map(',
+                '                    (i) => html`<li class=${i.problem}>${i.problem === "unreach" ? "⚠" : "🔋"} ${i.name}${i.room ? html` <small>${i.room}</small>` : nothing}${i.problem === "battery" && i.health.battery !== null ? html` <b>${Math.round(i.health.battery)} %</b>` : nothing}</li>`,',
+                '                  )}',
+                '                  ${items.length > 8 ? html`<li>+${items.length - 8}</li>` : nothing}',
+                '                </ul>`}',
+                '      </div>`;',
+                '    }',
+                '    const m = this.fp3dMotionRep;',
+                '    return html`<div class="fp3d-legend">',
+                '      <b>${t("heat_motion")}</b>',
+                '      <span class="fp3d-legend-bar" style="background:linear-gradient(90deg, rgb(255,235,128), rgb(255,150,60), rgb(235,55,45))"></span>',
+                '      <span class="fp3d-legend-range"><span>${t("home_motion_little")}</span><span>${t("home_motion_much")}</span></span>',
+                '      ${!m ? html`<span class="fp3d-legend-none">…</span>` : !m.total ? html`<span class="fp3d-legend-none">${t(m.sensors ? "home_motion_none" : "home_motion_nosensor")}</span>` : html`<span>${t("home_motion_total", { n: String(m.total) })}</span>`}',
+                '    </div>`;',
+                '  }',
+                '',
+                '  /** The air pressure seen while the page is open, and from the history of its sensor (read every ten minutes). */',
+            ].join('\n'),
+            'home: methods',
+        );
+        code = replaceRequired(
+            code,
+            [
+                '    if (this.heatMode !== "none" && this.heatMode !== "values") {',
+                '      const mode = this.heatMode;',
+            ].join('\n'),
+            [
+                '    if (this.heatMode !== "none" && this.heatMode !== "values" && this.heatMode !== "health" && this.heatMode !== "motion") {',
+                '      const mode = this.heatMode;',
+            ].join('\n'),
+            'home: views without scale',
+        );
+        code = replaceRequired(
+            code,
+            '    v.setRoomInfo(info);',
+            [
+                '    // the "Technik" view: rooms by the health of their devices; "Bewegung": by today\'s motion',
+                '    if (this.heatMode === "health" || this.heatMode === "motion") {',
+                '      tint = new Map();',
+                '      if (this.heatMode === "health" && this.fp3dHealthRep) {',
+                '        for (const [id, r] of this.fp3dHealthRep.rooms) {',
+                '          if (r.unreach || r.low || this.building?.settings.health_green !== false) tint.set(id, fp3dHealthColor(r));',
+                '          const parts = [r.unreach ? `⚠ ${r.unreach}` : "", r.low ? `🔋 ${r.low}` : ""].filter(Boolean);',
+                '          info.set(id, parts.length ? parts.join(" · ") : `✓ ${r.ok}`);',
+                '        }',
+                '      }',
+                '      if (this.heatMode === "motion" && this.fp3dMotionRep) {',
+                '        const rooms = this.fp3dMotionRep.rooms;',
+                '        const max = Math.max(0, ...[...rooms.values()].map((r) => r.count));',
+                '        for (const [id, r] of rooms) {',
+                '          tint.set(id, fp3dActivityColor(r.count, max));',
+                '          info.set(id, `${r.count}× · ${new Date(r.last).toLocaleTimeString(hass.language, { hour: "2-digit", minute: "2-digit" })}`);',
+                '        }',
+                '      }',
+                '    }',
+                '    v.setRoomInfo(info);',
+            ].join('\n'),
+            'home: view tints',
+        );
+        code = replaceRequired(
+            code,
+            [
+                '    if (this.heatMode === "none" || this.heatMode === "values") return nothing;',
+                '    const scale = HEAT_SCALES[this.heatMode];',
+            ].join('\n'),
+            [
+                '    if (this.heatMode === "health" || this.heatMode === "motion") return this.fp3dRenderLegend();',
+                '    if (this.heatMode === "none" || this.heatMode === "values") return nothing;',
+                '    const scale = HEAT_SCALES[this.heatMode];',
+            ].join('\n'),
+            'home: legend',
+        );
+        code = replaceRequired(
+            code,
+            '${this._alerts.length || this.fp3dStorm ? "fp3d-has-alerts" : ""}',
+            '${this._alerts.length || this.fp3dStorm ? "fp3d-has-alerts" : ""} ${this.fp3dWx ? `fp3d-wx fp3d-wx${this.fp3dWx}` : ""}',
+            'home: warning frame',
+        );
+        code = replaceRequired(
+            code,
+            '    if (e.tariff) items.push({ cls: "tariff", label: t("energy_tariff"), value: `${formatNumber(this.hass, e.tariff.value, 3)} ${e.tariff.unit}`.trim() });',
+            '    if (e.tariff) items.push({ cls: `tariff ${this.fp3dPriceTone ? `fp3d-price-${this.fp3dPriceTone}` : ""}`, label: this.fp3dPriceNote ? `${t("energy_tariff")} · ${this.fp3dPriceNote}` : t("energy_tariff"), value: `${formatNumber(this.hass, e.tariff.value, 3)} ${e.tariff.unit}`.trim() });',
+            'home: price note',
+        );
+        code = replaceRequired(
+            code,
+            ['      .fp3d-alert-water,', '      .fp3d-alert-window_rain {'].join('\n'),
+            [
+                '      .fp3d-alert-fp3d_window_heat {',
+                '        border-left-color: #ff8a2a;',
+                '        box-shadow: 0 0 18px rgba(255, 138, 42, 0.35);',
+                '      }',
+                '      .fp3d-alert-fp3d_water_run {',
+                '        border-left-color: #4fb3ff;',
+                '        box-shadow: 0 0 18px rgba(79, 179, 255, 0.35);',
+                '      }',
+                '      .fp3d-alert-fp3d_wx1 {',
+                '        border-left-color: #ffd633;',
+                '        box-shadow: 0 0 18px rgba(255, 214, 51, 0.35);',
+                '        animation: none;',
+                '      }',
+                '      .fp3d-alert-fp3d_wx2 {',
+                '        border-left-color: #ff8c1a;',
+                '        box-shadow: 0 0 18px rgba(255, 140, 26, 0.4);',
+                '        animation: none;',
+                '      }',
+                '      .fp3d-alert-fp3d_wx3 {',
+                '        border-left-color: #eb2626;',
+                '        box-shadow: 0 0 18px rgba(235, 38, 38, 0.45);',
+                '      }',
+                '      .fp3d-alert-fp3d_wx4 {',
+                '        border-left-color: #9e38d9;',
+                '        box-shadow: 0 0 18px rgba(158, 56, 217, 0.5);',
+                '      }',
+                '      .fp3d-stage.fp3d-wx::after {',
+                '        content: "";',
+                '        position: absolute;',
+                '        inset: 0;',
+                '        pointer-events: none;',
+                '        z-index: 3;',
+                '        box-shadow:',
+                '          inset 0 0 0 3px var(--fp3d-wx),',
+                '          inset 0 0 56px var(--fp3d-wx-soft);',
+                '      }',
+                '      .fp3d-wx1 {',
+                '        --fp3d-wx: rgba(255, 214, 51, 0.85);',
+                '        --fp3d-wx-soft: rgba(255, 214, 51, 0.22);',
+                '      }',
+                '      .fp3d-wx2 {',
+                '        --fp3d-wx: rgba(255, 140, 26, 0.9);',
+                '        --fp3d-wx-soft: rgba(255, 140, 26, 0.28);',
+                '      }',
+                '      .fp3d-wx3 {',
+                '        --fp3d-wx: rgba(235, 38, 38, 0.9);',
+                '        --fp3d-wx-soft: rgba(235, 38, 38, 0.3);',
+                '      }',
+                '      .fp3d-wx4 {',
+                '        --fp3d-wx: rgba(158, 56, 217, 0.95);',
+                '        --fp3d-wx-soft: rgba(158, 56, 217, 0.34);',
+                '      }',
+                '      .fp3d-energy-tariff.fp3d-price-cheap b {',
+                '        color: #4fd772;',
+                '      }',
+                '      .fp3d-energy-tariff.fp3d-price-dear b {',
+                '        color: #ff6a5a;',
+                '      }',
+                '      .fp3d-health-list {',
+                '        list-style: none;',
+                '        margin: 4px 0 0;',
+                '        padding: 0;',
+                '        font-size: 12px;',
+                '        max-height: 34vh;',
+                '        overflow: auto;',
+                '      }',
+                '      .fp3d-health-list li {',
+                '        white-space: nowrap;',
+                '        overflow: hidden;',
+                '        text-overflow: ellipsis;',
+                '        max-width: 300px;',
+                '        line-height: 1.5;',
+                '      }',
+                '      .fp3d-health-list small {',
+                '        opacity: 0.65;',
+                '      }',
+                '      .fp3d-health-list li.unreach {',
+                '        color: #ff7a7a;',
+                '      }',
+                '      /* the tip of a badge: which device, why, since when */',
+                '      .fp3d-home-tip {',
+                '        position: absolute;',
+                '        z-index: 5;',
+                '        max-width: 260px;',
+                '        padding: 6px 10px;',
+                '        border-radius: 8px;',
+                '        background: var(--fp3d-chrome);',
+                '        box-shadow: var(--fp3d-shadow);',
+                '        color: var(--fp3d-text);',
+                '        font-size: 12px;',
+                '        line-height: 1.45;',
+                '        white-space: pre-line;',
+                '        overflow-wrap: anywhere;',
+                '        pointer-events: none;',
+                '      }',
+                '      .fp3d-home-tip::first-line {',
+                '        font-weight: 600;',
+                '      }',
+                '      /* the list is taller than a scale: on the other side than the floor pictures */',
+                '      .fp3d-legend.fp3d-legend-health {',
+                '        left: auto;',
+                '        right: 12px;',
+                '      }',
+                '      .fp3d-side-right .fp3d-legend.fp3d-legend-health {',
+                '        left: 12px;',
+                '        right: auto;',
+                '      }',
+                '      .fp3d-alert-water,',
+                '      .fp3d-alert-window_rain {',
+            ].join('\n'),
+            'home: styles',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = `import { WATER_TYPES as FP3D_WATER_TYPES } from "${root}/frontend/vendor-ext/home-view.ts";\nimport { CAR_COLORS as FP3D_CAR_COLORS, isCarKind as fp3dIsCar } from "${root}/frontend/vendor-ext/cars.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '"propeller", "nav_light", "wind_vane"]);',
+            '"propeller", "nav_light", "wind_vane", "robot_mower", "sprinkler", "car_sedan", "car_hatchback", "car_van"]);',
+            'home: no state links',
+        );
+        code = replaceRequired(
+            code,
+            '${f.type === "wind_vane" ? this.fp3dRenderVaneForm(f) : nothing}',
+            '${f.type === "wind_vane" ? this.fp3dRenderVaneForm(f) : nothing} ${this.fp3dRenderHomeForm(f)}',
+            'home: forms',
+        );
+        code = replaceRequired(
+            code,
+            '  /** A wind indicator: which one, its height, whether a mast or pole is drawn; the wind comes from the house settings. */',
+            [
+                "  /** A robot mower's status, a sprinkler's valve and soil sensor, the water at a shower, bathtub or basin. */",
+                '  private fp3dRenderHomeForm(f: Furniture) {',
+                '    if (!this.hass) return nothing;',
+                '    const set = (patch: Partial<Furniture>) => this.updateFurniture(patch);',
+                '    const pick = (v: string | null) => (v && v !== "none" ? v : null);',
+                '    if (f.type === "robot_mower")',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        ${this.entitySelect(this.t("mower_entity" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => /^(sensor|select|vacuum|lawn_mower|binary_sensor|switch|input_select)\\./.test(id)), (v) => set({ entity: pick(v) }))}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("mower_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (f.type === "sprinkler")',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        ${this.entitySelect(this.t("sprinkler_entity" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => /^(switch|valve|binary_sensor|sensor|input_boolean|light)\\./.test(id)), (v) => set({ entity: pick(v) }))}',
+                '        ${this.entitySelect(this.t("sprinkler_moisture" as I18nKey), f.moisture ?? null, undefined, this.entityOptions((id) => id.startsWith("sensor.")), (v) => set({ moisture: pick(v) }))}',
+                '        ${this.num(this.t("sprinkler_min" as I18nKey), f.moisture_min ?? 30, (v) => set({ moisture_min: Math.round(Math.min(90, Math.max(5, v))) }), 1, 5)}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("sprinkler_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (fp3dIsCar(f.type))',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        ${this.entitySelect(this.t("fp3d_car_presence" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => /^(binary_sensor|device_tracker|person|sensor|switch|input_boolean)\\./.test(id)), (v) => set({ entity: pick(v) }))}',
+                '        <label class="fp3d-field"',
+                '          >${this.t("fp3d_car_color" as I18nKey)}',
+                '          <input type="color" .value=${f.car_color ?? FP3D_CAR_COLORS[f.type]} ?disabled=${!this.isAdmin} @change=${(e: Event) => set({ car_color: (e.target as HTMLInputElement).value })}',
+                '        /></label>',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("fp3d_car_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (FP3D_WATER_TYPES.has(f.type))',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        ${this.entitySelect(this.t("water_entity" as I18nKey), f.water ?? null, undefined, this.entityOptions((id) => /^(switch|valve|binary_sensor|sensor|input_boolean)\\./.test(id)), (v) => set({ water: pick(v) }))}',
+                '        <label class="fp3d-check fp3d-wide"',
+                '          ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${!!f.water_house} @change=${(e: Event) => set({ water_house: (e.target as HTMLInputElement).checked || undefined })} />',
+                '          ${this.t("water_house" as I18nKey)}</label',
+                '        >',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("water_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    return nothing;',
+                '  }',
+                '',
+                '  /** A wind indicator: which one, its height, whether a mast or pole is drawn; the wind comes from the house settings. */',
+            ].join('\n'),
+            'home: form method',
+        );
+        code = replaceRequired(
+            code,
+            [
+                '              <p class="fp3d-sub fp3d-wide">${this.t("wind_hint" as I18nKey)}</p>`',
+                '          : nothing}',
+            ].join('\n'),
+            [
+                '              <p class="fp3d-sub fp3d-wide">${this.t("wind_hint" as I18nKey)}</p>`',
+                '          : nothing}',
+                '        ${this.hass',
+                '          ? html`${(["warning_entity", "price_entity", "price_forecast", "water_flow"] as const).map((key) =>',
+                '                this.entitySelect(this.t(key as I18nKey), s[key] ?? null, undefined, this.entityOptions((id) => /^(sensor|binary_sensor|input_text|input_number)\\./.test(id)), (v) => set({ [key]: v === "none" ? null : v })),',
+                '              )}',
+                '              <label class="fp3d-check fp3d-wide"',
+                '                ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${s.home_air !== false} @change=${(e: Event) => set({ home_air: (e.target as HTMLInputElement).checked ? undefined : false })} />',
+                '                ${this.t("home_air_show" as I18nKey)}</label',
+                '              >',
+                '              <label class="fp3d-check fp3d-wide"',
+                '                ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${s.price_glow !== false} @change=${(e: Event) => set({ price_glow: (e.target as HTMLInputElement).checked ? undefined : false })} />',
+                '                ${this.t("price_glow" as I18nKey)}</label',
+                '              >',
+                '              <label class="fp3d-check fp3d-wide"',
+                '                ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${s.health_green !== false} @change=${(e: Event) => set({ health_green: (e.target as HTMLInputElement).checked ? undefined : false })} />',
+                '                ${this.t("health_green" as I18nKey)}</label',
+                '              >',
+                '              ${((c: { health_stale_min?: number | null }) => html`<label class="fp3d-field fp3d-wide"',
+                '                  >${this.t("health_stale" as I18nKey)}',
+                '                  <input',
+                '                    type="number"',
+                '                    min="1"',
+                '                    max="10080"',
+                '                    step="1"',
+                '                    placeholder=${this.t("health_stale_auto" as I18nKey)}',
+                '                    .value=${c.health_stale_min ? String(c.health_stale_min) : ""}',
+                '                    ?disabled=${!this.isAdmin}',
+                '                    @change=${(e: Event) => {',
+                '                      const v = (e.target as HTMLInputElement).value.trim();',
+                '                      const n = v ? Math.round(Number(v)) : null;',
+                '                      window.dispatchEvent(new CustomEvent("iobroker-health", { detail: { minutes: n && n >= 1 && n <= 10080 ? n : null } }));',
+                '                    }}',
+                '                /></label>',
+                '                <p class="fp3d-sub fp3d-wide">${this.t("health_stale_hint" as I18nKey)}</p>`)((this.hass?.config ?? {}) as { health_stale_min?: number | null })}',
+                '              <p class="fp3d-sub fp3d-wide">${this.t("home_hint" as I18nKey)}</p>`',
+                '          : nothing}',
+            ].join('\n'),
+            'home: settings',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            heat_short_health: 'Technik',
+            heat_short_motion: 'Bewegung',
+            heat_health: 'Technik: Batterien und Erreichbarkeit',
+            heat_motion: 'Bewegung heute',
+            furn_robot_mower: 'Mähroboter',
+            furn_sprinkler: 'Regner',
+            furn_car_sedan: 'Limousine',
+            furn_car_hatchback: 'Kompaktwagen',
+            furn_car_van: 'Transporter',
+            fp3d_car_presence: 'Zuhause (Datenpunkt)',
+            fp3d_car_color: 'Farbe',
+            fp3d_car_hint:
+                'Das Auto steht hier, solange der Datenpunkt „da“ meldet (an, home, anwesend, geparkt oder eine Zahl über 0, z. B. ein Tracker oder ein Sensor in der Garage); dann parkt es rückwärts ein, sonst fährt es weg und nur die Markierung bleibt. Ohne Datenpunkt steht es immer da. Breite, Länge und Höhe wie beim Möbel.',
+            home_health_low_one: '1 Batterie schwach',
+            home_last_update: 'Letztes Update {time}',
+            health_green: 'Technik-Ansicht: Räume ohne Problem grün färben (sonst bleiben sie, wie sie sind)',
+            health_stale: 'Nicht erreichbar nach … Minuten ohne Update',
+            health_stale_auto: 'wie das Gerät es meldet',
+            health_stale_hint:
+                'Leer: wie das Gerät es meldet (UNREACH, online, available; Batteriegeräte, die zwischen zwei Meldungen schlafen, erst nach 48 Stunden). Mit einer Zahl zählt nur, wann das Gerät zuletzt einen Wert geschickt hat, z. B. 15 für Sensoren, die alle 5 Minuten senden. Geräte, die nur bei einer Änderung senden (Tür- und Fensterkontakte), brauchen einen größeren Wert. Gilt für alle Grundrisse.',
+            mower_entity: 'Status (Datenpunkt)',
+            mower_hint:
+                'Steht an der Ladestation. Mäht er (Worx, Husqvarna, Gardena …), fährt er Bahnen über die Rasenfläche, auf der er steht (oder die nächste), und hinterlässt gemähte Streifen; „zurück“ oder „lädt“ bringt ihn zur Station, ein Fehler zeigt ein Warnschild.',
+            sprinkler_entity: 'Ventil oder Schalter',
+            sprinkler_moisture: 'Bodenfeuchte (Sensor, %)',
+            sprinkler_min: 'Trocken unter (%)',
+            sprinkler_hint:
+                'Sprüht Wasserbögen, solange das Ventil offen ist. Breite = Kreis, den er bewässert. Liegt die Bodenfeuchte unter dem Wert, wird der Rasen darum gelblich.',
+            water_entity: 'Wasser läuft (Sensor oder Ventil)',
+            water_house: '… oder wenn die Wasseruhr des Hauses zählt',
+            water_hint:
+                'Solange Wasser läuft, rinnt es aus dem Hahn bzw. der Brause. Mit der Wasseruhr (⚙ → Energie oder Durchfluss in ⚙ → Haus) zählt jeder Durchfluss über 0,3 l/min.',
+            warning_entity: 'Unwetterwarnung (Stufe, z. B. DWD)',
+            price_entity: 'Strompreis (sonst Tarif aus Energie)',
+            price_forecast: 'Preisvorschau (JSON, z. B. Tibber)',
+            water_flow: 'Wasser-Durchfluss (Sensor, l/min)',
+            home_air_show: 'Luft an offenen Fenstern und Schimmelrisiko zeigen',
+            price_glow: 'Haus im Strompreis leuchten lassen',
+            home_hint:
+                'Unwetterwarnung: Stufe 1–4 (oder Wörter wie „Unwetter“) färbt Rahmen und Banner. Strompreis: Das Haus leuchtet grün, wenn er im Vergleich zu heute günstig ist, rot, wenn teuer; mit einer Preisvorschau steht die günstigste Stunde in der Energieleiste. Wasser: Läuft es länger als 30 Minuten, erscheint eine Warnung.',
+            home_window_heat: 'Fenster seit {min} min offen, Heizung läuft',
+            home_water_run: 'Wasser läuft seit {min} min ({flow} l/min)',
+            home_air_out: 'Lüften',
+            home_mower_error: 'Mähroboter: Fehler',
+            home_adapter_stopped: 'Adapter gestoppt',
+            home_adapter_disconnected: 'Adapter ohne Verbindung',
+            home_offline: 'nicht erreichbar',
+            home_battery_low: 'Batterie schwach',
+            home_warning_1: 'Wetterwarnung',
+            home_warning_2: 'Markante Wetterwarnung',
+            home_warning_3: 'Unwetterwarnung',
+            home_warning_4: 'Extreme Unwetterwarnung',
+            home_price_cheap: 'günstig',
+            home_price_normal: 'mittel',
+            home_price_dear: 'teuer',
+            home_cheapest: 'günstigste Stunde',
+            home_health_none: 'Keine Geräte melden Batterie oder Erreichbarkeit.',
+            home_health_ok: 'Alle {n} Geräte in Ordnung',
+            home_health_unreach: '{n} nicht erreichbar',
+            home_health_low: '{n} Batterien schwach',
+            home_motion_little: 'wenig',
+            home_motion_much: 'viel',
+            home_motion_none: 'Heute noch keine Bewegung.',
+            home_motion_nosensor: 'Keine Bewegungsmelder im Plan.',
+            home_motion_total: '{n} Bewegungen seit Mitternacht',
+        };
+        const en: Record<string, string> = {
+            heat_short_health: 'Health',
+            heat_short_motion: 'Motion',
+            heat_health: 'Health: batteries and reachability',
+            heat_motion: 'Motion today',
+            furn_robot_mower: 'Robot mower',
+            furn_sprinkler: 'Sprinkler',
+            furn_car_sedan: 'Saloon',
+            furn_car_hatchback: 'Hatchback',
+            furn_car_van: 'Van',
+            fp3d_car_presence: 'At home (datapoint)',
+            fp3d_car_color: 'Colour',
+            fp3d_car_hint:
+                'The car stands here while the datapoint says it is there (on, home, present, parked or a number above 0, e.g. a tracker or a sensor in the garage); then it reverses into its place, else it drives away and only the marking stays. Without a datapoint it is always there. Width, length and height as for any furniture.',
+            home_health_low_one: '1 battery low',
+            home_last_update: 'Last update {time}',
+            health_green: '"Technik" view: colour rooms without a problem green (else they stay as they are)',
+            health_stale: 'Unreachable after … minutes without an update',
+            health_stale_auto: 'as the device reports it',
+            health_stale_hint:
+                'Empty: as the device reports it (UNREACH, online, available; battery devices that sleep between their reports only after 48 hours). With a number only the time of its last value counts, e.g. 15 for sensors that send every 5 minutes. Devices that only send on a change (door and window contacts) need a larger value. Counts for all floor plans.',
+            mower_entity: 'Status (datapoint)',
+            mower_hint:
+                'Stands at its charging station. While it mows (Worx, Husqvarna, Gardena …) it drives lanes over the lawn it stands on (or the nearest one) and leaves mown stripes; "returning" or "charging" takes it to the station, an error shows a warning sign.',
+            sprinkler_entity: 'Valve or switch',
+            sprinkler_moisture: 'Soil moisture (sensor, %)',
+            sprinkler_min: 'Dry below (%)',
+            sprinkler_hint:
+                'Sprays arcs of water while the valve is open. Width = the circle it waters. When the soil moisture is below the value, the lawn around it turns yellowish.',
+            water_entity: 'Water runs (sensor or valve)',
+            water_house: '… or while the house water meter counts',
+            water_hint:
+                'While water runs, it pours from the tap or the shower head. With the water meter (⚙ → Energy, or the flow in ⚙ → House) any flow above 0.3 l/min counts.',
+            warning_entity: 'Severe weather warning (level, e.g. DWD)',
+            price_entity: 'Electricity price (else the energy tariff)',
+            price_forecast: 'Price forecast (JSON, e.g. Tibber)',
+            water_flow: 'Water flow (sensor, l/min)',
+            home_air_show: 'Show air at open windows and the mould risk',
+            price_glow: 'Let the house glow in the electricity price',
+            home_hint:
+                'Weather warning: level 1–4 (or words like "severe") colours the frame and the banner. Electricity price: the house glows green when it is cheap compared with today, red when dear; with a price forecast the cheapest hour shows in the energy bar. Water: when it runs longer than 30 minutes, a warning shows.',
+            home_window_heat: 'Window open for {min} min while heating',
+            home_water_run: 'Water running for {min} min ({flow} l/min)',
+            home_air_out: 'Air the room',
+            home_mower_error: 'Robot mower: error',
+            home_adapter_stopped: 'adapter stopped',
+            home_adapter_disconnected: 'adapter not connected',
+            home_offline: 'unreachable',
+            home_battery_low: 'battery low',
+            home_warning_1: 'Weather warning',
+            home_warning_2: 'Significant weather warning',
+            home_warning_3: 'Severe weather warning',
+            home_warning_4: 'Extreme weather warning',
+            home_price_cheap: 'cheap',
+            home_price_normal: 'medium',
+            home_price_dear: 'dear',
+            home_cheapest: 'cheapest hour',
+            home_health_none: 'No device reports a battery or its reachability.',
+            home_health_ok: 'All {n} devices fine',
+            home_health_unreach: '{n} unreachable',
+            home_health_low: '{n} batteries low',
+            home_motion_little: 'little',
+            home_motion_much: 'much',
+            home_motion_none: 'No motion yet today.',
+            home_motion_nosensor: 'No motion sensors in the plan.',
+            home_motion_total: '{n} motions since midnight',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  heat_values: "Werte am Raumnamen",',
+            `  heat_values: "Werte am Raumnamen",${lines(de)}`,
+            'home de',
+        );
+        code = replaceRequired(
+            code,
+            '  heat_values: "Values at the room names",',
+            `  heat_values: "Values at the room names",${lines(en)}`,
+            'home en',
         );
     }
     return code;
@@ -2373,6 +3512,7 @@ const patches: Plugin = {
         code = keepUndoHistory(name, code);
         code = keepEditorView(name, code);
         code = tvAppLogo(name, code);
+        code = wheelOverLabels(name, code);
         code = sensorLook(name, code);
         code = editorDevices(name, code);
         code = solarText(name, code);
@@ -2386,7 +3526,9 @@ const patches: Plugin = {
         code = timeTravelSource(name, code);
         code = boatAnchor(name, code);
         code = boatGear(name, code);
+        code = upwardWindows(name, code);
         code = weatherMore(name, code);
+        code = homeMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

@@ -99,6 +99,20 @@ export function setupDatapoints(o: DatapointOptions): void {
         })().catch(fail);
     });
 
+    // the editor's house settings: unreachable after so many minutes without an update (null: as the device reports)
+    window.addEventListener('iobroker-health', ev => {
+        const minutes = (ev as CustomEvent<{ minutes?: number | null }>).detail?.minutes ?? null;
+        void (async () => {
+            await o.callWS({ type: 'iobroker/health/set', minutes });
+            await o.refresh();
+            o.setStatus(
+                minutes
+                    ? `Nicht erreichbar nach ${minutes} min ohne Update`
+                    : 'Nicht erreichbar: wie das Gerät es meldet',
+            );
+        })().catch(fail);
+    });
+
     // the editor's device list of a room: new devices from datapoints, placed in the room
     window.addEventListener('iobroker-add-devices', ev => {
         const done = (ev as CustomEvent<{ done?: (ids: string[]) => void }>).detail?.done;

@@ -130,6 +130,11 @@ export interface StorageData {
     position_id?: string | null;
     /** The history instance the time travel prefers for the datapoints it records (e.g. `recorder.0`); null: automatic. */
     timetravel_instance?: string | null;
+    /**
+     * A device counts as unreachable after this many minutes without an update of its datapoints, instead of by its
+     * UNREACH/online datapoints (sensors that send only every few minutes look offline in between); null: as reported.
+     */
+    health_stale_min?: number | null;
 }
 /** Format of 0.4.0, which kept everything (also the images as data URLs) in the state `home3d.0.storage`. */
 export interface LegacyStorageData {

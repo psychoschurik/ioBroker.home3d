@@ -16,12 +16,13 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 | `frontend/iobroker.ts` | `IoBroker`: socket-client wrapper, implements `IoAccess` (objects/states) and `FileAccess` (files of `home3d.0`) |
 | `frontend/store.ts` | `Store`: plans, history, images, mappings; handles every `callWS` message of the 3D frontend |
 | `frontend/entities.ts` | Mapping ioBroker datapoints ↔ devices of the 3D frontend, validation, actions (`execute`) |
+| `frontend/health.ts` | Battery, low battery, reachability and adapter state of the mapped devices: found once per device below its datapoint, subscribed, given to the entities as attributes; a battery device counts as unreachable only after 48 h without a message (it sleeps), or, with `health_stale_min`, after that many minutes without an update of any of its datapoints |
 | `frontend/history.ts`, `sun.ts`, `more-info.ts`, `mdi-icon.ts` | `history/history_during_period`, `home3d/timetravel/history` and `recorder/statistics_during_period` (energy) from the history adapters (beside `Store.call()`); `sun.sun` from the system position; detail dialog with history curve; `<ha-icon>` drawn with `@mdi/js` (full set loaded on demand) |
 | `frontend/device-dialog.ts`, `object-tree.ts`, `entity-picker.ts` | "Geräte verbinden" dialog with object tree |
 | `frontend/datapoint.ts` | Datapoints chosen at the device in the editor (events `iobroker-datapoint`, `iobroker-add-devices` from the patched editor): object browser, change or add mappings |
 | `frontend/project.ts` | Project files (one plan + its images + the mappings it uses): format, reading, naming |
 | `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
-| `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D), `sensor-look.ts` (sensor symbols and texts, also in the editor's floor plan), `mdi-paths.ts` (the symbols drawn at once, without the whole @mdi/js set), `solar-text.ts` (the power written on the solar modules), `sea.ts` (the sea with waves around a boat), `anchor.ts` (a boat's anchor with its chain as a catenary), `boat-gear.ts` + `boat-kinds.ts` (tanks, rudder, propeller, navigation lights), `editor-keep.ts` (the editor's view kept across the 3D view), `app-logo.ts` (a TV app's logo when it shows no picture), `weather-data.ts` (wind, fog, pressure trend), `sky-shade.ts` (cloud shadows and wet surfaces in every themed material and the sea), `wind-vane.ts` (windex, windsock, flag) |
+| `frontend/vendor-ext/` | Own code added to the 3D frontend at build time: `post.ts` (screen-space looks: comic outlines, gouache), `undo.ts` (editor undo history kept across the switch to 3D), `sensor-look.ts` (sensor symbols and texts, also in the editor's floor plan), `mdi-paths.ts` (the symbols drawn at once, without the whole @mdi/js set), `solar-text.ts` (the power written on the solar modules), `sea.ts` (the sea with waves around a boat), `anchor.ts` (a boat's anchor with its chain as a catenary), `boat-gear.ts` + `boat-kinds.ts` (tanks, rudder, propeller, navigation lights, deck hatches), `porthole.ts` (rounded outlines and plates of the window style "porthole"), `editor-keep.ts` (the editor's view kept across the 3D view), `app-logo.ts` (a TV app's logo when it shows no picture), `weather-data.ts` (wind, fog, pressure trend), `sky-shade.ts` (cloud shadows and wet surfaces in every themed material and the sea), `wind-vane.ts` (windex, windsock, flag), `home-data.ts` (pure: health, mould, price, warnings, mower lanes, water flow), `home-view.ts` (the home looks and their alerts from plan and states, the "Technik" report), `home-fx.ts` (draws them: air, water, sprinklers, mower, sound rings, flood, price glow, cars), `cars.ts` (saloon, hatchback, van) |
 | `frontend/model.ts` | Types |
 | `src-www/src/` | Upstream 3D frontend (MIT), unchanged except names; patched at build time in `tasks.ts` |
 | `www/` | Served by web; completely generated and gitignored: `index.html`, `bridge.js`, `chunks/`, `vendor/home3d*.js`, the public files, `licenses/page-licenses.md` |
@@ -32,10 +33,11 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 
 ## Storage (files of `home3d.0`, meta object from `instanceObjects`)
 
-- `data.json`: `{ version: 2, plans, images: {id → file}, mappings, locate_plan, position_id?, timetravel_instance? }` — written on every change;
+- `data.json`: `{ version: 2, plans, images: {id → file}, mappings, locate_plan, position_id?, timetravel_instance?, health_stale_min? }` — written on every change;
   `position_id`: a datapoint with the position (GPS on a boat) for `sun.sun` instead of the system settings;
   `timetravel_instance`: the history instance (e.g. `recorder.0`) the time travel prefers for the datapoints it records
-  (`getEnabledDPs`), else per datapoint the instance of its `common.custom`, else the default history
+  (`getEnabledDPs`), else per datapoint the instance of its `common.custom`, else the default history;
+  `health_stale_min`: a device is "unreachable" after that many minutes without an update instead of as it reports
 - `history/<plan>.json`: snapshots (max 30)
 - `images/<id>.<ext>`: binary images
 - IDs that are not `[A-Za-z0-9_-]{1,80}` become `x<hex>` file names (`fileKey`)
@@ -44,6 +46,9 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 ## Rules
 
 - Never load all states. Subscribe only `mappedIds(mappings)`; the object tree loads objects only when the dialog opens.
+  Exception, bounded: the health datapoints of the mapped devices (`health.ts`: the state objects below each mapped
+  device or channel are read once, at most 400; their battery/unreach/reachable states and the adapter's
+  `info.connection`/`alive` are subscribed too).
 - Never reach external hosts from the page (only exception: a picture whose URL a mapped datapoint gives, e.g. the
   `entity_picture` of a media player such as a YouTube thumbnail); links of the upstream frontend are rewritten to `help.html` in `tasks.ts`.
 - A mapping may have a condition `when: { id, values, else }`: its state counts only while datapoint `id` has one of

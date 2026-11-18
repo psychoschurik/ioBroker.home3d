@@ -75,6 +75,20 @@ test('first start writes data.json with the main plan', async () => {
     assert.equal(data.version, 2);
     assert.equal(data.plans.main.revision, 0);
 });
+test('unreachable after minutes without an update: saved for all plans, checked, cleared', async () => {
+    const { store, files } = await fixture();
+    const saved = (): unknown => JSON.parse(new TextDecoder().decode(files.files.get('data.json'))).health_stale_min;
+    await store.call({ type: 'iobroker/health/set', minutes: 15 });
+    assert.equal(store.data.health_stale_min, 15);
+    assert.equal(saved(), 15);
+    await assert.rejects(store.call({ type: 'iobroker/health/set', minutes: 0 }), /1 bis 10080/);
+    await assert.rejects(store.call({ type: 'iobroker/health/set', minutes: 'x' }), /1 bis 10080/);
+    assert.equal(store.data.health_stale_min, 15);
+    await store.call({ type: 'iobroker/health/set', minutes: null });
+    assert.equal(store.data.health_stale_min, null);
+    assert.equal(saved(), null);
+});
+
 test('concurrent saves: stale revision cannot overwrite a newer floor plan', async () => {
     const { store } = await fixture();
     const b = empty();

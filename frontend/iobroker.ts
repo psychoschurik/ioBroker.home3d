@@ -53,6 +53,11 @@ export class IoBroker implements IoAccess, FileAccess {
         }
         return out;
     }
+    /** The state objects below one device or channel (the health datapoints of a device, health.ts). */
+    async statesUnder(prefix: string): Promise<Record<string, StateObject>> {
+        const view = await this.conn.getObjectViewSystem('state', `${prefix}.`, `${prefix}.香`);
+        return view ?? {};
+    }
     async stateObjects(): Promise<Record<string, StateObject>> {
         const all = (await this.conn.getObjectViewSystem('state', '', '香')) as unknown as Record<string, StateObject>;
         for (const [id, o] of Object.entries(all)) {

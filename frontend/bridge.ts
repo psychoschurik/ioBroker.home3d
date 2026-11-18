@@ -12,6 +12,7 @@ import { pickDatapoint, setupDatapoints } from './datapoint.js';
 import { IoBroker, NAMESPACE } from './iobroker.js';
 import { Store, mappedIds, DATA_FILE } from './store.js';
 import { entities } from './entities.js';
+import { findHealth, healthAttributes, healthStateIds, type HealthIds } from './health.js';
 // Shop onboarding and telemetry are not supported in ioBroker.
 try {
     localStorage.setItem('home3d.news.fun_gifts_2026', 'never');
@@ -25,9 +26,13 @@ const subscriptions = new Set<{
     msg: ProtocolMessage;
 }>();
 const states: Record<string, StateValue> = {};
+// the objects read for the health datapoints, per device (kept: a device is read once)
+const healthCache = new Map<string, Record<string, StateObject>>();
 let objects: Record<string, StateObject> = {},
     areas: Record<string, { area_id: string; name: string }> = {},
     subscribed = new Set<string>(),
+    // the battery, reachability and adapter datapoints of the mapped devices (see health.ts)
+    health = new Map<string, HealthIds>(),
     language = 'de',
     systemPosition: { lat: number; lon: number } | null = null,
     historyInstances: string[] = [],
@@ -89,10 +94,18 @@ function place(): { lat: number; lon: number } | null {
 }
 /** Subscribes exactly the datapoints of the mappings (and of the position); values arrive as push. */
 async function follow(): Promise<void> {
-    const ids = [
+    const mapped = [
         ...new Set([...mappedIds(store.data.mappings), ...(store.data.position_id ? [store.data.position_id] : [])]),
     ];
-    objects = await io.getObjects(ids);
+    objects = await io.getObjects(mapped);
+    health = await findHealth(
+        store.data.mappings.map(m => m.state),
+        objects,
+        prefix => io.statesUnder(prefix),
+        list => io.getObjects(list),
+        healthCache,
+    ).catch(() => new Map<string, HealthIds>());
+    const ids = [...new Set([...mapped, ...healthStateIds(health)])];
     const next = new Set(ids);
     const added = ids.filter(id => !subscribed.has(id));
     const removed = [...subscribed].filter(id => !next.has(id));
@@ -109,6 +122,34 @@ async function follow(): Promise<void> {
     }
     schedule();
 }
+/** The device health (battery, reachability, adapter) as attributes of the entities; mapped attributes win. */
+function withHealth(list: ReturnType<typeof entities>): ReturnType<typeof entities> {
+    const minutes = store.data.health_stale_min ?? null;
+    // with "unreachable after X minutes": every mapped datapoint of a device is a sign of its life
+    const own = new Map<string, string[]>();
+    if (minutes) {
+        for (const [id, h] of health) {
+            own.set(h.device, [...(own.get(h.device) ?? []), id]);
+        }
+    }
+    const now = Date.now();
+    for (const m of store.data.mappings) {
+        const h = health.get(m.state);
+        const e = list[m.entity_id];
+        if (h && e) {
+            const a = healthAttributes(h, states, now, {
+                staleMs: minutes ? minutes * 60_000 : null,
+                own: own.get(h.device),
+            });
+            // a player that is off is just not connected (a TV's cast session)
+            if (m.entity_id.startsWith('media_player.')) {
+                delete a.unreachable;
+            }
+            e.attributes = { ...a, ...e.attributes };
+        }
+    }
+    return list;
+}
 function schedule(): void {
     timer ??= setTimeout(() => {
         timer = undefined;
@@ -122,7 +163,7 @@ function render(): void {
         user: { is_admin: true, name: 'ioBroker' },
         // the sun lights the rooms; ioBroker has none, it is calculated from the position of the system
         states: {
-            ...entities(store.data.mappings, states, objects),
+            ...withHealth(entities(store.data.mappings, states, objects)),
             ...(position ? { 'sun.sun': sunState(position.lat, position.lon) } : {}),
         },
         areas,
@@ -136,6 +177,8 @@ function render(): void {
             position_id: store.data.position_id ?? null,
             // the editor's house settings: where the time travel reads the past
             timetravel_instance: store.data.timetravel_instance ?? null,
+            // and after how many minutes without an update a device counts as unreachable (null: as it reports)
+            health_stale_min: store.data.health_stale_min ?? null,
             history_instances: historyInstances,
         },
         callWS,

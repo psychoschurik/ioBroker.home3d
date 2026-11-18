@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defaultLightY, isGear, lightOn, tankFill, tankWarn } from '../frontend/vendor-ext/boat-kinds';
+import { defaultLightY, hatchOpen, isGear, lightOn, tankFill, tankWarn } from '../frontend/vendor-ext/boat-kinds';
+import { buildGear } from '../frontend/vendor-ext/boat-gear';
 import { wakeStrength } from '../frontend/vendor-ext/sea';
 
 test('a tank reads its fill in % or as a fraction and warns when a supply runs out or a holding tank fills up', () => {
@@ -30,4 +31,32 @@ test('the wake starts at about half a knot and is full at about seven', () => {
     assert.equal(wakeStrength(0.1), 0);
     assert.ok(wakeStrength(1) > 0 && wakeStrength(1) < 0.5);
     assert.equal(wakeStrength(10), 1);
+});
+
+test('a deck hatch opens from its contact and is drawn shut, open with its struts, square or round', () => {
+    assert.equal(hatchOpen('on'), 1);
+    assert.equal(hatchOpen('Offen'), 1);
+    assert.equal(hatchOpen('open'), 1);
+    assert.equal(hatchOpen('off'), 0);
+    assert.equal(hatchOpen('closed'), 0);
+    assert.equal(hatchOpen(undefined), 0);
+    assert.equal(isGear('hatch'), true);
+    const scene = { floorY: 1, waterY: null, light: true, night: 0 };
+    const base = { id: 'h', floor: 'f', type: 'hatch' as const, x: 2, z: 3, rotation: 0, w: 0.6, d: 0.6, h: 0.06, base: 0, label: '', warn: false, mast: false, angle: 70 };
+    const parts = (g: ReturnType<typeof buildGear>): number => {
+        let n = 0;
+        g.traverse(o => {
+            n += (o as unknown as { isMesh?: boolean }).isMesh ? 1 : 0;
+        });
+        return n;
+    };
+    const shut = buildGear({ ...base, variant: 'square', value: 0 }, scene);
+    const open = buildGear({ ...base, variant: 'round', value: 1 }, scene);
+    // frame, opening, lid rim and pane; open also the two struts
+    assert.equal(parts(shut), 4);
+    assert.equal(parts(open), 6);
+    assert.deepEqual(open.position.toArray(), [2, 1, 3]);
+    // the lid stands up by its angle about the front edge
+    const lid = open.children.find((c: { type: string }) => c.type === 'Group')!;
+    assert.ok(Math.abs(lid.rotation.x + (70 * Math.PI) / 180) < 1e-9);
 });

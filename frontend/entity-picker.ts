@@ -1,5 +1,5 @@
 // ioBroker picker adapter. Reuses the shell's object tree; keeps existing plan IDs stable.
-import { css, html, LitElement, type TemplateResult } from 'lit';
+import { css, html, LitElement, nothing, type TemplateResult } from 'lit';
 import { tokens } from './picker-styles.js';
 export interface PickerOption {
     id: string;
@@ -52,16 +52,40 @@ export class EntityPicker extends LitElement {
             }),
         );
     }
+    /** The ioBroker ID of the chosen entity, from the hass of the editor around it; else the entity ID. */
+    private sourceId(value: string): string {
+        let node: Node = this;
+        for (let i = 0; i < 8; i++) {
+            const host = (node.getRootNode() as ShadowRoot).host as
+                | (Element & { hass?: { states?: Record<string, { attributes?: Record<string, unknown> }> } })
+                | undefined;
+            if (!host) {
+                break;
+            }
+            const id = host.hass?.states?.[value]?.attributes?.iobroker_id;
+            if (typeof id === 'string' && id) {
+                return id;
+            }
+            if (host.hass) {
+                break;
+            }
+            node = host;
+        }
+        return value;
+    }
     render(): TemplateResult {
         const current = [...this.fixed, ...this.options].find(o => o.id === this.value);
+        // the chosen datapoint's ID below the field (not for "none" and the other fixed choices)
+        const id = this.value && !this.fixed.some(o => o.id === this.value) ? this.sourceId(this.value) : '';
         return html`<button
-            type="button"
-            ?disabled=${this.disabled}
-            @click=${this.pick}
-            aria-label=${this.placeholder || 'Datenpunkt auswählen'}
-        >
-            <span>${current?.label || this.placeholder || 'Datenpunkt auswählen'}</span><b aria-hidden="true">▤</b>
-        </button>`;
+                type="button"
+                ?disabled=${this.disabled}
+                @click=${this.pick}
+                aria-label=${this.placeholder || 'Datenpunkt auswählen'}
+            >
+                <span>${current?.label || this.placeholder || 'Datenpunkt auswählen'}</span
+                ><b aria-hidden="true">▤</b></button
+            >${id ? html`<small title=${id}>${id}</small>` : nothing}`;
     }
     static styles = [
         tokens,
@@ -98,6 +122,15 @@ export class EntityPicker extends LitElement {
             button:disabled {
                 opacity: 0.45;
                 cursor: default;
+            }
+            small {
+                display: block;
+                margin-top: 4px;
+                color: var(--fp3d-muted, #8a9bb8);
+                font-size: 12px;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                overflow-wrap: anywhere;
+                user-select: text;
             }
         `,
     ];

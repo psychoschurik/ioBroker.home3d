@@ -11,6 +11,7 @@ import {
     Color,
     CylinderGeometry,
     EdgesGeometry,
+    ExtrudeGeometry,
     Group,
     LineBasicMaterial,
     LineSegments,
@@ -18,8 +19,10 @@ import {
     MeshBasicMaterial,
     SphereGeometry,
     SRGBColorSpace,
+    Shape,
     Sprite,
     SpriteMaterial,
+    Vector3,
     type BufferGeometry,
     type Object3D,
     type Texture,
@@ -52,6 +55,8 @@ export interface GearState {
     warn: boolean;
     /** A light: a mast carries it, from the floor up. */
     mast: boolean;
+    /** A hatch: how far it opens (°). */
+    angle?: number;
 }
 
 /** Where the gear is in the scene. */
@@ -110,6 +115,7 @@ export function gearKey(g: GearState, s: GearScene): string {
         r(s.waterY),
         s.light,
         g.type === 'nav_light' ? s.night.toFixed(1) : '',
+        g.type === 'hatch' ? (g.angle ?? '') : '',
     ].join(':');
 }
 
@@ -312,6 +318,91 @@ function navLight(g: GearState, s: GearScene, group: Group): void {
     }
 }
 
+/** The outline of a hatch in the floor plane (shape x → x, shape y → −z): a rounded square or a circle. */
+function hatchOutline(round: boolean, w: number, d: number, inset: number): Shape {
+    const s = new Shape();
+    if (round) {
+        s.absarc(0, 0, Math.max(0.02, Math.min(w, d) / 2 - inset), 0, Math.PI * 2, false);
+        return s;
+    }
+    const hw = w / 2 - inset;
+    const hd = d / 2 - inset;
+    const r = Math.max(0.01, Math.min(hw, hd) * 0.28);
+    s.moveTo(-hw + r, -hd);
+    s.lineTo(hw - r, -hd);
+    s.quadraticCurveTo(hw, -hd, hw, -hd + r);
+    s.lineTo(hw, hd - r);
+    s.quadraticCurveTo(hw, hd, hw - r, hd);
+    s.lineTo(-hw + r, hd);
+    s.quadraticCurveTo(-hw, hd, -hw, hd - r);
+    s.lineTo(-hw, -hd + r);
+    s.quadraticCurveTo(-hw, -hd, -hw + r, -hd);
+    return s;
+}
+
+/** A flat outline (with a hole) raised `depth` up from y = 0. */
+function slab(outline: Shape, depth: number): BufferGeometry {
+    return new ExtrudeGeometry(outline, { depth, bevelEnabled: false, curveSegments: 20 }).rotateX(-Math.PI / 2);
+}
+
+/** A thin rod from a to b. */
+function rod(group: Object3D, a: Vector3, b: Vector3, r: number, color: number): void {
+    const dir = b.clone().sub(a);
+    const len = dir.length();
+    if (len < 0.01) {
+        return;
+    }
+    const m = part(group, new CylinderGeometry(r, r, len, 8), color);
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), dir.normalize());
+}
+
+/**
+ * A deck hatch: a low aluminium frame round the opening and a lid of smoked acrylic hinged at its front edge (local −z,
+ * forward at 0°); open, it stands up by its angle on two gas struts and shows the dark opening below.
+ */
+function hatch(g: GearState, s: GearScene, group: Group): void {
+    const round = g.variant === 'round';
+    const metal = s.light ? 0xc9cfd5 : 0x8d99a6;
+    const rim = Math.min(0.05, Math.min(g.w, g.d) * 0.1);
+    const fh = Math.min(0.12, Math.max(0.025, g.h));
+    // the frame and the opening inside it
+    const frame = hatchOutline(round, g.w, g.d, 0);
+    frame.holes.push(hatchOutline(round, g.w, g.d, rim));
+    part(group, slab(frame, fh), metal);
+    const hole = part(group, slab(hatchOutline(round, g.w, g.d, rim), 0.004).translate(0, 0.004, 0), 0x161b20);
+    hole.renderOrder = 1;
+    // the lid, turned about its hinge at the front edge
+    const open = Math.min(1, Math.max(0, g.value ?? 0));
+    const a = (open * Math.min(110, Math.max(5, g.angle ?? 70)) * Math.PI) / 180;
+    const lid = new Group();
+    lid.position.set(0, fh, -g.d / 2);
+    lid.rotation.x = -a;
+    const lidRim = hatchOutline(round, g.w, g.d, 0);
+    lidRim.holes.push(hatchOutline(round, g.w, g.d, rim * 0.8));
+    part(lid, slab(lidRim, 0.022).translate(0, 0, g.d / 2), metal);
+    const pane = part(
+        lid,
+        slab(hatchOutline(round, g.w, g.d, rim * 0.8), 0.012).translate(0, 0.005, g.d / 2),
+        s.light ? 0x4a5866 : 0x2c3540,
+    );
+    const mat = pane.material as MeshBasicMaterial;
+    mat.transparent = true;
+    mat.opacity = 0.72;
+    pane.renderOrder = 3;
+    group.add(lid);
+    if (a > 0.08) {
+        // the gas struts: from the frame's sides to the lid
+        const q = g.d * 0.42;
+        for (const sx of [-1, 1]) {
+            const x = sx * (g.w / 2 - rim / 2) * (round ? 0.75 : 1);
+            const foot = new Vector3(x, fh, -g.d / 2 + g.d * 0.62);
+            const top = new Vector3(x, fh + q * Math.sin(a), -g.d / 2 + q * Math.cos(a));
+            rod(group, foot, top, 0.008, 0x3a3f45);
+        }
+    }
+}
+
 /** Builds one item in plan coordinates (the viewer's root). */
 export function buildGear(g: GearState, s: GearScene): Group {
     const group = new Group();
@@ -340,6 +431,9 @@ export function buildGear(g: GearState, s: GearScene): Group {
         case 'nav_light':
             navLight(g, s, group);
             break;
+        case 'hatch':
+            hatch(g, s, group);
+            break;
     }
     if (g.type === 'tank') {
         // seen through: tanks lie under berths and floors; the glass, then the liquid, then the edges, over everything
@@ -365,7 +459,7 @@ export function buildGear(g: GearState, s: GearScene): Group {
     }
     if (g.label) {
         const label = labelSprite(g.label, s.light, g.warn ? 'warn' : null, 0.024);
-        label.position.set(0, (g.type === 'tank' ? g.h : 0.2) + 0.3, 0);
+        label.position.set(0, (g.type === 'tank' ? g.h : g.type === 'hatch' ? g.d * 0.6 : 0.2) + 0.3, 0);
         group.add(label);
     }
     return group;

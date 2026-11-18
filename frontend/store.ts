@@ -21,10 +21,16 @@ const version = typeof __HOME3D_VERSION__ === 'string' ? __HOME3D_VERSION__ : 'd
 export const DATA_FILE = 'data.json';
 /** An adapter instance such as `recorder.0`. */
 const INSTANCE = /^[a-z0-9][a-z0-9_-]*\.\d+$/;
+/** Minutes without an update after which a device counts as unreachable (1 min … 1 week); null: not set or invalid. */
+export function staleMinutes(v: unknown): number | null {
+    const n = typeof v === 'string' && v.trim() ? Number(v) : v;
+    return typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= 10080 ? Math.round(n) : null;
+}
 const MUTATING = new Set([
     'iobroker/mappings/set',
     'iobroker/position/set',
     'iobroker/timetravel/set',
+    'iobroker/health/set',
     'building/save',
     'plans/create',
     'plans/update',
@@ -200,6 +206,7 @@ export class Store {
             ...(typeof d.timetravel_instance === 'string' && INSTANCE.test(d.timetravel_instance)
                 ? { timetravel_instance: d.timetravel_instance }
                 : {}),
+            ...(staleMinutes(d.health_stale_min) ? { health_stale_min: staleMinutes(d.health_stale_min) } : {}),
         };
     }
     private async persist(): Promise<void> {
@@ -418,6 +425,12 @@ export class Store {
                     error('invalid_instance', 'Ungültige Instanz für die Zeitreise.');
                 }
                 this.data.timetravel_instance = m.instance || null;
+                return save({});
+            case 'iobroker/health/set':
+                if (m.minutes != null && m.minutes !== '' && !staleMinutes(m.minutes)) {
+                    error('invalid_minutes', 'Minuten für „nicht erreichbar“: 1 bis 10080.');
+                }
+                this.data.health_stale_min = staleMinutes(m.minutes);
                 return save({});
             case 'iobroker/service':
                 return execute(this.data.mappings, m.domain, m.service, m.data || {}, this.io);

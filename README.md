@@ -177,6 +177,35 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler
+- (bluefox) Ansicht „Technik“: Räume nach dem Zustand ihrer Geräte gefärbt, Schilder an Geräten mit schwacher Batterie
+  oder ohne Verbindung, Liste und Zusammenfassung; die Batterie- und Erreichbarkeits-Datenpunkte (auch die Verbindung
+  und der Lauf des Adapters) werden zu jedem verbundenen Gerät selbst gefunden
+- (bluefox) Schimmelrisiko: aus Temperatur, Feuchte und Außentemperatur die Feuchte in der kältesten Ecke; dunkle Ecken
+  und „Lüften“ ab 80 %
+- (bluefox) Offene Fenster zeigen Luft, die je nach Wind hinein- oder hinausströmt (Querlüften sichtbar); heizt der Raum,
+  zieht rote Wärme hinaus, nach 10 Minuten mit Warnung
+- (bluefox) Garten: Mähroboter (Worx, Husqvarna, Gardena …) fährt Bahnen und hinterlässt Streifen, Regner sprühen,
+  solange ihr Ventil offen ist, trockener Boden färbt den Rasen gelblich
+- (bluefox) Strompreis (z. B. Tibber, aWATTar): das Haus leuchtet grün bis rot, mit Vorschau die günstigste Stunde
+- (bluefox) Unwetterwarnung (z. B. DWD): Rahmen und Banner in der Farbe der Warnstufe
+- (bluefox) Ansicht „Bewegung“: wo heute Bewegung war, aus dem Verlauf der Bewegungsmelder
+- (bluefox) Schallringe an spielenden Lautsprechern (nach Lautstärke) und an Lärmsensoren
+- (bluefox) Wasser: läuft an Dusche, Wanne und Waschbecken sichtbar, Warnung nach 30 Minuten Durchfluss, bei einem Leck
+  steigt das Wasser im Raum
+- (bluefox) Autos als Möbel: Limousine, Kompaktwagen und Transporter in wählbarer Farbe; mit einem Anwesenheits-Datenpunkt
+  parken sie ein oder fahren weg
+- (bluefox) Boote: neues Möbelstück „Luke“ fürs Deck, eckig mit runden Ecken oder rund – mit ihrem Kontakt steht der
+  getönte Deckel im Öffnungswinkel auf Gasfedern; offen bei Regen gibt es eine Warnung
+- (bluefox) Fenster, die nach oben aufgehen: Klappfenster mit eigenem Öffnungswinkel, auch nach innen; neuer Fensterstil
+  „Bullauge / rund“ mit abgerundetem Rahmen und Flügel, der als Klappe nach oben öffnet
+- (bluefox) Technik: „nicht erreichbar nach … Minuten ohne Update“ einstellbar, statt sich auf die Meldung des Geräts zu
+  verlassen; Batteriegeräte, die zwischen zwei Meldungen schlafen, gelten erst nach 48 Stunden als nicht erreichbar,
+  Fernseher und Player im Standby nie. Die Batterie von Shelly-Geräten (Kanal DevicePower0) wird gefunden; ein einzelner
+  Datenpunkt ohne Wert macht ein Gerät, das seinen Zustand selbst meldet, nicht mehr „nicht erreichbar“
+- (bluefox) Technik: einstellbar, ob Räume ohne Problem grün werden oder ihre Farbe behalten; ein Hinweis am Schild zeigt
+  Gerät, Grund und letztes Update; die Liste steht rechts unten und verdeckt die Etagen nicht mehr
+- (bluefox) Das Mausrad zoomt die 3D-Ansicht auch, wenn der Zeiger auf einem Sensor oder Schild steht
+- (bluefox) Datenpunkt-Felder der Einstellungen zeigen unter dem Namen die ioBroker-ID des gewählten Datenpunkts
 
 ### 0.4.0 (2026-11-15)
 

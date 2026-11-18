@@ -1,7 +1,7 @@
 // What a boat's gear can be (furniture types added in tasks.ts), shared by the editor, the 3D view and the viewer
 // (boat-gear.ts); without three.js, so the editor can import it.
 
-export const GEAR_TYPES = ['tank', 'rudder', 'propeller', 'nav_light'] as const;
+export const GEAR_TYPES = ['tank', 'rudder', 'propeller', 'nav_light', 'hatch'] as const;
 export type GearType = (typeof GEAR_TYPES)[number];
 
 /** What a tank holds: fresh water, diesel or petrol, gas, grey water, black water. */
@@ -26,6 +26,19 @@ export function tankWarn(kind: string | null | undefined, fill: number): boolean
 /** A tank's fill (0–1) from its sensor: in % (the unit says so, or the value is above 1) or as a fraction. */
 export function tankFill(value: number, unit: string): number {
     return Math.min(1, Math.max(0, unit === '%' || value > 1.0001 ? value / 100 : value));
+}
+
+/** A deck hatch: square with rounded corners, or round. */
+export const HATCH_KINDS = ['square', 'round'] as const;
+/** How far a hatch opens unless set (°). */
+export const HATCH_ANGLE = 70;
+
+/** A hatch's contact as open (1) or shut (0): on, open, true, offen, a number above 0. */
+export function hatchOpen(state: string | null | undefined): number {
+    const s = String(state ?? '')
+        .trim()
+        .toLowerCase();
+    return ['on', 'open', 'opened', 'true', 'offen', 'auf', 'geöffnet'].includes(s) || parseFloat(s) > 0 ? 1 : 0;
 }
 
 /** A switch's state as on (1) or off (0). */
