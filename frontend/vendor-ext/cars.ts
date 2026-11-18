@@ -200,7 +200,67 @@ function shadow(w: number, d: number): Mesh | null {
 }
 
 /** A car of `w` × `d` × `h` m standing on y = 0, its front towards local -z. */
-export function buildCar(kind: CarKind, w: number, d: number, h: number, color: string | null | undefined): Group {
+/** What a number plate may show: letters, digits, spaces and hyphens, at most 12, in capitals. */
+export function plateText(text: string | null | undefined): string {
+    return (text ?? '')
+        .toUpperCase()
+        .replace(/[^\p{L}\p{N} -]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 12);
+}
+
+/** A number plate with its text: white, a black rim, the blue strip at the left end (null without a page). */
+function plateTexture(text: string): CanvasTexture | null {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+    const cv = document.createElement('canvas');
+    cv.width = 520;
+    cv.height = 112;
+    const g = cv.getContext('2d');
+    if (!g) {
+        return null;
+    }
+    g.fillStyle = '#1b1b1b';
+    g.fillRect(0, 0, 520, 112);
+    g.fillStyle = '#f4f4ef';
+    g.fillRect(5, 5, 510, 102);
+    g.fillStyle = '#1d3f9a';
+    g.fillRect(5, 5, 46, 102);
+    // the ring of stars, as dots
+    g.fillStyle = '#f2c200';
+    for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        g.beginPath();
+        g.arc(28 + Math.cos(a) * 13, 40 + Math.sin(a) * 13, 2.2, 0, Math.PI * 2);
+        g.fill();
+    }
+    g.fillStyle = '#1b1b1b';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    let size = 86;
+    const font = (): string =>
+        `bold ${size}px "DIN Alternative", "Arial Narrow", "Roboto Condensed", Arial, sans-serif`;
+    g.font = font();
+    while (size > 30 && g.measureText(text).width > 440) {
+        size -= 4;
+        g.font = font();
+    }
+    g.fillText(text, 285, 60);
+    const t = new CanvasTexture(cv);
+    t.anisotropy = 4;
+    return t;
+}
+
+export function buildCar(
+    kind: CarKind,
+    w: number,
+    d: number,
+    h: number,
+    color: string | null | undefined,
+    plateNo?: string | null,
+): Group {
     const g = new Group();
     let paint: Color;
     try {
@@ -420,8 +480,10 @@ export function buildCar(kind: CarKind, w: number, d: number, h: number, color: 
         body.add(box(0.5, 0.11, 0.012, 0, y, z), 0xf1f1ec);
         body.add(box(0.045, 0.11, 0.014, -dir * 0.228, y, z), 0x1d3f9a);
     };
-    plate(nose - 0.008, clear + 0.17, 1);
-    plate(d / 2 + 0.012, van ? clear + 0.3 : clear + 0.24, -1);
+    const yFront = clear + 0.17;
+    const yBack = van ? clear + 0.3 : clear + 0.24;
+    plate(nose - 0.008, yFront, 1);
+    plate(d / 2 + 0.012, yBack, -1);
     // the wheel arches dark inside
     const tw = Math.min(0.26, w * 0.12);
     for (const z of [zA, zB]) {
@@ -440,6 +502,22 @@ export function buildCar(kind: CarKind, w: number, d: number, h: number, color: 
     const s = shadow(w, d);
     if (s) {
         g.add(s);
+    }
+    // the plate's own text, front and back
+    const text = plateText(plateNo);
+    const tex = text ? plateTexture(text) : null;
+    if (tex) {
+        const mat = new MeshBasicMaterial({ map: tex, transparent: true });
+        for (const [z, y, turn] of [
+            [nose - 0.016, yFront, Math.PI],
+            [d / 2 + 0.02, yBack, 0],
+        ]) {
+            const m = new Mesh(new PlaneGeometry(0.52, 0.112), mat);
+            m.position.set(0, y, z);
+            m.rotation.y = turn;
+            m.name = 'fp3dCarPlate';
+            g.add(m);
+        }
     }
     return g;
 }

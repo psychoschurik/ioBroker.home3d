@@ -170,6 +170,8 @@ export interface CarState {
     d: number;
     h: number;
     color: string | null;
+    /** The number plate's text (none: blank plates). */
+    plate?: string | null;
     present: boolean;
     /** It has a presence datapoint: its place is marked while it is away. */
     sensed: boolean;
@@ -482,7 +484,21 @@ export class HomeFx {
             s.lawns.map(l => [l.id, l.floor, l.points, l.y, Math.round(l.dry * 20), l.mown]),
             s.mowers.map(m => [m.id, m.floor, m.dock, m.dockAngle, m.size, m.y, m.label, m.lawn]),
             s.badges,
-            s.cars.map(c => [c.id, c.floor, c.kind, c.x, c.z, c.y, c.angle, c.w, c.d, c.h, c.color, c.sensed]),
+            s.cars.map(c => [
+                c.id,
+                c.floor,
+                c.kind,
+                c.x,
+                c.z,
+                c.y,
+                c.angle,
+                c.w,
+                c.d,
+                c.h,
+                c.color,
+                c.plate ?? null,
+                c.sensed,
+            ]),
             s.glow,
             this.light,
         ]);
@@ -649,7 +665,7 @@ export class HomeFx {
         }
         for (const c of s.cars) {
             const g = this.floorGroup(c.floor);
-            const car = buildCar(c.kind, c.w, c.d, c.h, c.color);
+            const car = buildCar(c.kind, c.w, c.d, c.h, c.color, c.plate);
             g.add(car);
             let bay: Group | null = null;
             if (c.sensed) {

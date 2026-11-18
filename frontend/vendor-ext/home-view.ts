@@ -93,6 +93,7 @@ export interface FurnitureLike {
     water?: string | null;
     water_house?: boolean;
     car_color?: string | null;
+    car_plate?: string | null;
     /** A boat's gear: the sensor of a hatch, a tank … */
     gear_entity?: string | null;
 }
@@ -567,6 +568,7 @@ export function homeScene(input: HomeInput): HomeOutput {
                     d: f.d,
                     h: f.h,
                     color: f.car_color ?? null,
+                    plate: f.car_plate ?? null,
                     present: !entity || carPresent(hass.states[entity]),
                     sensed: !!entity,
                 });

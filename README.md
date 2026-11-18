@@ -174,6 +174,10 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   schwingen
 - (bluefox) Meer: die Wellen laufen mit dem Wind, ab 4 Bft mit Schaumkronen, Böen kräuseln das Wasser, Regen macht Ringe;
   Deck und Dächer werden im Regen nass, Wolkenschatten ziehen mit dem Wind über Meer, Deck und Dächer
+- (bluefox) Wolken in 3D (in den Looks „Tag“ und „Wohnlich“): sie schweben über dem Haus genau über ihren Schatten
+  und ziehen mit dem Wind; ihre Menge folgt der Bewölkung, bei Regen eine flache graue Decke, bei Gewitter dunkle
+  Türme; tagsüber weiß, bei Sonnenauf- und -untergang rosa, nachts graublau; über dem Haus und nah vor der Kamera
+  blenden sie aus, damit sie nichts verdecken
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler
@@ -195,7 +199,7 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Autos als Möbel: Limousine, Kompaktwagen und Transporter in wählbarer Farbe; mit einem Anwesenheits-Datenpunkt
   parken sie ein oder fahren weg. Mit runder Karosserie und Radkästen, Fenstersäulen, Scheiben mit Himmelsspiegelung,
   Alufelgen (Transporter: Stahlfelgen), die sich beim Fahren drehen, Spiegeln, Türfugen, Lichtern, Nummernschildern und
-  einem weichen Schatten
+  einem weichen Schatten; ein eigenes Kennzeichen (vorne und hinten) lässt sich im Editor eingeben
 - (bluefox) Boote: neues Möbelstück „Luke“ fürs Deck, eckig mit runden Ecken oder rund – mit ihrem Kontakt steht der
   getönte Deckel im Öffnungswinkel auf Gasfedern; offen bei Regen gibt es eine Warnung
 - (bluefox) Fenster, die nach oben aufgehen: Klappfenster mit eigenem Öffnungswinkel, auch nach innen; neuer Fensterstil

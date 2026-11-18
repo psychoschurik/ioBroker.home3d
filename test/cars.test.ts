@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Box3, type Mesh } from 'three';
-import { buildCar, CAR_KINDS, WHEEL } from '../frontend/vendor-ext/cars';
+import { buildCar, CAR_KINDS, plateText, WHEEL } from '../frontend/vendor-ext/cars';
 
 const SIZES = {
     car_sedan: [1.85, 4.75, 1.45],
@@ -38,4 +38,13 @@ for (const kind of CAR_KINDS) {
 
 test('a colour that is no colour falls back to the kind’s', () => {
     assert.doesNotThrow(() => buildCar('car_sedan', 1.85, 4.75, 1.45, 'no colour'));
+});
+
+test('a number plate shows letters, digits, spaces and hyphens, in capitals, at most 12', () => {
+    assert.equal(plateText(' m-ab 1234 '), 'M-AB 1234');
+    assert.equal(plateText('ö-xy  7e<b>'), 'Ö-XY 7EB');
+    assert.equal(plateText('HH-AB 12345678'), 'HH-AB 123456');
+    assert.equal(plateText(null), '');
+    // without a page (no canvas) the car is built with blank plates
+    assert.doesNotThrow(() => buildCar('car_van', 2.05, 5.3, 2.3, null, 'B-XY 99'));
 });

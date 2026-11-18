@@ -1878,6 +1878,8 @@ function homeMore(name: string, code: string): string {
                 '  water_house?: boolean;',
                 "  /** A car's colour (#rrggbb); its presence datapoint is `entity` (without one it is always there). */",
                 '  car_color?: string | null;',
+                "  /** A car's number plate (shown front and back). */",
+                '  car_plate?: string | null;',
             ].join('\n'),
             'home: water link',
         );
@@ -2475,7 +2477,7 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
         );
     }
     if (name === 'components/editor.ts') {
-        code = `import { WATER_TYPES as FP3D_WATER_TYPES } from "${root}/frontend/vendor-ext/home-view.ts";\nimport { CAR_COLORS as FP3D_CAR_COLORS, isCarKind as fp3dIsCar } from "${root}/frontend/vendor-ext/cars.ts";\n${code}`;
+        code = `import { WATER_TYPES as FP3D_WATER_TYPES } from "${root}/frontend/vendor-ext/home-view.ts";\nimport { CAR_COLORS as FP3D_CAR_COLORS, isCarKind as fp3dIsCar, plateText as fp3dPlateText } from "${root}/frontend/vendor-ext/cars.ts";\n${code}`;
         code = replaceRequired(
             code,
             '"propeller", "nav_light", "wind_vane"]);',
@@ -2515,6 +2517,10 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
                 '        <label class="fp3d-field"',
                 '          >${this.t("fp3d_car_color" as I18nKey)}',
                 '          <input type="color" .value=${f.car_color ?? FP3D_CAR_COLORS[f.type]} ?disabled=${!this.isAdmin} @change=${(e: Event) => set({ car_color: (e.target as HTMLInputElement).value })}',
+                '        /></label>',
+                '        <label class="fp3d-field"',
+                '          >${this.t("fp3d_car_plate" as I18nKey)}',
+                '          <input type="text" maxlength="12" placeholder="M-AB 1234" .value=${f.car_plate ?? ""} ?disabled=${!this.isAdmin} @change=${(e: Event) => set({ car_plate: fp3dPlateText((e.target as HTMLInputElement).value) || null })}',
                 '        /></label>',
                 '        <p class="fp3d-sub fp3d-wide">${this.t("fp3d_car_hint" as I18nKey)}</p>',
                 '      </div>`;',
@@ -2603,6 +2609,7 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
             furn_car_van: 'Transporter',
             fp3d_car_presence: 'Zuhause (Datenpunkt)',
             fp3d_car_color: 'Farbe',
+            fp3d_car_plate: 'Kennzeichen',
             fp3d_car_hint:
                 'Das Auto steht hier, solange der Datenpunkt „da“ meldet (an, home, anwesend, geparkt oder eine Zahl über 0, z. B. ein Tracker oder ein Sensor in der Garage); dann parkt es rückwärts ein, sonst fährt es weg und nur die Markierung bleibt. Ohne Datenpunkt steht es immer da. Breite, Länge und Höhe wie beim Möbel.',
             home_health_low_one: '1 Batterie schwach',
@@ -2674,6 +2681,7 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
             furn_car_van: 'Van',
             fp3d_car_presence: 'At home (datapoint)',
             fp3d_car_color: 'Colour',
+            fp3d_car_plate: 'Number plate',
             fp3d_car_hint:
                 'The car stands here while the datapoint says it is there (on, home, present, parked or a number above 0, e.g. a tracker or a sensor in the garage); then it reverses into its place, else it drives away and only the marking stays. Without a datapoint it is always there. Width, length and height as for any furniture.',
             home_health_low_one: '1 battery low',
@@ -2855,6 +2863,7 @@ function weatherMore(name: string, code: string): string {
     if (name === 'viewer/viewer3d.ts') {
         code = [
             `import { skyUniforms as fp3dSkyUniforms } from "${root}/frontend/vendor-ext/sky-shade.ts";`,
+            `import { CloudLayer as Fp3dCloudLayer } from "${root}/frontend/vendor-ext/clouds.ts";`,
             `import { setSeaWeather as fp3dSetSeaWeather } from "${root}/frontend/vendor-ext/sea.ts";`,
             `import { gustiness as fp3dGustiness, type Wind as Fp3dWind } from "${data}";`,
             `import { animateVane as fp3dAnimateVane, buildVane as fp3dBuildVane, disposeVanes as fp3dDisposeVanes, vaneKey as fp3dVaneKey, type VaneScene as Fp3dVaneScene, type VaneState as Fp3dVane } from "${root}/frontend/vendor-ext/wind-vane.ts";`,
@@ -2872,6 +2881,8 @@ function weatherMore(name: string, code: string): string {
                 '  /** Clouds drift, whitecaps and rain move on the sea, an indicator swings: frames keep coming. */',
                 '  private fp3dSkyMoving = false;',
                 '  private fp3dSkyClock = 0;',
+                '  /** The clouds themselves, over their shadows (made when first shown). */',
+                '  private fp3dClouds: Fp3dCloudLayer | null = null;',
                 '',
                 '  fp3dSetWind(w: Fp3dWind | null): void {',
                 '    if (JSON.stringify(w) === JSON.stringify(this.fp3dWind)) return;',
@@ -2909,7 +2920,9 @@ function weatherMore(name: string, code: string): string {
                 '    const shadows = !!weather && this.style.natural && elev > 2 && !this.lowQuality && !this.options.safeFx && cover > 0.08 && cover < 0.97;',
                 '    u.uFp3dCloud.value = shadows ? Math.min(1, (elev - 2) / 8) : 0;',
                 '    u.uFp3dCover.value = cover;',
-                '    if (shadows && dir && w) {',
+                '    // the clouds themselves, in the looks with a real sky: where their shadows fall, coloured by the weather and the time of day',
+                '    const cloudsOn = !!weather && (this.theme === "day" || this.style.natural) && !this.lowQuality && !this.options.safeFx && cover > 0.08;',
+                '    if ((shadows || cloudsOn) && dir && w) {',
                 '      const drift = Math.min(6, 0.5 + 0.3 * w.speed) * dt;',
                 '      u.uFp3dCloudOff.value.set((u.uFp3dCloudOff.value.x + dir[0] * drift) % 100000, (u.uFp3dCloudOff.value.y + dir[1] * drift) % 100000);',
                 '    }',
@@ -2919,7 +2932,30 @@ function weatherMore(name: string, code: string): string {
                 '    u.uFp3dSkyMinY.value = !top ? 1e6 : this.fp3dSea ? top.group.position.y - 0.05 : top.group.position.y + top.floor.height - 0.05;',
                 '    const seaWind = weather && w ? w.speed : 0;',
                 '    if (this.fp3dSeaMesh) fp3dSetSeaWeather(this.fp3dSeaMesh, { dir, wind: seaWind, gust: weather ? gust : 0, rain: weather?.rain ?? 0 }, dt);',
-                '    let moving = (u.uFp3dCloud.value > 0 && !!dir && !!w && w.speed > 0.2) || (!!this.fp3dSeaMesh && !!weather && (seaWind >= 5.5 || weather.rain > 0 || gust > 0));',
+                '    if (cloudsOn && !this.fp3dClouds) {',
+                '      this.fp3dClouds = new Fp3dCloudLayer();',
+                '      this.root.add(this.fp3dClouds.mesh);',
+                '    }',
+                '    let cloudsShown = false;',
+                '    if (this.fp3dClouds) {',
+                '      const north = this.fp3dNorth() * (Math.PI / 180);',
+                '      const az = this.sun ? this.sun.azimuth * (Math.PI / 180) : null;',
+                '      const b = this.weatherBox;',
+                '      const house = new Vector3((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2);',
+                '      const houseR = Math.hypot((b.x1 - b.x0) / 2 - 6, (b.z1 - b.z0) / 2 - 6, (b.y1 - b.y0) / 2);',
+                '      cloudsShown = this.fp3dClouds.update({',
+                '        cover: cloudsOn ? cover : 0,',
+                '        rain: weather?.rain ?? 0,',
+                '        storm: (weather as { lightning?: boolean } | null)?.lightning ? 1 : 0,',
+                '        elevation: this.sun?.elevation ?? null,',
+                '        toSun: az === null ? null : [Math.sin(north + az), -Math.cos(north + az)],',
+                '        off: u.uFp3dCloudOff.value,',
+                '        house,',
+                '        houseR,',
+                '        top: b.y1 - 6,',
+                '      });',
+                '    }',
+                '    let moving = ((u.uFp3dCloud.value > 0 || cloudsShown) && !!dir && !!w && w.speed > 0.2) || (!!this.fp3dSeaMesh && !!weather && (seaWind >= 5.5 || weather.rain > 0 || gust > 0));',
                 '    // the wind indicators: built anew when they or their floor changed, turned by the wind every frame',
                 '    const light = this.theme === "day" || this.style.natural;',
                 '    const parts: { v: Fp3dVane; scene: Fp3dVaneScene }[] = [];',
@@ -2967,6 +3003,12 @@ function weatherMore(name: string, code: string): string {
             '|| this.fp3dSeaMoving || this.fp3dGearMoving;',
             '|| this.fp3dSeaMoving || this.fp3dGearMoving || this.fp3dSkyMoving;',
             'sky: frames while the clouds drift',
+        );
+        code = replaceRequired(
+            code,
+            '    this.sunFx.dispose();\n',
+            '    this.sunFx.dispose();\n    this.fp3dClouds?.dispose();\n',
+            'clouds: dispose',
         );
     }
     if (name === 'components/view3d.ts') {
