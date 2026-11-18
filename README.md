@@ -182,6 +182,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   mit Mondmeeren und Hof, die dunkle Seite schwach im Erdschein), die helle Seite zur Sonne; nachts ein Sternenhimmel,
   der sich mit der Sternzeit um den Polarstern dreht, schwächer hinter Wolken und im hellen Mondlicht; beides wird aus
   dem Standort berechnet und läuft auch in der Zeitreise mit
+- (bluefox) Regenbogen: steht die Sonne tief (unter 42°) und scheint, während es regnet oder bis zu zehn Minuten danach,
+  wölbt sich gegenüber der Sonne ein Regenbogen hinter dem Haus – Violett innen, Rot außen, mit schwächerem Nebenbogen
+  in umgekehrten Farben und hellerem Himmel innen
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler
