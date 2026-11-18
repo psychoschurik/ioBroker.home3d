@@ -31,7 +31,7 @@ import {
     type Object3D,
 } from 'three';
 import { labelSprite, shade } from './anchor';
-import { buildBay, buildCar, type CarKind } from './cars';
+import { buildBay, buildCar, type CarKind, WHEEL } from './cars';
 import { lanes, pathLength, pointAt, type Corner, type MowerPhase, type Rgb, type Vec2 } from './home-data';
 
 export interface AirState {
@@ -423,6 +423,8 @@ export class HomeFx {
     private runs = new Map<string, MowerRun>();
     private paints = new Map<string, LawnPaint>();
     private carMeshes = new Map<string, { car: Group; bay: Group | null }>();
+    /** How far each car stood out of its place in the last frame (m): its wheels roll by the difference. */
+    private carOut = new Map<string, number>();
     /** How far each car is in its place (0 away … 1 parked); kept across rebuilds. */
     private carIn = new Map<string, number>();
     /** The badges with a tip, for the pointer. */
@@ -707,7 +709,13 @@ export class HomeFx {
                 for (const mat of mats) {
                     const map = (mat as MeshBasicMaterial).map;
                     // the shared textures stay
-                    if (map && map !== dot && map !== mould && ![...this.paints.values()].some(p => p.tex === map)) {
+                    if (
+                        map &&
+                        map !== dot &&
+                        map !== mould &&
+                        !map.userData.fp3dShared &&
+                        ![...this.paints.values()].some(p => p.tex === map)
+                    ) {
                         map.dispose();
                     }
                     mat.dispose();
@@ -885,12 +893,19 @@ export class HomeFx {
         m.car.position.set(c.x + bx * out, c.y, c.z + bz * out);
         m.car.rotation.y = -c.angle;
         m.car.visible = k > 0.001;
+        // the wheels roll with the way it drove (backwards along local +z)
+        const moved = out - (this.carOut.get(c.id) ?? out);
+        this.carOut.set(c.id, out);
         const fade = Math.min(1, k * 4);
         m.car.traverse(o => {
+            if (moved && o.name === WHEEL) {
+                o.rotation.x += moved / ((o.userData.fp3dR as number) || 0.3);
+            }
             const mat = (o as Mesh).material as MeshBasicMaterial | undefined;
             if (mat) {
                 mat.opacity = fade;
-                mat.depthWrite = fade >= 1;
+                // the shadow under it never writes depth
+                mat.depthWrite = fade >= 1 && !o.userData.fp3dFlat;
             }
         });
         if (m.bay) {

@@ -193,7 +193,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Wasser: läuft an Dusche, Wanne und Waschbecken sichtbar, Warnung nach 30 Minuten Durchfluss, bei einem Leck
   steigt das Wasser im Raum
 - (bluefox) Autos als Möbel: Limousine, Kompaktwagen und Transporter in wählbarer Farbe; mit einem Anwesenheits-Datenpunkt
-  parken sie ein oder fahren weg
+  parken sie ein oder fahren weg. Mit runder Karosserie und Radkästen, Fenstersäulen, Scheiben mit Himmelsspiegelung,
+  Alufelgen (Transporter: Stahlfelgen), die sich beim Fahren drehen, Spiegeln, Türfugen, Lichtern, Nummernschildern und
+  einem weichen Schatten
 - (bluefox) Boote: neues Möbelstück „Luke“ fürs Deck, eckig mit runden Ecken oder rund – mit ihrem Kontakt steht der
   getönte Deckel im Öffnungswinkel auf Gasfedern; offen bei Regen gibt es eine Warnung
 - (bluefox) Fenster, die nach oben aufgehen: Klappfenster mit eigenem Öffnungswinkel, auch nach innen; neuer Fensterstil
