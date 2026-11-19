@@ -198,6 +198,24 @@ function wheelOverLabels(name: string, code: string): string {
 }
 
 /**
+ * A camera's field-of-view wedge starts at its lens, not on the floor under it: from there it falls to the floor it
+ * sees, so the beam hangs at the camera instead of lying at another height (a wall camera at 1.8 m, its wedge on the
+ * floor). Seen from above it stays the same wedge. Wall camera: the lens 0.1 m in front of the body, 0.055 m above
+ * its mount height (pushCameraModel); dome: just under the ceiling.
+ */
+function cameraBeam(name: string, code: string): string {
+    if (name !== 'viewer/viewer3d.ts') {
+        return code;
+    }
+    return replaceRequired(
+        code,
+        'const apex = [d.x, Math.max(groundAt(d.x, d.z), dome ? -Infinity : groundAt(d.x + dir[0] * 0.3, d.z + dir[1] * 0.3)), d.z];',
+        'const apex = dome ? [d.x, H - 0.07, d.z] : [d.x + dir[0] * 0.1, d.y + 0.055, d.z + dir[1] * 0.1];',
+        'camera beam from the lens',
+    );
+}
+
+/**
  * The editor's hint line says how to move the view: on a full plan every press hits something that would be dragged,
  * but the right (or middle) mouse button and two fingers always move the view.
  */
@@ -5556,6 +5574,7 @@ const patches: Plugin = {
         code = tvAppLogo(name, code);
         code = wheelOverLabels(name, code);
         code = panHint(name, code);
+        code = cameraBeam(name, code);
         code = sensorLook(name, code);
         code = editorDevices(name, code);
         code = markerLooks(name, code);

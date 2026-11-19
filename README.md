@@ -290,6 +290,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   nur zum Ansehen: wie im Kiosk, ohne Editor, „Projekte“ und „Geräte verbinden“; `?readonly` erzwingt das
 - (bluefox) Die Hinweiszeile des Editors nennt, wie man die Ansicht verschiebt: mit der rechten Maustaste oder zwei Fingern
 - (bluefox) Die Details einer Kamera zeigen ihr Bild: ein Standbild wird jede Sekunde neu geholt, ein MJPEG-Stream läuft durch
+- (bluefox) Der Sichtbereich einer Kamera beginnt an ihrer Linse und fällt von dort auf den Boden, statt in einer anderen
+  Höhe unter ihr auf dem Boden zu liegen
 
 ### 0.4.0 (2026-11-15)
 
