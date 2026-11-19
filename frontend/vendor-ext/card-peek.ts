@@ -15,6 +15,14 @@ export function holoModeValue(mode: HoloMode): string {
     return mode === 'always' ? '1' : mode === 'off' ? '0' : 'hover';
 }
 
+/**
+ * The radius (px) of a card's dot standing alone, by the anchor's scale (the viewer's: 15 / distance × the card size,
+ * the same the cards shrink by): small far off, never larger than 5 px close up, never below 1.6 px.
+ */
+export function dotRadius(scale: number): number {
+    return Math.round(Math.min(5, Math.max(1.6, scale * 6)) * 10) / 10;
+}
+
 /** What a card is, across updates (its place in the list changes): the module's card, the player, the car, else kind and name. */
 export function holoKey(card: {
     kind: string;

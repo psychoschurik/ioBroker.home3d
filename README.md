@@ -357,6 +357,11 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Glaskarten: unter „Anzeige“ drei Modi – „Karten immer“, „Karten beim Zeigen“ (am Gerät nur ein
   Leuchtpunkt, die Karte erscheint unter der Maus, ein Klick oder Tipp auf den Punkt hält sie offen) und „Ohne Karten“;
   ohne Wahl erscheinen die Karten jetzt beim Zeigen statt alle auf einmal
+- (bluefox) Glaskarten: Die runden Knöpfe (Player, Geräte) bleiben rund – eine volle Zeile drückte sie zu Ovalen
+  und brach die Lautstärke „15 %“ um; jetzt gibt der Regler nach, was nicht passt, kommt in die nächste Zeile
+- (bluefox) Glaskarten „beim Zeigen“: Die Leuchtpunkte sitzen auf dem Gerät statt darüber zu schweben und werden
+  mit der Entfernung kleiner wie die Karten (höchstens 5 px); ein unsichtbarer Ring um den Punkt fängt die Maus, auch
+  bei offener Karte – sie blinkt unter der Maus nicht mehr jede Sekunde
 
 ### 0.4.0 (2026-11-15)
 

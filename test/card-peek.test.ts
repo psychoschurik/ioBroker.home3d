@@ -2,7 +2,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test, { mock } from 'node:test';
-import { CardPeek, HOLO_MODES, holoKey, holoModeOf, holoModeValue } from '../frontend/vendor-ext/card-peek';
+import { CardPeek, dotRadius, HOLO_MODES, holoKey, holoModeOf, holoModeValue } from '../frontend/vendor-ext/card-peek';
+
+test('a dot shrinks with its distance, within bounds', () => {
+    // the viewer's scale: 15 / distance × 0.7 (the card size), between 0.25 and 1.6 times that
+    const at = (dist: number): number => dotRadius(Math.min(1.6, Math.max(0.25, 15 / dist)) * 0.7);
+    assert.equal(at(5), 5);
+    assert.ok(at(20) < at(10) && at(30) < at(20), `${at(10)} ${at(20)} ${at(30)}`);
+    assert.equal(at(80), 1.6);
+    assert.equal(dotRadius(0), 1.6);
+});
 
 test('the mode as kept per browser: nothing chosen yet shows the cards only when pointed at', () => {
     assert.equal(holoModeOf(null), 'hover');

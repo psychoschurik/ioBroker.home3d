@@ -3382,7 +3382,7 @@ function mediaMore(name: string, code: string): string {
  */
 function cardModes(name: string, code: string): string {
     if (name === 'components/view3d.ts') {
-        code = `import { CardPeek as Fp3dCardPeek, holoKey as fp3dHoloKey, holoModeOf as fp3dHoloModeOf, holoModeValue as fp3dHoloModeValue, type HoloMode as Fp3dHoloMode } from "${root}/frontend/vendor-ext/card-peek.ts";\n${code}`;
+        code = `import { CardPeek as Fp3dCardPeek, dotRadius as fp3dDotRadius, holoKey as fp3dHoloKey, holoModeOf as fp3dHoloModeOf, holoModeValue as fp3dHoloModeValue, type HoloMode as Fp3dHoloMode } from "${root}/frontend/vendor-ext/card-peek.ts";\n${code}`;
         code = replaceRequired(
             code,
             '      this._holoShow = localStorage.getItem("home3d.holos") !== "0";\n',
@@ -3456,7 +3456,9 @@ function cardModes(name: string, code: string): string {
                 '    });',
                 '    this.renderRoot.addEventListener("pointerout", (e) => {',
                 '      const key = keyOf(e);',
-                '      if (key) this.fp3dPeek.leave(key);',
+                '      // from the dot onto its card or within the card: still the same card',
+                '      const to = (e as PointerEvent).relatedTarget as Element | null;',
+                '      if (key && (!to || keyOf({ target: to } as unknown as Event) !== key)) this.fp3dPeek.leave(key);',
                 '    });',
                 '    this.renderRoot.addEventListener("click", (e) => {',
                 '      const key = keyOf(e, true);',
@@ -3477,6 +3479,13 @@ function cardModes(name: string, code: string): string {
             '      this.viewer.setAnchorCallback((i, x, y, on, scale, facing) => this.placeHolo(i, x, y, on, scale, facing));\n      this.fp3dPeekListen();\n',
             'card modes: listen',
         );
+        // a device's card hangs from a point on the device, not 25 cm above it: its dot sits on it instead of floating
+        code = replaceRequired(
+            code,
+            '          p = [f.x, floor.elevation + mountBase(floor, f) + f.h + 0.25, f.z];\n',
+            '          p = [f.x, floor.elevation + mountBase(floor, f) + f.h + 0.04, f.z];\n',
+            'card modes: the dot on the device',
+        );
         code = replaceRequired(
             code,
             '    if (main && on !== this._holoOn) this._holoOn = on;\n',
@@ -3493,9 +3502,12 @@ function cardModes(name: string, code: string): string {
             '    const hidden = !on;\n    if (el.hidden !== hidden) el.hidden = hidden;\n',
             [
                 '    if (link) {',
-                '      link.classList.toggle("fp3d-holo-hover", on && this.holograms === null && this.fp3dHoloHover && card?.kind !== "bin");',
+                '      const fp3dHover = on && this.holograms === null && this.fp3dHoloHover && card?.kind !== "bin";',
+                '      link.classList.toggle("fp3d-holo-hover", fp3dHover);',
                 '      link.classList.toggle("fp3d-holo-peek", fp3dDot && on);',
-                '      (link.lastElementChild as SVGCircleElement | null)?.setAttribute("r", fp3dDot && on ? "5" : "3");',
+                '      // the same dot whether its card shows or not: a smaller one would slip from under the pointer, the card',
+                '      // would close and open again every second',
+                '      (link.lastElementChild as SVGCircleElement | null)?.setAttribute("r", fp3dHover ? String(fp3dDotRadius(scale)) : "3");',
                 '    }',
                 '    if (fp3dDot && on) {',
                 '      if (!el.hidden) el.hidden = true;',
@@ -3517,17 +3529,16 @@ function cardModes(name: string, code: string): string {
             code,
             '      .fp3d-holo-min {\n        width: 150px;\n      }\n',
             [
-                '      /* the mode "hover": a card\'s dot answers the pointer, with a halo while it stands alone */',
+                '      /* the mode "hover": a card\'s dot answers the pointer; it is as small as its distance makes it, with a',
+                '         glow, and an invisible ring around it catches the pointer (also while its card shows) */',
                 '      .fp3d-holo-hover circle {',
                 '        pointer-events: all;',
                 '        cursor: pointer;',
+                '        stroke: transparent;',
+                '        stroke-width: 14;',
                 '      }',
                 '      .fp3d-holo-peek line {',
                 '        display: none;',
-                '      }',
-                '      .fp3d-holo-peek circle {',
-                '        stroke: rgba(55, 224, 255, 0.3);',
-                '        stroke-width: 10;',
                 '      }',
                 '      .fp3d-holo-min {',
                 '        width: 150px;',
@@ -3612,6 +3623,52 @@ function cardModes(name: string, code: string): string {
             'card modes: en',
         );
     }
+    return code;
+}
+
+/**
+ * The round buttons on the glass cards (player, devices) stay round: a full row (three buttons, the volume and its
+ * "15 %", or more buttons) squeezed them into ovals and broke the volume's text; now the slider gives way and what does
+ * not fit goes to the next line.
+ */
+function roundCardButtons(name: string, code: string): string {
+    if (name !== 'components/view3d.ts') {
+        return code;
+    }
+    code = replaceRequired(
+        code,
+        '      .fp3d-holo-media-controls {\n        display: flex;\n        align-items: center;\n        gap: 6px;\n',
+        '      .fp3d-holo-media-controls {\n        display: flex;\n        flex-wrap: wrap;\n        align-items: center;\n        gap: 6px;\n',
+        'round buttons: a full row wraps',
+    );
+    code = replaceRequired(
+        code,
+        '      .fp3d-holo-media-controls button {\n        width: 28px;\n        height: 28px;\n',
+        [
+            '      .fp3d-holo-media-controls button {',
+            '        flex: none;',
+            '        display: inline-grid;',
+            '        place-items: center;',
+            '        padding: 0;',
+            '        line-height: 1;',
+            '        width: 28px;',
+            '        height: 28px;',
+            '',
+        ].join('\n'),
+        'round buttons: never squeezed',
+    );
+    code = replaceRequired(
+        code,
+        '      .fp3d-holo-media-controls input[type="range"] {\n        width: 70px;\n',
+        '      .fp3d-holo-media-controls input[type="range"] {\n        flex: 1 1 48px;\n        min-width: 48px;\n        max-width: 90px;\n        width: auto;\n        margin: 0;\n',
+        'round buttons: the slider gives way',
+    );
+    code = replaceRequired(
+        code,
+        '      .fp3d-holo-vol {\n        font-size: 11px;\n',
+        '      .fp3d-holo-vol {\n        flex: none;\n        white-space: nowrap;\n        font-size: 11px;\n',
+        'round buttons: the volume on one line',
+    );
     return code;
 }
 
@@ -6403,6 +6460,7 @@ const patches: Plugin = {
         code = robotMore(name, code);
         code = mediaMore(name, code);
         code = cardModes(name, code);
+        code = roundCardButtons(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
