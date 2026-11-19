@@ -6,6 +6,7 @@ import { brewing } from './kitchen';
 import { RAIN_LOW, rainTankCapacity, rainTankFill, rainTankKind } from './rain-tank';
 import { mailBase, mailShape } from './mail-flag';
 import { frontRank, parcelWaits, ringAt } from './parcel';
+import { heatPumpDefrost, heatPumpRun } from './heat-pump';
 import { serverKind, serverLoad } from './server';
 import type {
     AirState,
@@ -15,6 +16,7 @@ import type {
     ServerState,
     MailFlagState,
     ParcelState,
+    HeatPumpState,
     SmokeState,
     HazeState,
     BadgeState,
@@ -115,6 +117,8 @@ export interface FurnitureLike {
     tank_capacity?: number | null;
     /** A server: "rack" or "nas". */
     server_kind?: string | null;
+    /** A heat pump: the datapoint that tells it defrosts. */
+    heat_pump_defrost?: string | null;
     /** The model's variant (a mailbox's shape …). */
     variant?: string | null;
     /** A boat's gear: the sensor of a hatch, a tank … */
@@ -231,6 +235,10 @@ export function homeWatched(
             }
             if (WATER_TYPES.has(x.type)) {
                 add(x.water);
+            }
+            if (x.type === 'heat_pump') {
+                add(x.entity);
+                add(x.heat_pump_defrost);
             }
         }
         for (const r of f.rooms) {
@@ -425,6 +433,7 @@ export function homeScene(input: HomeInput): HomeOutput {
     const rainTanks: RainTankState[] = [];
     const servers: ServerState[] = [];
     const mailFlags: MailFlagState[] = [];
+    const heatPumps: HeatPumpState[] = [];
     const sounds: SoundState[] = [];
     const streams: StreamState[] = [];
     const sprinklers: HomeScene['sprinklers'] = [];
@@ -727,6 +736,23 @@ export function homeScene(input: HomeInput): HomeOutput {
                     h: f.h,
                     up: !!input.mailPost?.(f),
                 });
+            } else if (f.type === 'heat_pump') {
+                // on the ground; its fan from its power or switch, steam while it defrosts
+                const linked = (id: string | null | undefined): StateLike | null =>
+                    id && id !== 'none' ? (hass.states[id] ?? null) : null;
+                heatPumps.push({
+                    id: f.id,
+                    floor: floor.id,
+                    x: f.x,
+                    z: f.z,
+                    y: f.mount_y ?? groundAt(f.x, f.z),
+                    angle: rad(f.rotation ?? 0),
+                    w: f.w,
+                    d: f.d,
+                    h: f.h,
+                    run: heatPumpRun(linked(f.entity)),
+                    defrost: heatPumpDefrost(linked(f.heat_pump_defrost)),
+                });
             } else if (f.type === 'server') {
                 // a rack on the floor, a NAS on a shelf or desk; its LEDs from its socket
                 const linked = !!f.entity && f.entity !== 'none';
@@ -967,6 +993,7 @@ export function homeScene(input: HomeInput): HomeOutput {
             rainTanks,
             servers,
             mailFlags,
+            heatPumps,
             parcels: parcelAtDoor(input, hass, b, now),
             glow,
         },

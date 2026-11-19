@@ -221,6 +221,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   nebeneinander mit den anderen auf dem nächsten Tonnenplatz und kommt danach wieder an ihren Platz
 - (bluefox) Paket nach dem Klingeln: hat die Klingel geläutet, liegt ein Paket vor der Haustür mit „📦 Paket · Uhrzeit“,
   bis die Tür aufgeht (höchstens vier Stunden; ohne Türkontakt eine Stunde)
+- (bluefox) Wärmepumpe: neues Möbelstück „Wärmepumpe (Außengerät)“ unter Außen. Der Lüfter dreht umso schneller, je mehr
+  Leistung sie zieht (oder gleichmäßig mit einem Schalter) und läuft langsam aus; meldet der Datenpunkt „Abtauen“, steht
+  der Lüfter und Dampf steigt auf
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler

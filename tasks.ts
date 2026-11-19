@@ -3114,6 +3114,144 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * Heat pump (heat-pump.ts, home-view.ts, home-fx.ts): the outdoor unit of a heat pump, drawn by the home looks; its fan
+ * turns the faster the more power it draws (or steadily by its switch) and runs down when it stops; while its defrost
+ * datapoint reports defrosting, the fan stands and steam rises from it. Also: the doorbells are watched, so the parcel
+ * at the front door comes with the ring.
+ */
+function heatPumpMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "bin_spot",\n] as const;',
+            '  "bin_spot",\n  "heat_pump",\n] as const;',
+            'heat pump: furniture type',
+        );
+        code = replaceRequired(
+            code,
+            '  outdoor: ["awning",',
+            '  outdoor: ["awning", "heat_pump",',
+            'heat pump: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  bin_spot: [2.4, 0.9, 0.02],',
+            '  bin_spot: [2.4, 0.9, 0.02],\n  // the outdoor unit of an air-to-water heat pump\n  heat_pump: [1.0, 0.4, 0.85],',
+            'heat pump: size',
+        );
+        code = replaceRequired(
+            code,
+            '  server_kind?: string | null;',
+            '  server_kind?: string | null;\n  /** A heat pump: the datapoint that tells it defrosts (on, or a mode naming it). */\n  heat_pump_defrost?: string | null;',
+            'heat pump: field',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  bin_spot: ["household", ["garden"]],',
+            '  bin_spot: ["household", ["garden"]],\n  heat_pump: ["outdoor", ["garden", "utility"]],',
+            'heat pump: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "bin_spot":',
+            [
+                '    case "heat_pump":',
+                '      // the unit from above, its fan side at the front',
+                '      return [rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"), line(-w / 2, d / 2 - Math.min(0.06, d * 0.2), w / 2, d / 2 - Math.min(0.06, d * 0.2)), ellipse(-w * 0.12, 0, Math.min(w * 0.3, d * 0.4), Math.min(w * 0.3, d * 0.4))];',
+                '    case "bin_spot":',
+            ].join('\n'),
+            'heat pump: symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "server":\n    case "rain_tank":\n',
+            '    case "heat_pump":\n    case "server":\n    case "rain_tank":\n',
+            'heat pump: drawn by the home looks',
+        );
+    }
+    if (name === 'viewer/preview.ts') {
+        code = `import { buildHeatPump as fp3dPrevHeatPump } from "${root}/frontend/vendor-ext/heat-pump.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '            ? fp3dPrevServer("rack", item.w, item.d, item.h)\n            : null;',
+            '            ? fp3dPrevServer("rack", item.w, item.d, item.h)\n            : item.type === "heat_pump"\n              ? fp3dPrevHeatPump(item.w, item.d, item.h)\n              : null;',
+            'heat pump: library picture',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_heat_pump: 'Wärmepumpe (Außengerät)',
+            heat_pump_entity: 'Leistung oder Schalter',
+            heat_pump_defrost: 'Abtauen (Datenpunkt)',
+            heat_pump_hint:
+                'Der Lüfter dreht umso schneller, je mehr Leistung die Wärmepumpe zieht (ab 60 W; mit einem Schalter gleichmäßig), und läuft nach dem Abschalten langsam aus. Meldet der Datenpunkt „Abtauen“ an (oder einen Betriebsmodus mit „Abtauen“ oder „Defrost“), steht der Lüfter und Dampf steigt aus dem Gerät auf.',
+        };
+        const en: Record<string, string> = {
+            furn_heat_pump: 'Heat pump (outdoor unit)',
+            heat_pump_entity: 'Power or switch',
+            heat_pump_defrost: 'Defrost (datapoint)',
+            heat_pump_hint:
+                'The fan turns the faster the more power the heat pump draws (from 60 W; steadily with a switch) and runs down slowly when it stops. While the defrost datapoint is on (or an operating mode naming "defrost"), the fan stands and steam rises from the unit.',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Mülltonne",',
+            `  furn_waste_bin: "Mülltonne",${lines(de)}`,
+            'heat pump de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Waste bin",',
+            `  furn_waste_bin: "Waste bin",${lines(en)}`,
+            'heat pump en',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '"rain_tank", "server", "bin_spot"]);',
+            '"rain_tank", "server", "bin_spot", "heat_pump"]);',
+            'heat pump: no state links',
+        );
+        code = replaceRequired(
+            code,
+            '    if (f.type === "bin_spot")\n',
+            [
+                '    if (f.type === "heat_pump")',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        ${this.entitySelect(this.t("heat_pump_entity" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => /^(switch|sensor|binary_sensor|input_boolean)\\./.test(id)), (v) => set({ entity: pick(v) }))}',
+                '        ${this.entitySelect(this.t("heat_pump_defrost" as I18nKey), f.heat_pump_defrost ?? null, undefined, this.entityOptions((id) => /^(switch|sensor|binary_sensor|input_boolean|select|input_select)\\./.test(id)), (v) => set({ heat_pump_defrost: pick(v) }))}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("heat_pump_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (f.type === "bin_spot")',
+                '',
+            ].join('\n'),
+            'heat pump: form',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        // the doorbells change no shown state of their own: watched, the parcel comes with the ring
+        code = replaceRequired(
+            code,
+            '...fp3dHomeWatched(hass, b, (a) => areaEntities(hass, a), this.heatMode === "health")])]',
+            '...fp3dHomeWatched(hass, b, (a) => areaEntities(hass, a), this.heatMode === "health"), ...doorbellEntities(hass, b.settings.director?.doorbell_entity)])]',
+            'parcel: the doorbells watched',
+        );
+    }
+    return code;
+}
+
+/**
  * Waste bins at the street (bin-spots.ts): a new piece "bin spot" (a paved pad at the street); a bin that is out (its
  * "put out" entity is on, else from the evening before its pickup until the pickup's morning, as its tag glows) stands
  * on the nearest spot of its floor, in a row, turned like it. The floors are built again only when a bin goes out or
@@ -5179,6 +5317,7 @@ const patches: Plugin = {
         code = snowMore(name, code);
         code = mailFlagMore(name, code);
         code = binsMore(name, code);
+        code = heatPumpMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

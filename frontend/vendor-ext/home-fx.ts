@@ -36,6 +36,7 @@ import { lanes, pathLength, pointAt, pointIn, type Corner, type MowerPhase, type
 import { buildCoffeeMachine } from './kitchen';
 import { buildRainTank, type RainTankKind } from './rain-tank';
 import { buildParcel } from './parcel';
+import { buildHeatPump, type HeatPumpRun } from './heat-pump';
 import { buildMailFlag, FLAG_DOWN, type MailShape } from './mail-flag';
 import { buildServer, LED_OFF, ledColor, ledLit, type ServerKind, type ServerLed, type ServerLoad } from './server';
 
@@ -244,6 +245,22 @@ export interface RainTankState {
     warn: boolean;
 }
 
+/** The outdoor unit of a heat pump: its fan turns with its power, steam rises while it defrosts. */
+export interface HeatPumpState {
+    id: string;
+    floor: string;
+    x: number;
+    z: number;
+    y: number;
+    /** Turn in the plan (rad, clockwise). */
+    angle: number;
+    w: number;
+    d: number;
+    h: number;
+    run: HeatPumpRun;
+    defrost: boolean;
+}
+
 /** A parcel outside the front door after the doorbell rang. */
 export interface ParcelState {
     id: string;
@@ -306,6 +323,7 @@ export interface HomeScene {
     servers?: ServerState[];
     mailFlags?: MailFlagState[];
     parcels?: ParcelState[];
+    heatPumps?: HeatPumpState[];
     glow: GlowState | null;
 }
 
@@ -605,6 +623,13 @@ export class HomeFx {
     /** The LEDs of each server and the colour each shows now. */
     /** The arm of each mailbox's flag and how far up it stands (0 … 1); kept over a rebuild. */
     private mailFlags = new Map<string, { arm: Object3D; cur: number }>();
+    /** The fans and the defrost steam of each heat pump. */
+    private heatPumps = new Map<
+        string,
+        { fans: Object3D[]; p: Particles; at: Vector3; fwd: Vector3; w: number; h: number }
+    >();
+    /** How fast each heat pump's fan turns (turns/s) and where it stands (rad); kept over a rebuild. */
+    private fanSpin = new Map<string, { speed: number; rot: number }>();
     private serverLeds = new Map<string, { leds: ServerLed[]; lit: number[] }>();
     private steamParts = new Map<
         string,
@@ -629,7 +654,7 @@ export class HomeFx {
 
     /**
      * The piece of furniture drawn here (a car, a mower and its dock, a sprinkler, a coffee machine, a rainwater tank,
-     * a server, a mailbox's flag) under a ray: its id and how far
+     * a server, a mailbox's flag, a heat pump) under a ray: its id and how far
      * away it is; null: none, or only hidden ones.
      */
     furnitureAt(ray: Raycaster): { id: string; distance: number } | null {
@@ -708,6 +733,7 @@ export class HomeFx {
             (s.hazes ?? []).map(x => [x.id, x.floor, x.points, x.top, x.label]),
             (s.coffees ?? []).map(c => [c.id, c.floor, c.x, c.z, c.y, c.angle, c.w, c.d, c.h]),
             (s.servers ?? []).map(v => [v.id, v.floor, v.kind, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
+            (s.heatPumps ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
             (s.parcels ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.label]),
             (s.mailFlags ?? []).map(v => [v.id, v.floor, v.shape, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
             (s.rainTanks ?? []).map(r => [
@@ -766,6 +792,28 @@ export class HomeFx {
                 m.add(label);
             }
             this.floorGroup(r.floor).add(m);
+        }
+        for (const v of s.heatPumps ?? []) {
+            const m = buildHeatPump(v.w, v.d, v.h, this.light);
+            m.userData.fp3dFurniture = v.id;
+            m.position.set(v.x, v.y, v.z);
+            m.rotation.y = -v.angle;
+            this.floorGroup(v.floor).add(m);
+            const up = new Vector3(0, 1, 0);
+            const fwd = new Vector3(0, 0, 1).applyAxisAngle(up, -v.angle);
+            const at = new Vector3(0, v.h * 0.5, v.d / 2).applyAxisAngle(up, -v.angle).add(m.position);
+            const p = particles(60, 0.5, 6, puffTexture());
+            p.points.visible = false;
+            // over the glass walls behind it, else the clouds above the unit vanish in them
+            p.points.renderOrder = 12;
+            this.floorGroup(v.floor).add(p.points);
+            this.heatPumps.set(v.id, { fans: m.userData.fans as Object3D[], p, at, fwd, w: v.w, h: v.h });
+            const spin = this.fanSpin.get(v.id);
+            if (spin) {
+                for (const f of m.userData.fans as Object3D[]) {
+                    f.rotation.z = -spin.rot;
+                }
+            }
         }
         for (const v of s.parcels ?? []) {
             const m = buildParcel(this.light);
@@ -1060,9 +1108,11 @@ export class HomeFx {
         this.hazeParts.clear();
         this.steamParts.clear();
         this.serverLeds.clear();
+        this.heatPumps.clear();
         this.tips = [];
         if (all) {
             this.carIn.clear();
+            this.fanSpin.clear();
             for (const p of this.paints.values()) {
                 p.tex.dispose();
             }
@@ -1187,6 +1237,34 @@ export class HomeFx {
             e.arm.rotation.x = FLAG_DOWN * (1 - k);
             moving ||= e.cur !== goal;
         }
+        for (const v of s.heatPumps ?? []) {
+            const e = this.heatPumps.get(v.id);
+            if (!e) {
+                continue;
+            }
+            // the fan speeds up in a few seconds and runs down slowly; it stands while the pump defrosts
+            const spin = this.fanSpin.get(v.id) ?? { speed: 0, rot: 0 };
+            this.fanSpin.set(v.id, spin);
+            const goal = v.defrost ? 0 : v.run.rate;
+            if (calm) {
+                spin.speed = goal;
+            } else if (spin.speed !== goal) {
+                spin.speed =
+                    goal > spin.speed ? Math.min(goal, spin.speed + dt * 2.5) : Math.max(goal, spin.speed - dt * 1.2);
+            }
+            if (!calm && spin.speed > 0 && shown(v.floor)) {
+                spin.rot = (spin.rot + spin.speed * 2 * Math.PI * dt) % (2 * Math.PI);
+                for (const f of e.fans) {
+                    f.rotation.z = -spin.rot;
+                }
+                moving = true;
+            }
+            e.p.points.visible = v.defrost;
+            if (v.defrost && shown(v.floor)) {
+                moving ||= !calm;
+                this.defrostSteam(e.p, e.at, e.fwd, e.w, e.h, tt);
+            }
+        }
         for (const v of s.servers ?? []) {
             const e = this.serverLeds.get(v.id);
             if (!e || !shown(v.floor)) {
@@ -1275,6 +1353,31 @@ export class HomeFx {
             const y = 0.35 + (hz.top - 0.7) * b + 0.08 * Math.sin(t * 0.3 + ph * 9);
             p.pos.set([x, y, z], i * 3);
             const alpha = (0.06 + 0.26 * hz.level) * (this.light ? 2 : 1.2) * (0.7 + 0.3 * Math.sin(t * 0.25 + a * 12));
+            p.col.set([c[0], c[1], c[2], alpha], i * 4);
+        }
+        flush(p);
+    }
+
+    /** Defrost steam: thick white clouds that roll out of the unit's front, rise above it, widen and fade. */
+    private defrostSteam(p: Particles, at: Vector3, fwd: Vector3, w: number, h: number, t: number): void {
+        const n = p.pos.length / 3;
+        const c: Rgb = this.light ? [0.64, 0.68, 0.73] : [0.86, 0.9, 0.96];
+        const sx = -fwd.z;
+        const sz = fwd.x;
+        for (let i = 0; i < n; i++) {
+            const u = p.seeds[i * 3] - 0.5;
+            const v = p.seeds[i * 3 + 1] - 0.5;
+            const ph = p.seeds[i * 3 + 2];
+            const s = (t * 0.22 + ph) % 1;
+            const sway = Math.sin(t * 0.9 + ph * 9) * 0.06 * s;
+            const side = u * w * (0.7 + 0.6 * s) + sway;
+            const out = 0.08 + 0.35 * Math.min(1, s * 2) + v * 0.15 * s;
+            const x = at.x + fwd.x * out + sx * side;
+            const z = at.z + fwd.z * out + sz * side;
+            const y = at.y - h * 0.25 + v * h * 0.4 * (1 - s) + s * 1.1 + s * s * 0.6;
+            p.pos.set([x, y, z], i * 3);
+            // in quickly, then thinning out as it rises
+            const alpha = Math.min(1, s / 0.12) * Math.pow(1 - s, 0.9) * (this.light ? 0.95 : 0.7);
             p.col.set([c[0], c[1], c[2], alpha], i * 4);
         }
         flush(p);
