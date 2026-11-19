@@ -8,6 +8,7 @@ import { mailBase, mailShape } from './mail-flag';
 import { frontRank, parcelWaits, ringAt } from './parcel';
 import { heatPumpDefrost, heatPumpRun } from './heat-pump';
 import { ebikeCharging, ebikeLevel } from './ebike';
+import { storeHeating, storeLayers, storeTemp } from './heat-store';
 import { serverKind, serverLoad } from './server';
 import type {
     AirState,
@@ -19,6 +20,7 @@ import type {
     ParcelState,
     HeatPumpState,
     EbikeState,
+    StoreState,
     SmokeState,
     HazeState,
     BadgeState,
@@ -124,6 +126,10 @@ export interface FurnitureLike {
     /** An e-bike: its charger (power or switch) and whether it is home (a tracker, a sensor). */
     ebike_charge?: string | null;
     ebike_presence?: string | null;
+    /** A store: its sensors in the middle and at the bottom (the top one is its entity), what heats it. */
+    store_mid?: string | null;
+    store_bottom?: string | null;
+    store_heat?: string | null;
     /** The model's variant (a mailbox's shape …). */
     variant?: string | null;
     /** A boat's gear: the sensor of a hatch, a tank … */
@@ -244,6 +250,12 @@ export function homeWatched(
             if (x.type === 'heat_pump') {
                 add(x.entity);
                 add(x.heat_pump_defrost);
+            }
+            if (x.type === 'heat_store') {
+                add(x.entity);
+                add(x.store_mid);
+                add(x.store_bottom);
+                add(x.store_heat);
             }
             if (x.type === 'ebike') {
                 add(x.entity);
@@ -445,6 +457,7 @@ export function homeScene(input: HomeInput): HomeOutput {
     const mailFlags: MailFlagState[] = [];
     const heatPumps: HeatPumpState[] = [];
     const ebikes: EbikeState[] = [];
+    const stores: StoreState[] = [];
     const sounds: SoundState[] = [];
     const streams: StreamState[] = [];
     const sprinklers: HomeScene['sprinklers'] = [];
@@ -747,6 +760,27 @@ export function homeScene(input: HomeInput): HomeOutput {
                     h: f.h,
                     up: !!input.mailPost?.(f),
                 });
+            } else if (f.type === 'heat_store') {
+                // its layers between the sensors at the top, the middle and the bottom; a flame while it is heated
+                const linked = (id: string | null | undefined): StateLike | null =>
+                    id && id !== 'none' ? (hass.states[id] ?? null) : null;
+                const top = storeTemp(linked(f.entity));
+                const bottom = storeTemp(linked(f.store_bottom));
+                const shownTemps = [top, bottom].filter((v): v is number => v !== null).map(v => `${Math.round(v)}°`);
+                stores.push({
+                    id: f.id,
+                    floor: floor.id,
+                    x: f.x,
+                    z: f.z,
+                    y: f.mount_y ?? 0,
+                    angle: rad(f.rotation ?? 0),
+                    w: f.w,
+                    d: f.d,
+                    h: f.h,
+                    layers: storeLayers(top, storeTemp(linked(f.store_mid)), bottom),
+                    heating: storeHeating(linked(f.store_heat)),
+                    label: shownTemps.length ? `🌡 ${shownTemps.join(' · ')}` : '',
+                });
             } else if (f.type === 'ebike') {
                 // gone while it is out (by its presence datapoint); its charge on the battery, the charger while it charges
                 const linked = (id: string | null | undefined): StateLike | null =>
@@ -1037,6 +1071,7 @@ export function homeScene(input: HomeInput): HomeOutput {
             mailFlags,
             heatPumps,
             ebikes,
+            stores,
             parcels: parcelAtDoor(input, hass, b, now),
             glow,
         },

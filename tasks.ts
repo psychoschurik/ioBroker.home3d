@@ -3114,6 +3114,141 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * Hot water or buffer store (heat-store.ts, home-view.ts, home-fx.ts): a new piece under switches and tech, drawn by
+ * the home looks; a window in its jacket shows its water's layers coloured by temperature (from its sensors at the
+ * top, the middle and the bottom), and while it is heated a flame burns under it.
+ */
+function heatStoreMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "ebike",\n] as const;',
+            '  "ebike",\n  "heat_store",\n] as const;',
+            'store: furniture type',
+        );
+        code = replaceRequired(
+            code,
+            '"server", "water_heater"',
+            '"server", "water_heater", "heat_store"',
+            'store: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  ebike: [1.8, 0.62, 1.1],',
+            '  ebike: [1.8, 0.62, 1.1],\n  // a 500 l buffer store\n  heat_store: [0.75, 0.75, 1.9],',
+            'store: size',
+        );
+        code = replaceRequired(
+            code,
+            '  ebike_presence?: string | null;',
+            '  ebike_presence?: string | null;\n  /** A store: its sensors in the middle and at the bottom (the top one is its entity), what heats it. */\n  store_mid?: string | null;\n  store_bottom?: string | null;\n  store_heat?: string | null;',
+            'store: fields',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  ebike: ["vehicle", ["garage", "garden"]],',
+            '  ebike: ["vehicle", ["garage", "garden"]],\n  heat_store: ["tech", ["utility"]],',
+            'store: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "ebike":',
+            [
+                '    case "heat_store":',
+                '      // the round store from above, its window at the front',
+                '      return [ellipse(0, 0, w / 2, d / 2), line(-w * 0.15, d / 2 - 0.02, w * 0.15, d / 2 - 0.02)];',
+                '    case "ebike":',
+            ].join('\n'),
+            'store: symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "ebike":\n    case "heat_pump":\n',
+            '    case "heat_store":\n    case "ebike":\n    case "heat_pump":\n',
+            'store: drawn by the home looks',
+        );
+    }
+    if (name === 'viewer/preview.ts') {
+        code = `import { buildHeatStore as fp3dPrevHeatStore } from "${root}/frontend/vendor-ext/heat-store.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '                ? fp3dPrevEbike(item.w, item.d, item.h)\n                : null;',
+            '                ? fp3dPrevEbike(item.w, item.d, item.h)\n                : item.type === "heat_store"\n                  ? fp3dPrevHeatStore(item.w, item.d, item.h)\n                  : null;',
+            'store: library picture',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_heat_store: 'Speicher (Warmwasser / Puffer)',
+            store_top: 'Temperatur oben',
+            store_mid: 'Temperatur Mitte',
+            store_bottom: 'Temperatur unten',
+            store_heat: 'Heizung (Brenner, Heizstab, Pumpe)',
+            store_hint:
+                'Ein Fenster in der Hülle zeigt die Schichten des Wassers nach Temperatur: blau bis 20 °C, über Türkis, Grün und Gelb bis rot bei 70 °C. Zwischen den Fühlern oben, in der Mitte und unten verläuft die Temperatur gerade; mit einem Fühler sind alle Schichten wie er. Solange der Datenpunkt der Heizung an ist (oder ab 20 W zieht), brennt unter dem Speicher eine Flamme.',
+        };
+        const en: Record<string, string> = {
+            furn_heat_store: 'Store (hot water / buffer)',
+            store_top: 'Temperature at the top',
+            store_mid: 'Temperature in the middle',
+            store_bottom: 'Temperature at the bottom',
+            store_heat: 'Heating (burner, heating rod, pump)',
+            store_hint:
+                'A window in the jacket shows the layers of the water by temperature: blue up to 20 °C, through cyan, green and yellow to red at 70 °C. Between the sensors at the top, the middle and the bottom it runs in a straight line; with one sensor all layers are as it. While the heating datapoint is on (or draws 20 W and more), a flame burns under the store.',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Mülltonne",',
+            `  furn_waste_bin: "Mülltonne",${lines(de)}`,
+            'store de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Waste bin",',
+            `  furn_waste_bin: "Waste bin",${lines(en)}`,
+            'store en',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '"heat_pump", "ebike"]);',
+            '"heat_pump", "ebike", "heat_store"]);',
+            'store: no state links',
+        );
+        const temp = '/^(sensor|input_number|number|climate|water_heater)\\./';
+        code = replaceRequired(
+            code,
+            '    if (f.type === "ebike")\n',
+            [
+                '    if (f.type === "heat_store")',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                `        \${this.entitySelect(this.t("store_top" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => ${temp}.test(id)), (v) => set({ entity: pick(v) }))}`,
+                `        \${this.entitySelect(this.t("store_mid" as I18nKey), f.store_mid ?? null, undefined, this.entityOptions((id) => ${temp}.test(id)), (v) => set({ store_mid: pick(v) }))}`,
+                `        \${this.entitySelect(this.t("store_bottom" as I18nKey), f.store_bottom ?? null, undefined, this.entityOptions((id) => ${temp}.test(id)), (v) => set({ store_bottom: pick(v) }))}`,
+                '        ${this.entitySelect(this.t("store_heat" as I18nKey), f.store_heat ?? null, undefined, this.entityOptions((id) => /^(switch|sensor|binary_sensor|input_boolean|climate|water_heater|select)\\./.test(id)), (v) => set({ store_heat: pick(v) }))}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("store_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (f.type === "ebike")',
+                '',
+            ].join('\n'),
+            'store: form',
+        );
+    }
+    return code;
+}
+
+/**
  * E-bike (ebike.ts, home-view.ts, home-fx.ts): a new piece under vehicles, drawn by the home looks; the five LEDs on its
  * battery show its charge, the charger stands beside it with its cable while it charges (the next LED blinks), and with
  * a presence datapoint it is gone while it is out.
@@ -5450,6 +5585,7 @@ const patches: Plugin = {
         code = binsMore(name, code);
         code = heatPumpMore(name, code);
         code = ebikeMore(name, code);
+        code = heatStoreMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

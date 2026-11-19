@@ -227,6 +227,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) E-Bike: neues Möbelstück unter Fahrzeuge. Fünf LEDs am Akku zeigen den Ladestand, darüber die Prozent; beim
   Laden steht das Ladegerät mit Kabel daneben und die nächste LED blinkt; mit einem Datenpunkt für die Anwesenheit ist
   das Rad weg, solange es unterwegs ist
+- (bluefox) Speicher: neues Möbelstück „Speicher (Warmwasser / Puffer)“. Ein Fenster in der Hülle zeigt die Wasserschichten
+  nach Temperatur (blau bis rot) aus den Fühlern oben, Mitte und unten, darüber „🌡 62° · 31°“; solange geheizt wird,
+  brennt unten eine Flamme
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler
