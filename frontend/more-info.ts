@@ -1,8 +1,10 @@
 // Details of a device, opened by the 3D frontend with the event `hass-more-info` (a tap on a sensor, a name in the room
 // panel). The original host has its own dialog for this; here: the value now, switching for lights and switches, and the
 // history from the history adapter of ioBroker – a curve for measured values (temperature with the humidity of the same
-// device), the on/off times for contacts, motion, water and smoke.
+// device), the on/off times for contacts, motion, water and smoke; for a camera its picture (`entity_picture`), a still
+// fetched again every second, an MJPEG stream as it runs.
 import type { CallWS, Hass } from './types.js';
+import { cameraSrc } from './vendor-ext/camera-url.js';
 import { sensorIcon } from './vendor-ext/sensor-look.js';
 import { t } from './lang.js';
 
@@ -36,6 +38,7 @@ const STYLE = `
 .mi-chart{position:relative;height:220px;background:#1b2631;border:1px solid #314151;border-radius:6px}.mi-chart svg{display:block;width:100%;height:100%}.mi-chart text{font-size:10px;fill:#8faabd}
 .mi-tip{position:absolute;pointer-events:none;background:#263544;border:1px solid #4a5c6c;border-radius:4px;padding:4px 8px;font-size:12px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
 .mi-legend{display:flex;gap:16px;font-size:12px;color:#a9bdce;margin-top:6px}.mi-legend i{display:inline-block;width:12px;height:3px;margin-right:6px;vertical-align:middle}
+.mi-camera{margin:16px 0 4px;background:#000;border-radius:6px;overflow:hidden}.mi-camera img{display:block;width:100%;max-height:70vh;object-fit:contain}
 .mi-empty{display:grid;place-items:center;height:100%;color:#8faabd;font-size:13px;padding:0 20px;text-align:center}.mi-list{margin-top:12px;max-height:180px;overflow:auto;font-size:13px}.mi-list div{display:flex;justify-content:space-between;padding:6px 2px;border-bottom:1px solid #314151}
 `;
 
@@ -88,6 +91,8 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
     let loading = 0;
     /** Whether a history adapter logs the device shown (null: not known yet). */
     let logged: boolean | null = null;
+    /** Counts the seconds a camera is shown: a new number fetches its still again. */
+    let cameraTick = 0;
 
     const fmt = (v: number, digits = 1): string =>
         new Intl.NumberFormat(getHass()?.language || 'de', { maximumFractionDigits: digits }).format(v);
@@ -110,7 +115,7 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
         d.className = 'mi';
         d.setAttribute('aria-labelledby', 'mi-title');
         d.innerHTML = `<div class="mi-head"><span class="mi-icon"></span><div class="mi-name"><h2 id="mi-title"></h2><small></small></div><button class="mi-close" aria-label="${t('close')}">✕</button></div>
-<div class="mi-now"><span class="mi-value"></span><span class="mi-since"></span></div><div class="mi-actions"></div>
+<div class="mi-camera" hidden><img alt=""></div><div class="mi-now"><span class="mi-value"></span><span class="mi-since"></span></div><div class="mi-actions"></div>
 <div class="mi-ranges" role="group" aria-label="${t('range')}"></div><div class="mi-chart"></div><div class="mi-legend"></div><div class="mi-list"></div>`;
         d.querySelector('.mi-close')!.addEventListener('click', () => d.close());
         // a click on the backdrop closes it
@@ -118,9 +123,46 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
         d.addEventListener('close', () => {
             clearInterval(ticker);
             current = null;
+            showCamera(undefined);
         });
+        const img = d.querySelector('.mi-camera img') as HTMLImageElement;
+        // the next still only after the last one came, so a slow camera does not pile up requests
+        img.addEventListener('load', () => delete img.dataset.busy);
+        img.addEventListener('error', () => delete img.dataset.busy);
         document.body.append(d);
         return d;
+    }
+
+    /** The picture of a camera (none: hidden, and a running stream is closed). */
+    function showCamera(e: Entity | undefined): void {
+        const box = dialog?.querySelector('.mi-camera') as HTMLElement | null;
+        if (!box) {
+            return;
+        }
+        const img = box.querySelector('img')!;
+        const picture = e?.attributes.entity_picture;
+        const live =
+            e &&
+            domain(e.entity_id) === 'camera' &&
+            typeof picture === 'string' &&
+            picture !== '' &&
+            e.state !== 'unavailable';
+        box.hidden = !live;
+        if (!live || img.dataset.for !== e.entity_id) {
+            img.removeAttribute('src');
+            delete img.dataset.busy;
+            delete img.dataset.for;
+        }
+        if (!live) {
+            return;
+        }
+        img.dataset.for = e.entity_id;
+        img.alt = name(e);
+        const src = cameraSrc(picture, cameraTick++);
+        if (img.getAttribute('src') !== src && !img.dataset.busy) {
+            img.dataset.busy = '1';
+            img.src = src;
+        }
     }
 
     /** The value now, the symbol and the switch buttons. */
@@ -136,7 +178,9 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
                 ? 'lightbulb'
                 : domain(e.entity_id) === 'switch'
                   ? 'power-socket-de'
-                  : 'gauge');
+                  : domain(e.entity_id) === 'camera'
+                    ? 'cctv'
+                    : 'gauge');
         const iconBox = dialog.querySelector('.mi-icon')!;
         iconBox.classList.toggle('on', on);
         if (iconBox.firstElementChild?.getAttribute('icon') !== `mdi:${icon}`) {
@@ -162,6 +206,10 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
         const since = e.last_changed ? new Date(e.last_changed).getTime() : 0;
         dialog.querySelector('.mi-since')!.textContent =
             since > 0 ? t('since', { time: dateFmt(since, Date.now() - since > 20 * 3600e3) }) : '';
+        showCamera(e);
+        // a camera shows its picture instead of the value
+        (dialog.querySelector('.mi-now') as HTMLElement).hidden = !(dialog.querySelector('.mi-camera') as HTMLElement)
+            .hidden;
     }
 
     function actions(e: Entity): void {
