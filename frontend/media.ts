@@ -315,14 +315,17 @@ export function mediaCandidates(
     entityId: (base: string) => string,
     nameOf: (o: StateObject | undefined) => string,
 ): Mapping[] {
-    return findMediaPlayers(objects).map(({ base, parts }) => {
-        // a player in a channel ("Player") goes by its device's name
+    const players = findMediaPlayers(objects);
+    return players.map(({ base, parts }) => {
+        // a player in a channel ("Player") goes by its device's name; with more of them in the device (the zones of a
+        // receiver, two channels of one speaker) the channel's name follows
         const own = devices[base];
         const device = own?.type === 'channel' ? devices[parentOf(base)] : undefined;
+        const last = base.slice(base.lastIndexOf('.') + 1).replace(/_/g, ' ');
+        const ownName = (own && nameOf(own)) || last;
+        const siblings = players.filter(p => parentOf(p.base) === parentOf(base)).length;
         const name =
-            (device && nameOf(device)) ||
-            (own && nameOf(own)) ||
-            base.slice(base.lastIndexOf('.') + 1).replace(/_/g, ' ');
+            device && nameOf(device) ? (siblings > 1 ? `${nameOf(device)} · ${ownName}` : nameOf(device)) : ownName;
         const m = mediaPlayerMapping(entityId(base), name, parts, objects);
         const room = Object.values(rooms).find(r =>
             r.common?.members?.some(

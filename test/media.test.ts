@@ -108,26 +108,28 @@ test('a TV without a play state is on or off by its power; a writable state play
     assert.deepEqual(sm.actions?.media_pause, [{ id: 'sonos.0.room.state', value: false }]);
 });
 
-test('a player goes by its device when it lies in a channel; the texts of its state count', () => {
+test('a player goes by its device when it lies in a channel (with its channel beside others); its state texts count', () => {
     const objects: Record<string, StateObject> = {
         'alexa2.0.Echo.Player.currentState': st('media.state', 'boolean'),
         'alexa2.0.Echo.Player.controlPlay': st('button.play', 'boolean', true),
         'alexa2.0.Echo.Media.state': st('media.state', 'boolean'),
+        'alexa2.0.Echo.Media.next': st('button.next', 'boolean', true),
         'yt.0.tv.state': st('media.state', 'number', false, { states: { 0: 'pause', 1: 'play', 2: 'stop' } }),
         'yt.0.tv.play': st('button.play', 'boolean', true),
     };
     const devices = {
         'alexa2.0.Echo.Player': { type: 'channel', common: { name: 'Player' } } as StateObject,
         'alexa2.0.Echo': { type: 'device', common: { name: 'Echo Salon' } } as StateObject,
+        'alexa2.0.Echo.Media': { type: 'channel', common: { name: 'Media' } } as StateObject,
     };
     const players = mediaCandidates(objects, {}, devices, b => `media_player.${b.replace(/\W/g, '_')}`, o =>
         typeof o?.common.name === 'string' ? o.common.name : '',
     );
     assert.deepEqual(
         players.map(p => p.name),
-        ['Echo Salon', 'tv'],
+        ['Echo Salon · Player', 'Echo Salon · Media', 'tv'],
     );
-    const yt = players[1];
+    const yt = players[2];
     const e = entities([yt], { 'yt.0.tv.state': { val: 2, ts: 1 } } as never, objects)[yt.entity_id];
     assert.equal(e.state, 'idle');
 });
