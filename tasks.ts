@@ -3112,6 +3112,142 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * Server (server.ts, home-view.ts, home-fx.ts): a 19" rack or a NAS whose LEDs follow its socket: dark while off, the
+ * power LED green while on, the activity LEDs flickering the faster the more power it draws.
+ */
+function serverMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "rain_tank",\n] as const;',
+            '  "rain_tank",\n  "server",\n] as const;',
+            'server: furniture types',
+        );
+        code = replaceRequired(
+            code,
+            '"wall_socket", "wifi_ap", "water_heater"',
+            '"wall_socket", "wifi_ap", "server", "water_heater"',
+            'server: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  rain_tank: [0.7, 0.7, 1],',
+            '  rain_tank: [0.7, 0.7, 1],\n  // a 24-unit 19" rack (a NAS: 0.2 × 0.25 × 0.2)\n  server: [0.6, 0.8, 1.2],',
+            'server: sizes',
+        );
+        code = replaceRequired(
+            code,
+            '  tank_capacity?: number | null;',
+            '  tank_capacity?: number | null;\n  /** A server: "rack" (19" cabinet) or "nas". */\n  server_kind?: string | null;',
+            'server: fields',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  wifi_ap: ["tech", []],',
+            '  wifi_ap: ["tech", []],\n  server: ["tech", ["office"]],',
+            'server: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "rain_tank":',
+            [
+                '    case "server":',
+                '      // a server from above: its body and its front',
+                '      return [rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"), line(-w / 2, d / 2 - Math.min(0.06, d * 0.2), w / 2, d / 2 - Math.min(0.06, d * 0.2))];',
+                '    case "rain_tank":',
+            ].join('\n'),
+            'server: symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "rain_tank":\n',
+            '    case "server":\n    case "rain_tank":\n',
+            'server: drawn by the home looks',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_server: 'Server / NAS',
+            server_kind: 'Art',
+            server_rack: 'Serverschrank (19″)',
+            server_nas: 'NAS / Mini-Server',
+            server_entity: 'Steckdose (Schalter oder Leistung)',
+            server_hint:
+                'Die LEDs folgen der Steckdose: aus (oder unter 2 W) alles dunkel, an die grüne Betriebs-LED, und die Aktivitäts-LEDs flackern umso schneller, je mehr Leistung er zieht. Ist die Steckdose nicht erreichbar, blinkt die Betriebs-LED orange. Ohne Steckdose läuft er als Bild. Ein NAS steht auf der Höhe eines Regals oder Schreibtischs darunter.',
+        };
+        const en: Record<string, string> = {
+            furn_server: 'Server / NAS',
+            server_kind: 'Kind',
+            server_rack: 'Server rack (19″)',
+            server_nas: 'NAS / mini server',
+            server_entity: 'Socket (switch or power)',
+            server_hint:
+                'The LEDs follow the socket: off (or below 2 W) all dark, on the green power LED, and the activity LEDs flicker the faster the more power it draws. If the socket cannot be reached, the power LED blinks amber. Without a socket it runs as a picture. A NAS stands at the height of a shelf or desk below it.',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  furn_rain_tank: "Regenwassertank",',
+            `  furn_rain_tank: "Regenwassertank",${lines(de)}`,
+            'server de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_rain_tank: "Rainwater tank",',
+            `  furn_rain_tank: "Rainwater tank",${lines(en)}`,
+            'server en',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '"coffee_machine", "rain_tank"]);',
+            '"coffee_machine", "rain_tank", "server"]);',
+            'server: no state links',
+        );
+        code = replaceRequired(
+            code,
+            '    if (f.type === "rain_tank")\n',
+            [
+                '    if (f.type === "server")',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        <label class="fp3d-field"',
+                '          >${this.t("server_kind" as I18nKey)}',
+                '          <select ?disabled=${!this.isAdmin} @change=${(e: Event) => { const k = (e.target as HTMLSelectElement).value; set(k === "nas" ? { server_kind: k, w: 0.2, d: 0.25, h: 0.2 } : { server_kind: null, w: 0.6, d: 0.8, h: 1.2 }); }}>',
+                '            ${["rack", "nas"].map((k) => html`<option value=${k} ?selected=${k === (f.server_kind ?? "rack")}>${this.t(`server_${k}` as I18nKey)}</option>`)}',
+                '          </select></label',
+                '        >',
+                '        ${this.entitySelect(this.t("server_entity" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => /^(switch|sensor|binary_sensor|input_boolean)\\./.test(id)), (v) => set({ entity: pick(v) }))}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("server_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (f.type === "rain_tank")',
+                '',
+            ].join('\n'),
+            'server: form',
+        );
+    }
+    if (name === 'viewer/preview.ts') {
+        code = `import { buildServer as fp3dPrevServer } from "${root}/frontend/vendor-ext/server.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '          ? fp3dPrevRainTank("barrel", item.w, item.d, item.h, 0.6)\n          : null;',
+            '          ? fp3dPrevRainTank("barrel", item.w, item.d, item.h, 0.6)\n          : item.type === "server"\n            ? fp3dPrevServer("rack", item.w, item.d, item.h)\n            : null;',
+            'server: library picture',
+        );
+    }
+    return code;
+}
+
+/**
  * Rainwater tank (rain-tank.ts, home-view.ts, home-fx.ts): a rain barrel or a cistern in the garden, filled to the level
  * of its sensor, with the litres over it; while it rains, water runs in from above.
  */
@@ -4626,6 +4762,7 @@ const patches: Plugin = {
         code = treesMore(name, code);
         code = kitchenMore(name, code);
         code = rainTankMore(name, code);
+        code = serverMore(name, code);
         code = tapMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too

@@ -201,6 +201,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Ereignissen des Zeitraums auf einmal statt mit zwei Anfragen je Datenpunkt
 - (bluefox) Markise, Kühlschranktüren, motorisierte Vorhänge und Leinwände lassen sich in 3D antippen (bisher nur über
   ihr Symbol), ebenso Autos, Mähroboter mit Ladestation, Sprenger, Kaffeemaschine und Regenwassertank
+- (bluefox) Server / NAS (Technik & Smart Home): Serverschrank (19″) oder NAS, dessen LEDs der Steckdose folgen: aus
+  dunkel, an die grüne Betriebs-LED, die Aktivitäts-LEDs flackern umso schneller, je mehr Leistung er zieht; ist die
+  Steckdose nicht erreichbar, blinkt die Betriebs-LED orange
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler

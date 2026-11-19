@@ -35,6 +35,7 @@ import { buildBay, buildCar, type CarKind, WHEEL } from './cars';
 import { lanes, pathLength, pointAt, pointIn, type Corner, type MowerPhase, type Rgb, type Vec2 } from './home-data';
 import { buildCoffeeMachine } from './kitchen';
 import { buildRainTank, type RainTankKind } from './rain-tank';
+import { buildServer, LED_OFF, ledColor, ledLit, type ServerKind, type ServerLed, type ServerLoad } from './server';
 
 export interface AirState {
     id: string;
@@ -226,6 +227,22 @@ export interface RainTankState {
     warn: boolean;
 }
 
+/** A server (rack or NAS) whose LEDs follow its socket. */
+export interface ServerState {
+    id: string;
+    floor: string;
+    kind: ServerKind;
+    x: number;
+    z: number;
+    y: number;
+    /** Turn in the plan (rad, clockwise). */
+    angle: number;
+    w: number;
+    d: number;
+    h: number;
+    load: ServerLoad;
+}
+
 export interface HomeScene {
     airs: AirState[];
     moulds: MouldState[];
@@ -240,6 +257,7 @@ export interface HomeScene {
     smokes?: SmokeState[];
     coffees?: CoffeeState[];
     rainTanks?: RainTankState[];
+    servers?: ServerState[];
     glow: GlowState | null;
 }
 
@@ -502,6 +520,8 @@ export class HomeFx {
     /** Smoke: its particles and where each one stands in the room (x, z). */
     private smokeParts = new Map<string, { p: Particles; base: Float32Array }>();
     /** Steam over a coffee machine's cup: its particles and where the cup is. */
+    /** The LEDs of each server and the colour each shows now. */
+    private serverLeds = new Map<string, { leds: ServerLed[]; lit: number[] }>();
     private steamParts = new Map<
         string,
         { p: Particles; at: Vector3; fwd: Vector3; out: number; stream: Object3D | null }
@@ -524,7 +544,8 @@ export class HomeFx {
     }
 
     /**
-     * The piece of furniture drawn here (a car, a mower and its dock, a sprinkler, a coffee machine, a rainwater tank) under a ray: its id and how far
+     * The piece of furniture drawn here (a car, a mower and its dock, a sprinkler, a coffee machine, a rainwater tank,
+     * a server) under a ray: its id and how far
      * away it is; null: none, or only hidden ones.
      */
     furnitureAt(ray: Raycaster): { id: string; distance: number } | null {
@@ -601,6 +622,7 @@ export class HomeFx {
             ]),
             (s.smokes ?? []).map(x => [x.id, x.floor, x.points, x.top]),
             (s.coffees ?? []).map(c => [c.id, c.floor, c.x, c.z, c.y, c.angle, c.w, c.d, c.h]),
+            (s.servers ?? []).map(v => [v.id, v.floor, v.kind, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
             (s.rainTanks ?? []).map(r => [
                 r.id,
                 r.floor,
@@ -674,6 +696,14 @@ export class HomeFx {
                 m.add(label);
             }
             this.floorGroup(r.floor).add(m);
+        }
+        for (const v of s.servers ?? []) {
+            const m = buildServer(v.kind, v.w, v.d, v.h, this.light);
+            m.userData.fp3dFurniture = v.id;
+            m.position.set(v.x, v.y, v.z);
+            m.rotation.y = -v.angle;
+            this.floorGroup(v.floor).add(m);
+            this.serverLeds.set(v.id, { leds: m.userData.leds as ServerLed[], lit: [] });
         }
         for (const c of s.coffees ?? []) {
             const m = buildCoffeeMachine(c.w, c.d, c.h, this.light);
@@ -937,6 +967,7 @@ export class HomeFx {
         this.carMeshes.clear();
         this.smokeParts.clear();
         this.steamParts.clear();
+        this.serverLeds.clear();
         this.tips = [];
         if (all) {
             this.carIn.clear();
@@ -1035,6 +1066,25 @@ export class HomeFx {
             }
             moving ||= !calm;
             this.smoke(e.p, e.base, sm, tt);
+        }
+        for (const v of s.servers ?? []) {
+            const e = this.serverLeds.get(v.id);
+            if (!e || !shown(v.floor)) {
+                continue;
+            }
+            // calm: the LEDs stand as they are lit at rest (power on, the drives dark, the ports lit)
+            if (!calm && (v.load.on || v.load.unknown)) {
+                moving = true;
+            }
+            const lt = calm ? 0 : t;
+            e.leds.forEach((l, k) => {
+                const lit = calm && v.load.on ? l.role !== 'act' : ledLit(l.role, l.seed, v.load, lt);
+                const color = lit ? ledColor(l.role, v.load.unknown) : LED_OFF;
+                if (e.lit[k] !== color) {
+                    e.lit[k] = color;
+                    (l.mesh.material as MeshBasicMaterial).color.setHex(color);
+                }
+            });
         }
         for (const c of s.coffees ?? []) {
             const e = this.steamParts.get(c.id);

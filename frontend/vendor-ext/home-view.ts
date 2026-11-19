@@ -4,11 +4,13 @@
 import { isCarKind } from './cars';
 import { brewing } from './kitchen';
 import { RAIN_LOW, rainTankCapacity, rainTankFill, rainTankKind } from './rain-tank';
+import { serverKind, serverLoad } from './server';
 import type {
     AirState,
     CarState,
     CoffeeState,
     RainTankState,
+    ServerState,
     SmokeState,
     BadgeState,
     FloodState,
@@ -102,6 +104,8 @@ export interface FurnitureLike {
     /** A rainwater tank: barrel or cistern; what it holds when full (l, null: from its size). */
     rain_kind?: string | null;
     tank_capacity?: number | null;
+    /** A server: "rack" or "nas". */
+    server_kind?: string | null;
     /** A boat's gear: the sensor of a hatch, a tank … */
     gear_entity?: string | null;
 }
@@ -345,6 +349,7 @@ export function homeScene(input: HomeInput): HomeOutput {
     const smokes: SmokeState[] = [];
     const coffees: CoffeeState[] = [];
     const rainTanks: RainTankState[] = [];
+    const servers: ServerState[] = [];
     const sounds: SoundState[] = [];
     const streams: StreamState[] = [];
     const sprinklers: HomeScene['sprinklers'] = [];
@@ -607,6 +612,22 @@ export function homeScene(input: HomeInput): HomeOutput {
                 if (lawn && m !== null) {
                     dry.set(lawn.id, Math.max(dry.get(lawn.id) ?? 0, dryness(m, f.moisture_min ?? 30)));
                 }
+            } else if (f.type === 'server') {
+                // a rack on the floor, a NAS on a shelf or desk; its LEDs from its socket
+                const linked = !!f.entity && f.entity !== 'none';
+                servers.push({
+                    id: f.id,
+                    floor: floor.id,
+                    kind: serverKind(f.server_kind),
+                    x: f.x,
+                    z: f.z,
+                    y: f.mount_y ?? input.surface?.(floor, f.x, f.z, f.h) ?? 0,
+                    angle: rad(f.rotation ?? 0),
+                    w: f.w,
+                    d: f.d,
+                    h: f.h,
+                    load: serverLoad(linked ? hass.states[f.entity as string] : null, linked),
+                });
             } else if (f.type === 'rain_tank') {
                 // on the ground (a cistern in it); its fill from the level sensor, the litres over it
                 const kind = rainTankKind(f.rain_kind);
@@ -828,6 +849,7 @@ export function homeScene(input: HomeInput): HomeOutput {
             smokes,
             coffees,
             rainTanks,
+            servers,
             glow,
         },
         alerts,
