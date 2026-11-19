@@ -204,6 +204,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Server / NAS (Technik & Smart Home): Serverschrank (19″) oder NAS, dessen LEDs der Steckdose folgen: aus
   dunkel, an die grüne Betriebs-LED, die Aktivitäts-LEDs flackern umso schneller, je mehr Leistung er zieht; ist die
   Steckdose nicht erreichbar, blinkt die Betriebs-LED orange
+- (bluefox) Fensterstil „Durchreiche (ohne Rahmen und Glas)“: eine Öffnung mit Brüstung und Höhe, nur als Loch in der
+  Wand, z. B. von der Küche ins Wohnzimmer
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler

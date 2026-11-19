@@ -3112,6 +3112,65 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * Window style "pass_through": a pass-through (e.g. from the kitchen into the living room) — a window with its sill
+ * and height, drawn only as the gap in the wall: no frame, no glass, no sash, no blind.
+ */
+function passThroughMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            'export const WINDOW_STYLES = ["standard", "bars", "glass_wall", "slide", "porthole"] as const;',
+            'export const WINDOW_STYLES = ["standard", "bars", "glass_wall", "slide", "porthole", "pass_through"] as const;',
+            'pass-through: style',
+        );
+    }
+    if (name === 'viewer/openings.ts') {
+        code = replaceRequired(
+            code,
+            '    } else if (openingStyle(info.opening, info.exterior) === "slide") {\n',
+            [
+                '    } else if (openingStyle(info.opening, info.exterior) === "pass_through") {',
+                '      // a pass-through: nothing but the gap in the wall',
+                '    } else if (openingStyle(info.opening, info.exterior) === "slide") {',
+                '',
+            ].join('\n'),
+            'pass-through: drawn as a gap',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '      } else {\n        // two panes in the middle of the wall; a double window has a post in the middle\n',
+            [
+                '      } else if (style === "pass_through") {',
+                '        // a pass-through: a dashed line in the gap, as a passage',
+                '        const mid = (across[0] - across[1]) / 2;',
+                '        symbol = svg`<line class="fp3d-open-passage" x1=${q(p0, mid)[0]} y1=${q(p0, mid)[1]} x2=${q(p1, mid)[0]} y2=${q(p1, mid)[1]} />`;',
+                '      } else {',
+                '        // two panes in the middle of the wall; a double window has a post in the middle',
+                '',
+            ].join('\n'),
+            'pass-through: plan symbol',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  style_passage: "Durchbruch (ohne Tür)",',
+            '  style_passage: "Durchbruch (ohne Tür)",\n  style_pass_through: "Durchreiche (ohne Rahmen und Glas)",',
+            'pass-through de',
+        );
+        code = replaceRequired(
+            code,
+            '  style_passage: "Opening (no door)",',
+            '  style_passage: "Opening (no door)",\n  style_pass_through: "Pass-through (no frame, no glass)",',
+            'pass-through en',
+        );
+    }
+    return code;
+}
+
+/**
  * Server (server.ts, home-view.ts, home-fx.ts): a 19" rack or a NAS whose LEDs follow its socket: dark while off, the
  * power LED green while on, the activity LEDs flickering the faster the more power it draws.
  */
@@ -4764,6 +4823,7 @@ const patches: Plugin = {
         code = rainTankMore(name, code);
         code = serverMore(name, code);
         code = tapMore(name, code);
+        code = passThroughMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
