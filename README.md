@@ -316,6 +316,10 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Kaffeemaschine Ein/Aus, Getränke als Chips, Bezüge, Leistung, Wassertank, Bohnen und Entkalken mit Hinweis. Die
   Datenpunkte werden am Gerät im Editor gewählt oder unter demselben ioBroker-Gerät bzw. nach dem Namen gefunden. Der
   Saugroboter fährt jetzt auch mit den Zustandscodes von Xiaomi/Roborock los
+- (bluefox) Glaskarte für die Wallbox: Status (lädt, angesteckt, beendet, kein Auto, Störung) seit wann, Ladestand des
+  Autos mit Ladeziel, Ladeleistung, Reichweite, in diesem Ladevorgang geladene kWh und „voll um“ (mit der Akkugröße des
+  Autos); Laden starten/stoppen, Chips für den Ladestrom (6–16 A) und den Lademodus von evcc (Aus, Sofort, Min+PV, PV).
+  Beschreibbare Zahlen- und Text-Datenpunkte lassen sich dafür über `set_value` setzen (Typ und min/max werden geprüft)
 
 ### 0.4.0 (2026-11-15)
 

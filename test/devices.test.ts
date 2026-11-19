@@ -60,6 +60,21 @@ test('turn_on with rgb_color writes the colour as text, with the white channel f
     assert.deepEqual(written, [['a.on', true]]);
 });
 
+test('set_value writes the own datapoint of the mapping, checked against its type and range', async () => {
+    const written: [string, unknown][] = [];
+    const io = {
+        getObjects: async (ids: string[]) => Object.fromEntries(ids.map(id => [id, object('number', { min: 6, max: 16 })])),
+        getState: async () => null,
+        setState: async (id: string, value: unknown) => void written.push([id, value]),
+    } as unknown as IoAccess;
+    const amps: Mapping = { entity_id: 'sensor.amps', state: 'wb.0.amps' };
+    await execute([amps], 'sensor', 'set_value', { entity_id: 'sensor.amps', value: 10 }, io);
+    assert.deepEqual(written, [['wb.0.amps', 10]]);
+    await assert.rejects(execute([amps], 'sensor', 'set_value', { entity_id: 'sensor.amps', value: 32 }, io));
+    await assert.rejects(execute([amps], 'sensor', 'turn_on', { entity_id: 'sensor.amps' }, io));
+    assert.equal(written.length, 1);
+});
+
 test('the history is read from the instance that logs the datapoint and turned into device states', async () => {
     const asked: [string, ioBroker.GetHistoryOptions][] = [];
     const io: HistoryAccess = {

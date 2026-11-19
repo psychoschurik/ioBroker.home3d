@@ -204,6 +204,8 @@ function entities(
             iobroker_id: m.state,
             iobroker_role: objects[m.state]?.common?.role || '',
             iobroker_type: objects[m.state]?.common?.type || '',
+            // writable: a card may set it (set_value through execute(), see there)
+            ...(objects[m.state]?.common?.write === true ? { iobroker_write: true } : {}),
             ...(m.reach !== undefined ? { iobroker_reach: m.reach } : {}),
             ...(m.reach_connected ? { iobroker_reach_connected: true } : {}),
             ...(m.battery ? { iobroker_battery_own: m.battery } : {}),
@@ -321,7 +323,9 @@ async function execute(
         if (!m || (domain !== 'homeassistant' && id.split('.')[0] !== domain)) {
             fail(t('unknown_device', { id }));
         }
-        const rules = m.actions?.[service];
+        // set_value needs no rule of its own: the mapping's own datapoint takes the value (type, min/max and
+        // write are checked below like for every rule) – a wallbox's charging current, a mode
+        const rules = m.actions?.[service] ?? (service === 'set_value' ? [{ id: m.state, field: 'value' }] : undefined);
         if (!rules?.length) {
             fail(t('no_action', { service, name: m.name || id }));
         }

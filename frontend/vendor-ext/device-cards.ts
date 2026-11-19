@@ -20,6 +20,10 @@ export interface DeviceItem {
     entity?: string | null;
     device_links?: Partial<Record<DeviceRole, string>> | null;
     device_card?: boolean;
+    /** Wallbox: its power and status sensors as the plan already knows them, the car's battery (kWh). */
+    power?: string | null;
+    status?: string | null;
+    device_capacity?: number | null;
 }
 interface FloorLike {
     id: string;
@@ -36,7 +40,7 @@ export interface DeviceHost {
     callService?(domain: string, service: string, data?: Record<string, unknown>): Promise<unknown>;
 }
 
-export type DeviceKind = 'vacuum' | 'mower' | 'coffee';
+export type DeviceKind = 'vacuum' | 'mower' | 'coffee' | 'wallbox';
 export type DeviceRole =
     | 'battery'
     | 'start'
@@ -49,12 +53,20 @@ export type DeviceRole =
     | 'cups'
     | 'drink1'
     | 'drink2'
-    | 'drink3';
+    | 'drink3'
+    | 'charge'
+    | 'current'
+    | 'mode'
+    | 'soc'
+    | 'target'
+    | 'range'
+    | 'energy';
 
 export const DEVICE_ROLES: Record<DeviceKind, DeviceRole[]> = {
     vacuum: ['battery', 'start', 'pause', 'home'],
     mower: ['battery', 'start', 'pause', 'home'],
     coffee: ['power', 'water', 'beans', 'descale', 'cups', 'drink1', 'drink2', 'drink3'],
+    wallbox: ['power', 'charge', 'current', 'mode', 'soc', 'target', 'range', 'energy'],
 };
 
 /** Which card a piece of furniture gets. */
@@ -67,6 +79,9 @@ export function deviceKind(type: string): DeviceKind | null {
     }
     if (type === 'coffee_machine' || /coffee_machine|espresso_machine/.test(type)) {
         return 'coffee';
+    }
+    if (type === 'wallbox' || /wallbox|ev_charger/.test(type)) {
+        return 'wallbox';
     }
     return null;
 }
@@ -112,6 +127,31 @@ const TEXTS: Record<string, Record<string, string>> = {
         empty: 'leer',
         ok: 'ok',
         due: 'fällig',
+        wallbox: 'Wallbox',
+        charge: 'Laden (Start/Stop)',
+        current: 'Ladestrom (A)',
+        mode: 'Lademodus',
+        soc: 'Ladestand des Autos',
+        target: 'Ladeziel',
+        range: 'Reichweite',
+        energy: 'Geladen (Ladevorgang)',
+        capacity: 'Akku des Autos (kWh)',
+        capacity_hint: 'Für „voll um“; leer: keine Uhrzeit',
+        charging: 'lädt',
+        plugged: 'angesteckt',
+        full: 'Laden beendet',
+        free: 'kein Auto',
+        charge_start: 'Laden starten',
+        charge_stop: 'Laden stoppen',
+        full_at: 'Voll um',
+        power_now: 'Ladeleistung',
+        charged: 'Geladen',
+        amps: 'Ladestrom',
+        soc_short: 'Ladestand',
+        mode_off: 'Aus',
+        mode_now: 'Sofort',
+        mode_minpv: 'Min+PV',
+        mode_pv: 'PV',
     },
     en: {
         vacuum: 'Robot vacuum',
@@ -153,6 +193,31 @@ const TEXTS: Record<string, Record<string, string>> = {
         empty: 'empty',
         ok: 'ok',
         due: 'due',
+        wallbox: 'Wallbox',
+        charge: 'Charging (start/stop)',
+        current: 'Charging current (A)',
+        mode: 'Charging mode',
+        soc: "Car's state of charge",
+        target: 'Charge target',
+        range: 'Range',
+        energy: 'Charged (session)',
+        capacity: "Car's battery (kWh)",
+        capacity_hint: 'For "full at"; empty: no time',
+        charging: 'charging',
+        plugged: 'plugged in',
+        full: 'charging done',
+        free: 'no car',
+        charge_start: 'Start charging',
+        charge_stop: 'Stop charging',
+        full_at: 'Full at',
+        power_now: 'Charging power',
+        charged: 'Charged',
+        amps: 'Current',
+        soc_short: 'Charge',
+        mode_off: 'Off',
+        mode_now: 'Now',
+        mode_minpv: 'Min+PV',
+        mode_pv: 'PV',
     },
     ru: {
         vacuum: 'Робот-пылесос',
@@ -194,6 +259,31 @@ const TEXTS: Record<string, Record<string, string>> = {
         empty: 'пусто',
         ok: 'ок',
         due: 'пора',
+        wallbox: 'Зарядная станция',
+        charge: 'Зарядка (старт/стоп)',
+        current: 'Ток зарядки (А)',
+        mode: 'Режим зарядки',
+        soc: 'Заряд автомобиля',
+        target: 'Цель зарядки',
+        range: 'Запас хода',
+        energy: 'Заряжено (сеанс)',
+        capacity: 'Батарея автомобиля (кВт·ч)',
+        capacity_hint: 'Для «полностью в»; пусто: без времени',
+        charging: 'заряжает',
+        plugged: 'подключён',
+        full: 'зарядка завершена',
+        free: 'нет автомобиля',
+        charge_start: 'Начать зарядку',
+        charge_stop: 'Остановить зарядку',
+        full_at: 'Полностью в',
+        power_now: 'Мощность зарядки',
+        charged: 'Заряжено',
+        amps: 'Ток',
+        soc_short: 'Заряд',
+        mode_off: 'Выкл.',
+        mode_now: 'Сейчас',
+        mode_minpv: 'Мин+СЭС',
+        mode_pv: 'СЭС',
     },
 };
 
@@ -292,6 +382,8 @@ const KIND_WORD: Record<DeviceKind, RegExp> = {
     vacuum: /saug|vacuum|robo|roborock|deebot|ecovacs|roomba|valetudo|dreame|xiaomi|пылесос/i,
     mower: /mäh|mower|landroid|worx|automower|husqvarna|gardena|indego|navimow|segway|газонокос/i,
     coffee: /kaffee|coffee|espresso|jura|melitta|delonghi|de'longhi|nespresso|siemens eq|кофе/i,
+    wallbox:
+        /wallbox|wall box|evcc|go-?e|keba|easee|wallbe|openwb|charger|ladestation|ladepunkt|loadpoint|ladesäule|зарядн/i,
 };
 
 /** Whether an entity may serve a role (its domain, then its ioBroker role or name). */
@@ -329,6 +421,36 @@ function fits(role: DeviceRole, id: string, st: StateLike): boolean {
             return /^(sensor|binary_sensor)$/.test(d) && /bohne|bean|зерн/.test(n);
         case 'descale':
             return /^(sensor|binary_sensor)$/.test(d) && /entkalk|descal|kalk|накип/.test(n);
+        case 'charge':
+            return (
+                WRITABLE.test(d) &&
+                /charg|laden|lade|enable|freigabe|allow|start|заряд/.test(n) &&
+                !/strom|current|amp|mode|modus|stop/.test(n)
+            );
+        case 'current':
+            return (
+                (d === 'number' || (d === 'sensor' && st.attributes.iobroker_write === true)) &&
+                (unit === 'A' || /strom|current|ampere|\bamp|ток/.test(n))
+            );
+        case 'mode':
+            return (
+                (/^(select|input_select)$/.test(d) || st.attributes.iobroker_write === true) &&
+                /mode|modus|режим/.test(n) &&
+                !/[^a-z]?power/.test(n)
+            );
+        case 'soc':
+            return (
+                d === 'sensor' &&
+                (unit === '%' || /soc/.test(n)) &&
+                /soc|ladestand|state.?of.?charge|akku|batter|заряд/.test(n) &&
+                !/target|ziel|limit|min/.test(n)
+            );
+        case 'target':
+            return /^(sensor|number)$/.test(d) && /target|ziel|limit/.test(n) && (unit === '%' || /soc/.test(n));
+        case 'range':
+            return d === 'sensor' && (unit === 'km' || unit === 'mi' || /reichweite|range|запас/.test(n));
+        case 'energy':
+            return d === 'sensor' && /^k?Wh$/.test(unit) && /session|sitzung|geladen|charged|ladevorgang|сесси/.test(n);
         case 'cups':
             return d === 'sensor' && /tasse|cup|bezug|bezüge|getränke|counter|zähler|drinks|чаш|напит/.test(n);
         default:
@@ -345,13 +467,17 @@ function fits(role: DeviceRole, id: string, st: StateLike): boolean {
 
 /** The datapoint that tells a device's state (linked by hand, else one of its kind found by name). */
 export function mainEntity(hass: HassLike, f: DeviceItem): string | null {
+    const kind = deviceKind(f.type);
+    // a wallbox's state is its status sensor (the plan's own field), else its linked entity
+    if (kind === 'wallbox' && f.status && f.status !== 'none') {
+        return f.status;
+    }
     if (f.entity === 'none') {
         return null;
     }
     if (f.entity) {
         return f.entity;
     }
-    const kind = deviceKind(f.type);
     if (!kind) {
         return null;
     }
@@ -362,6 +488,18 @@ export function mainEntity(hass: HassLike, f: DeviceItem): string | null {
             id => /^(switch|input_boolean)$/.test(domain(id)) && named(id) && !fits('drink1', id, hass.states[id]!),
         );
         return switches.find(id => /power/.test(roleOf(hass.states[id]))) ?? switches[0] ?? null;
+    }
+    if (kind === 'wallbox') {
+        return (
+            ids.find(
+                id =>
+                    /^(sensor|binary_sensor)$/.test(domain(id)) &&
+                    named(id) &&
+                    /status|state|zustand|connected|angesteckt|plug|состоян/i.test(
+                        `${nameOf(id, hass.states[id])} ${roleOf(hass.states[id])}`,
+                    ),
+            ) ?? null
+        );
     }
     const own = kind === 'vacuum' ? 'vacuum' : 'lawn_mower';
     return (
@@ -421,6 +559,10 @@ export function deviceLink(hass: HassLike, f: DeviceItem, role: DeviceRole): str
     const v = f.device_links?.[role];
     if (v === 'none') {
         return null;
+    }
+    // a wallbox's power sensor as the plan already knows it
+    if (!v && role === 'power' && deviceKind(f.type) === 'wallbox' && f.power && f.power !== 'none') {
+        return f.power;
     }
     return v || autoRole(hass, f, role);
 }
@@ -530,9 +672,12 @@ export function deviceCard(host: DeviceHost, floorId: string, f: DeviceItem): Re
     const base = {
         id: `devices:${f.id}`,
         anchor: { floorId, furnitureId: f.id },
-        icon: kind === 'vacuum' ? '🧹' : kind === 'mower' ? '🌱' : '☕',
+        icon: kind === 'vacuum' ? '🧹' : kind === 'mower' ? '🌱' : kind === 'wallbox' ? '🔌' : '☕',
         title: f.name || text(lang, kind),
     };
+    if (kind === 'wallbox') {
+        return wallboxCard(host, f, base, main, links);
+    }
     if (kind === 'coffee') {
         const watts = links.power ? num(hass.states[links.power]) : null;
         const switched = mainSt && !DEAD.test(mainSt.state) ? ON.test(mainSt.state) : null;
@@ -659,6 +804,213 @@ export function deviceCard(host: DeviceHost, floorId: string, f: DeviceItem): Re
     };
 }
 
+/** What a wallbox's status says (go-e's car state 1–5, words of evcc, OCPP and others, a plugged-in flag). */
+export type WallboxPhase = 'charging' | 'plugged' | 'full' | 'free' | 'error' | 'unknown';
+const GO_E: Record<number, WallboxPhase> = { 0: 'free', 1: 'free', 2: 'charging', 3: 'plugged', 4: 'full', 5: 'error' };
+export function wallboxPhase(st: StateLike | undefined, id: string | null, watts: number | null): WallboxPhase {
+    const raw = st && !DEAD.test(st.state) ? st.state.trim() : '';
+    const t = raw.toLowerCase();
+    if (/error|fehler|fault|störung|faulted|ошибк/.test(t)) {
+        return 'error';
+    }
+    if (watts !== null && watts > 50) {
+        return 'charging';
+    }
+    if (/^\d+$/.test(t) && !(id && domain(id) === 'binary_sensor')) {
+        return GO_E[Number(t)] ?? 'unknown';
+    }
+    if (id && domain(id) === 'binary_sensor') {
+        // a flag "charging" or "plugged in"
+        const on = ON.test(t);
+        return !t ? 'unknown' : on ? (/charg|lädt|laden/.test(nameOf(id, st)) ? 'charging' : 'plugged') : 'free';
+    }
+    if (!t) {
+        return 'unknown';
+    }
+    if (/disconnect|not.?connected|nicht.?verbunden|available|frei|kein|no.?car|unplugged|^a$|отключ/.test(t)) {
+        return 'free';
+    }
+    if (/complete|beendet|finish|voll|full|done|заверш/.test(t)) {
+        return 'full';
+    }
+    if (/^c\d?$|charg|lädt|laden|заряж/.test(t) && !/not|nicht|kein/.test(t)) {
+        return 'charging';
+    }
+    if (/^b\d?$|connect|plug|ready|angesteckt|verbunden|wait|paused|suspend|bereit|подключ/.test(t)) {
+        return 'plugged';
+    }
+    return 'unknown';
+}
+
+/** The time a car is full at: what is missing of its battery at today's charging power. */
+export function fullAt(
+    soc: number | null,
+    target: number | null,
+    capacity: number | null,
+    watts: number | null,
+    now = Date.now(),
+): Date | null {
+    const goal = target ?? 100;
+    if (soc === null || !capacity || !watts || watts < 500 || soc >= goal) {
+        return null;
+    }
+    const hours = (((goal - soc) / 100) * capacity) / (watts / 1000);
+    return hours > 0 && hours < 72 ? new Date(now + hours * 3600000) : null;
+}
+
+const EVCC_MODES = ['off', 'now', 'minpv', 'pv'];
+
+function setValue(host: DeviceHost, id: string, value: number | string): void {
+    const d = domain(id);
+    void Promise.resolve(host.callService?.(d, 'set_value', { entity_id: id, value })).catch((e: unknown) =>
+        console.warn(`home3d: ${d}.set_value`, e),
+    );
+}
+
+function wallboxCard(
+    host: DeviceHost,
+    f: DeviceItem,
+    base: Record<string, unknown>,
+    main: string | null,
+    links: Partial<Record<DeviceRole, string | null>>,
+): Record<string, unknown> {
+    const hass = host.hass();
+    const lang = host.language();
+    const mainSt = main ? hass.states[main] : undefined;
+    const val = (role: DeviceRole): number | null => {
+        const id = links[role];
+        return id ? num(hass.states[id]) : null;
+    };
+    const fmt = (n: number, digits = 0): string =>
+        n.toLocaleString(lang, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+    const watts = val('power');
+    const phase = wallboxPhase(mainSt, main, watts);
+    const color = {
+        charging: '#4cd97b',
+        plugged: '#ffd166',
+        full: '#4cd97b',
+        free: '#9fb3c8',
+        error: '#ff5d5d',
+        unknown: '#9fb3c8',
+    }[phase];
+    const icon = { charging: '⚡', plugged: '🔌', full: '✓', free: '○', error: '⚠', unknown: '?' }[phase];
+    const soc = val('soc');
+    const target = val('target');
+    const amps = val('current');
+    const power =
+        watts !== null && watts >= 50 ? (watts >= 1000 ? `${fmt(watts / 1000, 1)} kW` : `${fmt(watts)} W`) : null;
+    const cells: Record<string, unknown>[] = [];
+    const range = val('range');
+    if (range !== null) {
+        const rangeId = links.range!;
+        cells.push({
+            label: text(lang, 'range'),
+            value: `${fmt(range)} ${str(hass.states[rangeId]?.attributes.unit_of_measurement) || 'km'}`,
+        });
+    }
+    const energy = val('energy');
+    if (energy !== null) {
+        const kwh = str(hass.states[links.energy!]?.attributes.unit_of_measurement) === 'Wh' ? energy / 1000 : energy;
+        cells.push({ label: text(lang, 'charged'), value: `${fmt(kwh, 1)} kWh` });
+    }
+    if (amps !== null) {
+        cells.push({ label: text(lang, 'amps'), value: `${fmt(amps)} A`, minor: true });
+    }
+    const full = phase === 'charging' ? fullAt(soc, target, f.device_capacity ?? null, watts) : null;
+    if (full) {
+        cells.push({
+            label: text(lang, 'full_at'),
+            value: full.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }),
+            color: '#4cd97b',
+        });
+    }
+    const chips: { title: string; items: Record<string, unknown>[] }[] = [];
+    const currentId = links.current;
+    if (currentId) {
+        const steps = [6, 8, 10, 13, 16];
+        if (amps !== null && amps > 16) {
+            steps.push(Math.round(amps));
+        }
+        chips.push({
+            title: text(lang, 'amps'),
+            items: [...new Set(steps)].map(a => ({
+                label: `${a} A`,
+                on: amps === a,
+                onTap: () => setValue(host, currentId, a),
+            })),
+        });
+    }
+    const modeId = links.mode;
+    const mode = modeId ? str(hass.states[modeId]?.state).toLowerCase() : '';
+    if (modeId && EVCC_MODES.includes(mode)) {
+        chips.push({
+            title: text(lang, 'mode'),
+            items: EVCC_MODES.map(m => ({
+                label: text(lang, `mode_${m}`),
+                on: mode === m,
+                onTap: () => setValue(host, modeId, m),
+            })),
+        });
+    }
+    const chargeId = links.charge;
+    const enabled = chargeId ? ON.test(str(hass.states[chargeId]?.state)) : false;
+    const charging = phase === 'charging';
+    const buttons = chargeId
+        ? [
+              {
+                  label: '⚡',
+                  title: text(lang, charging || enabled ? 'charge_stop' : 'charge_start'),
+                  on: charging || enabled,
+                  onTap: () => {
+                      const d = domain(chargeId);
+                      press(
+                          host,
+                          chargeId,
+                          d === 'button' || d === 'input_button'
+                              ? 'press'
+                              : charging || enabled
+                                ? 'turn_off'
+                                : 'turn_on',
+                      );
+                  },
+              },
+          ]
+        : [];
+    return {
+        ...base,
+        live:
+            power && charging
+                ? `${text(lang, 'charging')} · ${power}`
+                : text(lang, phase === 'unknown' ? 'unknown' : phase),
+        liveColor: color,
+        status: { icon, text: text(lang, phase === 'unknown' ? 'unknown' : phase), since: since(lang, mainSt), color },
+        ...(soc !== null
+            ? {
+                  main: {
+                      text: `${fmt(soc)} %`,
+                      sub: text(lang, 'soc_short'),
+                      color: batteryColor(soc),
+                      ...(power ? { side: { text: power, sub: text(lang, 'power_now'), color: '#4cd97b' } } : {}),
+                  },
+                  rows: [
+                      {
+                          label: text(lang, 'soc_short'),
+                          value: target !== null ? `${fmt(soc)} → ${fmt(target)} %` : `${fmt(soc)} %`,
+                          at: Math.max(0, Math.min(100, soc)),
+                          fill: true,
+                          color: batteryColor(soc),
+                      },
+                  ],
+              }
+            : power
+              ? { main: { text: power, sub: text(lang, 'power_now'), color: '#4cd97b' } }
+              : {}),
+        ...(cells.length ? { cells } : {}),
+        ...(chips.length ? { chips } : {}),
+        buttons,
+    };
+}
+
 function devicesOf(b: BuildingLike | null): { floorId: string; f: DeviceItem }[] {
     return (b?.floors ?? []).flatMap(fl =>
         fl.furniture.filter(f => deviceKind(f.type)).map(f => ({ floorId: fl.id, f })),
@@ -700,6 +1052,13 @@ const ROLE_DOMAIN: Record<DeviceRole, RegExp> = {
     beans: /^(sensor|binary_sensor)$/,
     descale: /^(sensor|binary_sensor)$/,
     cups: /^sensor$/,
+    charge: WRITABLE,
+    current: /^(sensor|number)$/,
+    mode: /^(sensor|select|input_select)$/,
+    soc: /^sensor$/,
+    target: /^(sensor|number)$/,
+    range: /^sensor$/,
+    energy: /^sensor$/,
     drink1: WRITABLE,
     drink2: WRITABLE,
     drink3: WRITABLE,
@@ -756,6 +1115,27 @@ export function deviceFields(host: DeviceHost, item: DeviceItem): unknown[] {
                     }
                 }),
         })),
+        ...(kind === 'wallbox'
+            ? [
+                  {
+                      kind: 'number',
+                      label: text(lang, 'capacity'),
+                      value: item.device_capacity ?? null,
+                      step: 1,
+                      min: 5,
+                      max: 250,
+                      hint: text(lang, 'capacity_hint'),
+                      set: (v: number | null) =>
+                          update(f => {
+                              if (v === null) {
+                                  delete f.device_capacity;
+                              } else {
+                                  f.device_capacity = v;
+                              }
+                          }),
+                  },
+              ]
+            : []),
         { kind: 'text', text: text(lang, 'hint') },
     ];
 }

@@ -8,9 +8,11 @@ import {
     deviceLink,
     deviceModule,
     deviceWatched,
+    fullAt,
     mainEntity,
     robotState,
     vacuumPhase,
+    wallboxPhase,
     type DeviceHost,
     type DeviceItem,
 } from '../frontend/vendor-ext/device-cards';
@@ -146,4 +148,73 @@ test('the cards: state, battery, warnings, buttons that switch only through the 
     fields.find(f => f.kind === 'check')?.set?.(false);
     assert.equal((saved as typeof b).floors[0].furniture[0].device_card, false);
     assert.equal(deviceModule.id, 'home3d.devices');
+});
+
+test('the wallbox: its status, the car, full at, charging on and off, current and mode', async () => {
+    const wb: Record<string, St> = {
+        'sensor.w_state': st('2', io('go-e.0.car', 'go-e Status', 'value')),
+        'sensor.w_power': st('11000', io('go-e.0.power', 'Wallbox Leistung', 'value.power', { unit_of_measurement: 'W' })),
+        'switch.w_allow': st('on', io('go-e.0.allow_charging', 'Laden erlauben', 'switch')),
+        'sensor.w_amp': st('16', io('go-e.0.amp', 'Ladestrom', 'level', { unit_of_measurement: 'A', iobroker_write: true })),
+        'sensor.w_energy': st('12400', io('go-e.0.energy_session', 'Geladen Sitzung', 'value', { unit_of_measurement: 'Wh' })),
+        'sensor.car_soc': st('40', io('evcc.0.loadpoint.1.status.vehicleSoc', 'Auto Ladestand', 'value', { unit_of_measurement: '%' })),
+        'sensor.car_target': st('80', io('evcc.0.loadpoint.1.status.targetSoc', 'Ladeziel', 'value', { unit_of_measurement: '%' })),
+        'sensor.car_mode': st('pv', io('evcc.0.loadpoint.1.control.mode', 'Lademodus', 'text', { iobroker_write: true })),
+        'sensor.car_range': st('180', io('evcc.0.loadpoint.1.status.vehicleRange', 'Reichweite', 'value', { unit_of_measurement: 'km' })),
+    };
+    const wbHass = { states: wb };
+    const box: DeviceItem = {
+        id: 'w',
+        type: 'wallbox',
+        status: 'sensor.w_state',
+        power: 'sensor.w_power',
+        device_capacity: 60,
+        device_links: { soc: 'sensor.car_soc', target: 'sensor.car_target', mode: 'sensor.car_mode', range: 'sensor.car_range' },
+    };
+    assert.equal(wallboxPhase(st('3'), 'sensor.x', null), 'plugged');
+    assert.equal(wallboxPhase(st('Laden beendet'), 'sensor.x', 0), 'full');
+    assert.equal(wallboxPhase(st('disconnected'), 'sensor.x', null), 'free');
+    assert.equal(wallboxPhase(st('off', { friendly_name: 'Auto angesteckt' }), 'binary_sensor.x', null), 'free');
+    assert.equal(wallboxPhase(st('A'), 'sensor.x', null), 'free');
+    assert.equal(wallboxPhase(st('C2'), 'sensor.x', null), 'charging');
+    // 60 kWh, 40 → 80 % at 11 kW: 24 kWh, a little over two hours
+    assert.equal(fullAt(40, 80, 60, 11000, 0)?.getTime(), Math.round((24 / 11) * 3600000));
+    assert.equal(fullAt(40, 80, null, 11000), null);
+    assert.equal(autoRole(wbHass, box, 'charge'), 'switch.w_allow');
+    assert.equal(autoRole(wbHass, box, 'current'), 'sensor.w_amp');
+    assert.equal(autoRole(wbHass, box, 'energy'), 'sensor.w_energy');
+    assert.equal(deviceLink(wbHass, box, 'power'), 'sensor.w_power');
+    const calls: string[] = [];
+    const host: DeviceHost = {
+        hass: () => wbHass,
+        building: () => ({ floors: [{ id: 'eg', furniture: [box] }] }),
+        language: () => 'de',
+        callService: (d, s, data) => {
+            calls.push(`${d}.${s}:${String(data?.entity_id)}=${String(data?.value ?? '')}`);
+            return Promise.resolve();
+        },
+    };
+    const [card] = deviceCards(host) as {
+        live: string;
+        main: { text: string; side: { text: string } };
+        rows: { value: string }[];
+        cells: { label: string; value: string }[];
+        chips: { title: string; items: { label: string; on: boolean; onTap(): void }[] }[];
+        buttons: { title: string; on: boolean; onTap(): void }[];
+    }[];
+    assert.equal(card.live, 'lädt · 11,0 kW');
+    assert.equal(card.main.text, '40 %');
+    assert.equal(card.main.side.text, '11,0 kW');
+    assert.equal(card.rows[0].value, '40 → 80 %');
+    assert.deepEqual(card.cells.map(c => c.label), ['Reichweite', 'Geladen', 'Ladestrom', 'Voll um']);
+    assert.equal(card.cells[1].value, '12,4 kWh');
+    assert.deepEqual(card.chips.map(c => c.title), ['Ladestrom', 'Lademodus']);
+    assert.equal(card.chips[0].items.find(i => i.on)?.label, '16 A');
+    assert.equal(card.chips[1].items.find(i => i.on)?.label, 'PV');
+    assert.equal(card.buttons[0].title, 'Laden stoppen');
+    card.chips[0].items[0].onTap();
+    card.chips[1].items[1].onTap();
+    card.buttons[0].onTap();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(calls, ['sensor.set_value:sensor.w_amp=6', 'sensor.set_value:sensor.car_mode=now', 'switch.turn_off:switch.w_allow=']);
 });
