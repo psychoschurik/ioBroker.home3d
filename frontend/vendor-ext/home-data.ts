@@ -98,6 +98,21 @@ export interface Mould {
     level: 0 | 1 | 2;
 }
 
+/** From this much CO₂ (ppm) the air in a room is stale: a light haze; from CO2_THICK_PPM it is thick (with its label). */
+export const CO2_HAZE_PPM = 1000;
+export const CO2_THICK_PPM = 1400;
+
+/** How thick the haze of stale air is from its CO₂ (ppm): 0 below 1000, 0.15 … 0.5 up to 1400, then up to 1 at 2000. */
+export function co2Haze(ppm: number | null | undefined): number {
+    if (ppm === null || ppm === undefined || !Number.isFinite(ppm) || ppm < CO2_HAZE_PPM) {
+        return 0;
+    }
+    if (ppm < CO2_THICK_PPM) {
+        return 0.15 + (0.35 * (ppm - CO2_HAZE_PPM)) / (CO2_THICK_PPM - CO2_HAZE_PPM);
+    }
+    return Math.min(1, 0.5 + (0.5 * (ppm - CO2_THICK_PPM)) / 600);
+}
+
 /**
  * How damp the coldest corner of a room gets: the corner is colder than the room by the outdoor temperature
  * (`tOut`; without one, 3 °C colder); mould grows where the air right at the wall reaches 80 % humidity.

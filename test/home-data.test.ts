@@ -22,6 +22,7 @@ import {
     meterLitres,
     MeterFlow,
     mouldRisk,
+    co2Haze,
     mowerPhase,
     noiseLevel,
     parseForecast,
@@ -585,4 +586,33 @@ test('home: a rainwater tank shows its litres, warns when nearly empty and fills
     out = homeScene(input(b, states));
     assert.equal(out.scene.rainTanks?.[0]?.warn, true);
     assert.ok(!out.scene.streams.some(s => s.id === 'rt-rain'), 'dry weather');
+});
+
+test('home: stale air hazes a room from 1000 ppm CO2, with its label from 1400, not where smoke is', () => {
+    assert.equal(co2Haze(null), 0);
+    assert.equal(co2Haze(950), 0);
+    near(co2Haze(1000), 0.15, 1e-9);
+    near(co2Haze(1400), 0.5, 1e-9);
+    assert.equal(co2Haze(2600), 1);
+    const b = house();
+    const co2: Record<string, number> = { living: 1800, bath: 1100 };
+    const states: Record<string, StateLike> = {};
+    const out = homeScene(input(b, states, { climate: (_f, r) => ({ t: null, rh: null, co2: co2[r.id] ?? null }) }));
+    const living = out.scene.hazes?.find(h => h.id === 'living');
+    const bath = out.scene.hazes?.find(h => h.id === 'bath');
+    near(living!.level, 0.833, 0.001);
+    assert.match(living!.label, /^CO₂ 1800 ppm/);
+    assert.equal(bath?.label, '');
+    // smoke wins in its room
+    states['binary_sensor.smoke'] = st('on');
+    const smoky = homeScene(
+        input(b, states, {
+            climate: (_f, r) => ({ t: null, rh: null, co2: co2[r.id] ?? null }),
+            smokes: [{ entity: 'binary_sensor.smoke', roomId: 'living', floorId: 'eg' }],
+        }),
+    );
+    assert.deepEqual(smoky.scene.hazes?.map(h => h.id), ['bath']);
+    // without the air of the home looks: none
+    b.settings.home_air = false;
+    assert.equal(homeScene(input(b, states, { climate: () => ({ t: null, rh: null, co2: 1800 }) })).scene.hazes?.length, 0);
 });

@@ -208,6 +208,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Wand, z. B. von der Küche ins Wohnzimmer
 - (bluefox) MJPEG-Kamerastreams (z. B. `stream.mjpeg` von Frigate) laufen durch, statt sich alle paar Sekunden neu zu
   verbinden; Standbilder werden weiter aufgefrischt
+- (bluefox) Dicke Luft: ab 1000 ppm CO₂ liegt ein leichter Dunst im Raum, ab 1400 ppm ein deutlicher mit dem Schild
+  „CO₂ … ppm · Lüften“ (aus mit der Luft an offenen Fenstern; im Raum mit Rauch nur der Rauch)
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler

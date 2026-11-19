@@ -191,6 +191,21 @@ export interface SmokeState {
     level: number;
 }
 
+/** Stale air in a room (CO₂): a haze through the whole room, its label when it is thick. */
+export interface HazeState {
+    id: string;
+    floor: string;
+    points: Vec2[];
+    /** The ceiling's height above the floor (m). */
+    top: number;
+    /** How thick, 0 … 1. */
+    level: number;
+    /** The label over the room (empty: none). */
+    label: string;
+    cx: number;
+    cz: number;
+}
+
 /** A coffee machine; while it brews, steam rises from its cup. */
 export interface CoffeeState {
     id: string;
@@ -255,6 +270,7 @@ export interface HomeScene {
     badges: BadgeState[];
     cars: CarState[];
     smokes?: SmokeState[];
+    hazes?: HazeState[];
     coffees?: CoffeeState[];
     rainTanks?: RainTankState[];
     servers?: ServerState[];
@@ -324,6 +340,38 @@ function puffTexture(): CanvasTexture {
     }
     puff = new CanvasTexture(c);
     return puff;
+}
+
+/** Where n puffs stand in a room (x, z pairs), also in an L-shaped one: the same for the same room. */
+function scatter(points: Vec2[], n: number): Float32Array {
+    const xs = points.map(q => q[0]);
+    const zs = points.map(q => q[1]);
+    const x0 = Math.min(...xs);
+    const x1 = Math.max(...xs);
+    const z0 = Math.min(...zs);
+    const z1 = Math.max(...zs);
+    const base = new Float32Array(n * 2);
+    let seed = 7;
+    const rnd = (): number => {
+        seed = (seed * 16807) % 2147483647;
+        return seed / 2147483647;
+    };
+    for (let i = 0; i < n; i++) {
+        let x = (x0 + x1) / 2;
+        let z = (z0 + z1) / 2;
+        for (let k = 0; k < 12; k++) {
+            const cx = x0 + 0.2 + (x1 - x0 - 0.4) * rnd();
+            const cz = z0 + 0.2 + (z1 - z0 - 0.4) * rnd();
+            if (pointIn([cx, cz], points)) {
+                x = cx;
+                z = cz;
+                break;
+            }
+        }
+        base[i * 2] = x;
+        base[i * 2 + 1] = z;
+    }
+    return base;
 }
 
 let mould: CanvasTexture | null = null;
@@ -519,6 +567,8 @@ export class HomeFx {
     private carMeshes = new Map<string, { car: Group; bay: Group | null }>();
     /** Smoke: its particles and where each one stands in the room (x, z). */
     private smokeParts = new Map<string, { p: Particles; base: Float32Array }>();
+    /** Stale air: its particles and where each one stands in the room (x, z). */
+    private hazeParts = new Map<string, { p: Particles; base: Float32Array }>();
     /** Steam over a coffee machine's cup: its particles and where the cup is. */
     /** The LEDs of each server and the colour each shows now. */
     private serverLeds = new Map<string, { leds: ServerLed[]; lit: number[] }>();
@@ -621,6 +671,7 @@ export class HomeFx {
                 c.sensed,
             ]),
             (s.smokes ?? []).map(x => [x.id, x.floor, x.points, x.top]),
+            (s.hazes ?? []).map(x => [x.id, x.floor, x.points, x.top, x.label]),
             (s.coffees ?? []).map(c => [c.id, c.floor, c.x, c.z, c.y, c.angle, c.w, c.d, c.h]),
             (s.servers ?? []).map(v => [v.id, v.floor, v.kind, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
             (s.rainTanks ?? []).map(r => [
@@ -654,36 +705,19 @@ export class HomeFx {
         for (const sm of s.smokes ?? []) {
             const n = 110;
             const p = particles(n, 3.6, 30, puffTexture());
-            // each puff stands somewhere in the room (also an L-shaped one)
-            const xs = sm.points.map(q => q[0]);
-            const zs = sm.points.map(q => q[1]);
-            const x0 = Math.min(...xs);
-            const x1 = Math.max(...xs);
-            const z0 = Math.min(...zs);
-            const z1 = Math.max(...zs);
-            const base = new Float32Array(n * 2);
-            let seed = 7;
-            const rnd = (): number => {
-                seed = (seed * 16807) % 2147483647;
-                return seed / 2147483647;
-            };
-            for (let i = 0; i < n; i++) {
-                let x = (x0 + x1) / 2;
-                let z = (z0 + z1) / 2;
-                for (let k = 0; k < 12; k++) {
-                    const cx = x0 + 0.2 + (x1 - x0 - 0.4) * rnd();
-                    const cz = z0 + 0.2 + (z1 - z0 - 0.4) * rnd();
-                    if (pointIn([cx, cz], sm.points)) {
-                        x = cx;
-                        z = cz;
-                        break;
-                    }
-                }
-                base[i * 2] = x;
-                base[i * 2 + 1] = z;
-            }
             this.floorGroup(sm.floor).add(p.points);
-            this.smokeParts.set(sm.id, { p, base });
+            this.smokeParts.set(sm.id, { p, base: scatter(sm.points, n) });
+        }
+        for (const hz of s.hazes ?? []) {
+            const n = 70;
+            const p = particles(n, 3.2, 26, puffTexture());
+            this.floorGroup(hz.floor).add(p.points);
+            this.hazeParts.set(hz.id, { p, base: scatter(hz.points, n) });
+            if (hz.label) {
+                const l = labelSprite(hz.label, this.light, hz.level >= 0.5 ? 'warn' : null, 0.024);
+                l.position.set(hz.cx, hz.top + 0.3, hz.cz);
+                this.floorGroup(hz.floor).add(l);
+            }
         }
         for (const r of s.rainTanks ?? []) {
             const m = buildRainTank(r.kind, r.w, r.d, r.h, r.fill, this.light);
@@ -966,6 +1000,7 @@ export class HomeFx {
         this.mowerMeshes.clear();
         this.carMeshes.clear();
         this.smokeParts.clear();
+        this.hazeParts.clear();
         this.steamParts.clear();
         this.serverLeds.clear();
         this.tips = [];
@@ -1067,6 +1102,14 @@ export class HomeFx {
             moving ||= !calm;
             this.smoke(e.p, e.base, sm, tt);
         }
+        for (const hz of s.hazes ?? []) {
+            const e = this.hazeParts.get(hz.id);
+            if (!e || !shown(hz.floor)) {
+                continue;
+            }
+            moving ||= !calm;
+            this.haze(e.p, e.base, hz, tt);
+        }
         for (const v of s.servers ?? []) {
             const e = this.serverLeds.get(v.id);
             if (!e || !shown(v.floor)) {
@@ -1137,6 +1180,24 @@ export class HomeFx {
                 (this.light ? 1.9 : 1) *
                 (0.75 + 0.25 * Math.sin(t * 0.35 + a * 12)) *
                 (1 - 0.4 * b);
+            p.col.set([c[0], c[1], c[2], alpha], i * 4);
+        }
+        flush(p);
+    }
+
+    /** Stale air: a faint, slowly drifting haze through the whole height of the room, denser with more CO₂. */
+    private haze(p: Particles, base: Float32Array, hz: HazeState, t: number): void {
+        const n = p.pos.length / 3;
+        const c: Rgb = this.light ? [0.46, 0.42, 0.3] : [0.82, 0.77, 0.58];
+        for (let i = 0; i < n; i++) {
+            const a = p.seeds[i * 3];
+            const b = p.seeds[i * 3 + 1];
+            const ph = p.seeds[i * 3 + 2];
+            const x = base[i * 2] + 0.25 * Math.sin(t * 0.11 + ph * 6.3) * (0.5 + a);
+            const z = base[i * 2 + 1] + 0.25 * Math.cos(t * 0.09 + a * 6.3) * (0.5 + ph);
+            const y = 0.35 + (hz.top - 0.7) * b + 0.08 * Math.sin(t * 0.3 + ph * 9);
+            p.pos.set([x, y, z], i * 3);
+            const alpha = (0.06 + 0.26 * hz.level) * (this.light ? 2 : 1.2) * (0.7 + 0.3 * Math.sin(t * 0.25 + a * 12));
             p.col.set([c[0], c[1], c[2], alpha], i * 4);
         }
         flush(p);

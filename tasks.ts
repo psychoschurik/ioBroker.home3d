@@ -2171,7 +2171,7 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
                 '      now,',
                 '      t,',
                 '      areaEntities: (a) => areaEntities(hass, a),',
-                '      climate: (f, r) => ({ t: roomClimateValue(hass, f as Floor, r as never, "temperature"), rh: roomClimateValue(hass, f as Floor, r as never, "humidity") }),',
+                '      climate: (f, r) => ({ t: roomClimateValue(hass, f as Floor, r as never, "temperature"), rh: roomClimateValue(hass, f as Floor, r as never, "humidity"), co2: roomClimateValue(hass, f as Floor, r as never, "co2") }),',
                 '      ground: (f, x, z) => outdoorGround(f as Floor, x, z),',
                 '      openings,',
                 '      contacts,',

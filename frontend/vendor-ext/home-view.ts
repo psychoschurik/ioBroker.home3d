@@ -12,6 +12,7 @@ import type {
     RainTankState,
     ServerState,
     SmokeState,
+    HazeState,
     BadgeState,
     FloodState,
     HomeScene,
@@ -42,6 +43,8 @@ import {
     mediaLevel,
     meterLitres,
     mouldRisk,
+    co2Haze,
+    CO2_THICK_PPM,
     mowerPhase,
     noiseLevel,
     OPEN_HEAT_MS,
@@ -266,7 +269,7 @@ export interface HomeInput {
     t: Translate;
     areaEntities: (area: string | null) => string[];
     /** Room temperature and humidity (°C, %), null when unknown. */
-    climate: (floor: FloorLike, room: RoomLike) => { t: number | null; rh: number | null };
+    climate: (floor: FloorLike, room: RoomLike) => { t: number | null; rh: number | null; co2?: number | null };
     /** The ground's height at a point outside the rooms (a lawn's top, the terrain); without it 0, the floor. */
     ground?: (floor: FloorLike, x: number, z: number) => number;
     /** How far each opening stands open (0 … 1) and the sensor that says so (for since when). */
@@ -347,6 +350,7 @@ export function homeScene(input: HomeInput): HomeOutput {
     const moulds: MouldState[] = [];
     const floods: FloodState[] = [];
     const smokes: SmokeState[] = [];
+    const hazes: HazeState[] = [];
     const coffees: CoffeeState[] = [];
     const rainTanks: RainTankState[] = [];
     const servers: ServerState[] = [];
@@ -452,7 +456,8 @@ export function homeScene(input: HomeInput): HomeOutput {
                 }
             }
             // mould: how damp the coldest corner gets
-            const cl = mould ? input.climate(floor, room) : { t: null, rh: null };
+            const climate = mould || air ? input.climate(floor, room) : null;
+            const cl = mould && climate ? climate : { t: null, rh: null };
             if (cl.t !== null && cl.rh !== null) {
                 const m = mouldRisk(cl.t, cl.rh, input.tOut);
                 if (m.level > 0) {
@@ -474,6 +479,29 @@ export function homeScene(input: HomeInput): HomeOutput {
                         });
                     }
                 }
+            }
+            // stale air: a haze through the room from 1000 ppm CO₂, thicker and with its label from 1400
+            const co2 = air ? (climate?.co2 ?? null) : null;
+            const haze = co2Haze(co2);
+            if (haze > 0 && co2 !== null) {
+                const centre = room.points.reduce<Vec2>(
+                    (s, p) => [s[0] + p[0] / room.points.length, s[1] + p[1] / room.points.length],
+                    [0, 0],
+                );
+                hazes.push({
+                    id: room.id,
+                    floor: floor.id,
+                    points: room.points,
+                    top: room.ceiling_height ?? floor.height,
+                    level: haze,
+                    // rounded to 50 ppm: a new label (and a new build) only when it really changes
+                    label:
+                        co2 >= CO2_THICK_PPM
+                            ? `CO₂ ${input.fmt(Math.round(co2 / 50) * 50, 0)} ppm · ${t('home_air_out')}`
+                            : '',
+                    cx: centre[0],
+                    cz: centre[1],
+                });
             }
         }
         // water standing in a room with a leak: it rises over the first quarter of an hour
@@ -847,6 +875,7 @@ export function homeScene(input: HomeInput): HomeOutput {
             badges,
             cars,
             smokes,
+            hazes: hazes.filter(h => !smokes.some(s => s.id === h.id)),
             coffees,
             rainTanks,
             servers,
