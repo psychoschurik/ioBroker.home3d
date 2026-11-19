@@ -32,7 +32,9 @@ import {
 } from 'three';
 import { labelSprite, shade } from './anchor';
 import { buildBay, buildCar, type CarKind, WHEEL } from './cars';
-import { lanes, pathLength, pointAt, type Corner, type MowerPhase, type Rgb, type Vec2 } from './home-data';
+import { lanes, pathLength, pointAt, pointIn, type Corner, type MowerPhase, type Rgb, type Vec2 } from './home-data';
+import { buildCoffeeMachine } from './kitchen';
+import { buildRainTank, type RainTankKind } from './rain-tank';
 
 export interface AirState {
     id: string;
@@ -177,6 +179,53 @@ export interface CarState {
     sensed: boolean;
 }
 
+/** Smoke in a room whose smoke detector went off: it fills the room from the ceiling down. */
+export interface SmokeState {
+    id: string;
+    floor: string;
+    points: Vec2[];
+    /** The ceiling's height above the floor (m). */
+    top: number;
+    /** How far the smoke has come down, 0 … 1 (it grows over the first minutes). */
+    level: number;
+}
+
+/** A coffee machine; while it brews, steam rises from its cup. */
+export interface CoffeeState {
+    id: string;
+    floor: string;
+    x: number;
+    z: number;
+    /** Its base above the floor (the worktop it stands on). */
+    y: number;
+    /** Turn in the plan (rad, clockwise). */
+    angle: number;
+    w: number;
+    d: number;
+    h: number;
+    brewing: boolean;
+}
+
+/** A rainwater tank: a barrel on the ground or a cistern in it, filled to its level. */
+export interface RainTankState {
+    id: string;
+    floor: string;
+    kind: RainTankKind;
+    x: number;
+    z: number;
+    /** The ground under it. */
+    y: number;
+    /** Turn in the plan (rad, clockwise). */
+    angle: number;
+    w: number;
+    d: number;
+    h: number;
+    /** 0 … 1, null: no sensor. */
+    fill: number | null;
+    label: string | null;
+    warn: boolean;
+}
+
 export interface HomeScene {
     airs: AirState[];
     moulds: MouldState[];
@@ -188,6 +237,9 @@ export interface HomeScene {
     mowers: MowerState[];
     badges: BadgeState[];
     cars: CarState[];
+    smokes?: SmokeState[];
+    coffees?: CoffeeState[];
+    rainTanks?: RainTankState[];
     glow: GlowState | null;
 }
 
@@ -232,6 +284,28 @@ function dotTexture(): CanvasTexture {
     g.fillRect(0, 0, 32, 32);
     dot = new CanvasTexture(c);
     return dot;
+}
+
+let puff: CanvasTexture | null = null;
+/** A soft cloudy puff for smoke: no edge, a few lumps inside. */
+function puffTexture(): CanvasTexture {
+    if (puff) {
+        return puff;
+    }
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d')!;
+    for (const [x, y, r, a] of [[32, 32, 31, 0.9]]) {
+        const gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, `rgba(255,255,255,${a})`);
+        gr.addColorStop(0.35, `rgba(255,255,255,${a * 0.55})`);
+        gr.addColorStop(0.7, `rgba(255,255,255,${a * 0.15})`);
+        gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr;
+        g.fillRect(0, 0, 64, 64);
+    }
+    puff = new CanvasTexture(c);
+    return puff;
 }
 
 let mould: CanvasTexture | null = null;
@@ -302,7 +376,7 @@ interface Particles {
  * Points of `size` m that stay at least `minPx` CSS pixels big from afar (else a window's air or a shower's water
  * would vanish in the overview).
  */
-function particles(n: number, size: number, minPx = 3): Particles {
+function particles(n: number, size: number, minPx = 3, map: CanvasTexture = dotTexture()): Particles {
     const geo = new BufferGeometry();
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 4);
@@ -315,7 +389,7 @@ function particles(n: number, size: number, minPx = 3): Particles {
         vertexColors: true,
         transparent: true,
         depthWrite: false,
-        map: dotTexture(),
+        map,
     });
     const min = (minPx * (globalThis.devicePixelRatio || 1)).toFixed(1);
     mat.onBeforeCompile = shader => {
@@ -425,6 +499,13 @@ export class HomeFx {
     private runs = new Map<string, MowerRun>();
     private paints = new Map<string, LawnPaint>();
     private carMeshes = new Map<string, { car: Group; bay: Group | null }>();
+    /** Smoke: its particles and where each one stands in the room (x, z). */
+    private smokeParts = new Map<string, { p: Particles; base: Float32Array }>();
+    /** Steam over a coffee machine's cup: its particles and where the cup is. */
+    private steamParts = new Map<
+        string,
+        { p: Particles; at: Vector3; fwd: Vector3; out: number; stream: Object3D | null }
+    >();
     /** How far each car stood out of its place in the last frame (m): its wheels roll by the difference. */
     private carOut = new Map<string, number>();
     /** How far each car is in its place (0 away … 1 parked); kept across rebuilds. */
@@ -499,6 +580,23 @@ export class HomeFx {
                 c.plate ?? null,
                 c.sensed,
             ]),
+            (s.smokes ?? []).map(x => [x.id, x.floor, x.points, x.top]),
+            (s.coffees ?? []).map(c => [c.id, c.floor, c.x, c.z, c.y, c.angle, c.w, c.d, c.h]),
+            (s.rainTanks ?? []).map(r => [
+                r.id,
+                r.floor,
+                r.kind,
+                r.x,
+                r.z,
+                r.y,
+                r.angle,
+                r.w,
+                r.d,
+                r.h,
+                r.fill === null ? null : Math.round(r.fill * 200),
+                r.label,
+                r.warn,
+            ]),
             s.glow,
             this.light,
         ]);
@@ -511,6 +609,70 @@ export class HomeFx {
             const p = particles(40, 0.11, 4);
             this.floorGroup(a.floor).add(p.points);
             this.airs.set(a.id, p);
+        }
+        for (const sm of s.smokes ?? []) {
+            const n = 110;
+            const p = particles(n, 3.6, 30, puffTexture());
+            // each puff stands somewhere in the room (also an L-shaped one)
+            const xs = sm.points.map(q => q[0]);
+            const zs = sm.points.map(q => q[1]);
+            const x0 = Math.min(...xs);
+            const x1 = Math.max(...xs);
+            const z0 = Math.min(...zs);
+            const z1 = Math.max(...zs);
+            const base = new Float32Array(n * 2);
+            let seed = 7;
+            const rnd = (): number => {
+                seed = (seed * 16807) % 2147483647;
+                return seed / 2147483647;
+            };
+            for (let i = 0; i < n; i++) {
+                let x = (x0 + x1) / 2;
+                let z = (z0 + z1) / 2;
+                for (let k = 0; k < 12; k++) {
+                    const cx = x0 + 0.2 + (x1 - x0 - 0.4) * rnd();
+                    const cz = z0 + 0.2 + (z1 - z0 - 0.4) * rnd();
+                    if (pointIn([cx, cz], sm.points)) {
+                        x = cx;
+                        z = cz;
+                        break;
+                    }
+                }
+                base[i * 2] = x;
+                base[i * 2 + 1] = z;
+            }
+            this.floorGroup(sm.floor).add(p.points);
+            this.smokeParts.set(sm.id, { p, base });
+        }
+        for (const r of s.rainTanks ?? []) {
+            const m = buildRainTank(r.kind, r.w, r.d, r.h, r.fill, this.light);
+            m.position.set(r.x, r.y, r.z);
+            m.rotation.y = -r.angle;
+            if (r.label) {
+                const label = labelSprite(r.label, this.light, r.warn ? 'warn' : null, 0.026);
+                label.position.set(0, (r.kind === 'barrel' ? r.h : 0) + 0.4, 0);
+                m.add(label);
+            }
+            this.floorGroup(r.floor).add(m);
+        }
+        for (const c of s.coffees ?? []) {
+            const m = buildCoffeeMachine(c.w, c.d, c.h, this.light);
+            m.position.set(c.x, c.y, c.z);
+            m.rotation.y = -c.angle;
+            this.floorGroup(c.floor).add(m);
+            const [cx, cy, cz] = m.userData.cupTop as [number, number, number];
+            const up = new Vector3(0, 1, 0);
+            const at = new Vector3(cx, cy, cz).applyAxisAngle(up, -c.angle).add(m.position);
+            const fwd = new Vector3(0, 0, 1).applyAxisAngle(up, -c.angle);
+            const p = particles(36, 0.11, 3, puffTexture());
+            this.floorGroup(c.floor).add(p.points);
+            this.steamParts.set(c.id, {
+                p,
+                at,
+                fwd,
+                out: (m.userData.headFront as number) + 0.03,
+                stream: m.getObjectByName('fp3dCoffeeStream') ?? null,
+            });
         }
         for (const st of s.streams) {
             const p = particles(32, 0.05, 2.5);
@@ -728,6 +890,7 @@ export class HomeFx {
                     if (
                         map &&
                         map !== dot &&
+                        map !== puff &&
                         map !== mould &&
                         !map.userData.fp3dShared &&
                         ![...this.paints.values()].some(p => p.tex === map)
@@ -747,6 +910,8 @@ export class HomeFx {
         this.floodMeshes.clear();
         this.mowerMeshes.clear();
         this.carMeshes.clear();
+        this.smokeParts.clear();
+        this.steamParts.clear();
         this.tips = [];
         if (all) {
             this.carIn.clear();
@@ -838,6 +1003,29 @@ export class HomeFx {
                 moving = true;
             }
         }
+        for (const sm of s.smokes ?? []) {
+            const e = this.smokeParts.get(sm.id);
+            if (!e || !shown(sm.floor)) {
+                continue;
+            }
+            moving ||= !calm;
+            this.smoke(e.p, e.base, sm, tt);
+        }
+        for (const c of s.coffees ?? []) {
+            const e = this.steamParts.get(c.id);
+            if (!e) {
+                continue;
+            }
+            e.p.points.visible = c.brewing;
+            if (e.stream) {
+                e.stream.visible = c.brewing;
+            }
+            if (!c.brewing || !shown(c.floor)) {
+                continue;
+            }
+            moving ||= !calm;
+            this.steam(e.p, e.at, e.fwd, e.out, tt);
+        }
         for (const c of s.cars) {
             if (this.car(c, dt, calm)) {
                 moving = true;
@@ -853,6 +1041,52 @@ export class HomeFx {
             }
         }
         return moving;
+    }
+
+    /** Smoke under the ceiling: a layer that thickens downwards with the level, slowly rolling. */
+    private smoke(p: Particles, base: Float32Array, sm: SmokeState, t: number): void {
+        const n = p.pos.length / 3;
+        const thick = 0.3 + sm.level * sm.top * 0.7;
+        const c: Rgb = this.light ? [0.3, 0.3, 0.32] : [0.7, 0.7, 0.74];
+        for (let i = 0; i < n; i++) {
+            const a = p.seeds[i * 3];
+            const b = p.seeds[i * 3 + 1];
+            const ph = p.seeds[i * 3 + 2];
+            const x = base[i * 2] + 0.3 * Math.sin(t * 0.19 + ph * 6.3) * (0.5 + a);
+            const z = base[i * 2 + 1] + 0.3 * Math.cos(t * 0.15 + a * 6.3) * (0.5 + ph);
+            const y = sm.top - 0.15 - thick * Math.pow(b, 0.8) + 0.06 * Math.sin(t * 0.45 + ph * 9);
+            p.pos.set([x, Math.max(0.1, y), z], i * 3);
+            // on a light ground grey smoke needs more cover to be seen
+            const alpha =
+                (0.22 + 0.3 * sm.level) *
+                (this.light ? 1.9 : 1) *
+                (0.75 + 0.25 * Math.sin(t * 0.35 + a * 12)) *
+                (1 - 0.4 * b);
+            p.col.set([c[0], c[1], c[2], alpha], i * 4);
+        }
+        flush(p);
+    }
+
+    /** Steam from a cup: wisps that drift out from under the machine's head, rise, sway, widen and fade. */
+    private steam(p: Particles, at: Vector3, fwd: Vector3, out: number, t: number): void {
+        const n = p.pos.length / 3;
+        const c: Rgb = this.light ? [0.97, 0.97, 0.98] : [0.86, 0.92, 1];
+        for (let i = 0; i < n; i++) {
+            const u = p.seeds[i * 3] - 0.5;
+            const v = p.seeds[i * 3 + 1] - 0.5;
+            const ph = p.seeds[i * 3 + 2];
+            const s = (t * 0.42 + ph) % 1;
+            const sway = Math.sin(t * 1.4 + ph * 7 + s * 4) * 0.025 * s;
+            // out first, then up
+            const o = out * Math.min(1, s * 2.6);
+            const x = at.x + fwd.x * o + u * (0.02 + 0.08 * s) + sway;
+            const z = at.z + fwd.z * o + v * (0.02 + 0.08 * s) + sway * 0.6;
+            const y = at.y + 0.005 + 0.05 * Math.min(1, s * 2.6) + Math.max(0, s - 0.38) * 0.55;
+            p.pos.set([x, y, z], i * 3);
+            const alpha = Math.pow(Math.sin(Math.PI * Math.min(1, s * 1.3)), 1.3) * (1 - s) * 0.95;
+            p.col.set([c[0], c[1], c[2], alpha], i * 4);
+        }
+        flush(p);
     }
 
     private air(p: Particles, a: AirState, t: number): void {

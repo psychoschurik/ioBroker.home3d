@@ -2,9 +2,14 @@
 // devices are synced (tasks.ts patches view3d.ts to call it) and drawn by home-fx.ts. No three.js here; the plan's
 // types are described by their shape, so this file needs nothing of the 3D frontend.
 import { isCarKind } from './cars';
+import { brewing } from './kitchen';
+import { RAIN_LOW, rainTankCapacity, rainTankFill, rainTankKind } from './rain-tank';
 import type {
     AirState,
     CarState,
+    CoffeeState,
+    RainTankState,
+    SmokeState,
     BadgeState,
     FloodState,
     HomeScene,
@@ -94,6 +99,9 @@ export interface FurnitureLike {
     water_house?: boolean;
     car_color?: string | null;
     car_plate?: string | null;
+    /** A rainwater tank: barrel or cistern; what it holds when full (l, null: from its size). */
+    rain_kind?: string | null;
+    tank_capacity?: number | null;
     /** A boat's gear: the sensor of a hatch, a tank … */
     gear_entity?: string | null;
 }
@@ -267,6 +275,12 @@ export interface HomeInput {
     tOut: number | null;
     /** Water sensors that report a leak, by room. */
     leaks: readonly { entity: string; roomId: string; floorId: string }[];
+    /** It rains now (the weather): water runs into the rainwater tanks. */
+    raining?: boolean;
+    /** Smoke detectors that went off, by room. */
+    smokes?: readonly { entity: string; roomId: string; floorId: string }[];
+    /** The height of the surface under a point (a worktop, a table), for things put on it; without it 0. */
+    surface?: (floor: FloorLike, x: number, z: number, h: number) => number;
     /** Price slots from the history of the price entity (when there is no forecast). */
     priceHistory: readonly { start: number; end: number; price: number }[];
     /** Badges of devices with a low battery or out of reach (the "Technik" view). */
@@ -328,6 +342,9 @@ export function homeScene(input: HomeInput): HomeOutput {
     const airs: AirState[] = [];
     const moulds: MouldState[] = [];
     const floods: FloodState[] = [];
+    const smokes: SmokeState[] = [];
+    const coffees: CoffeeState[] = [];
+    const rainTanks: RainTankState[] = [];
     const sounds: SoundState[] = [];
     const streams: StreamState[] = [];
     const sprinklers: HomeScene['sprinklers'] = [];
@@ -467,6 +484,44 @@ export function homeScene(input: HomeInput): HomeOutput {
             const k = Number.isFinite(from) ? Math.min(1, Math.max(0, (now - from) / (15 * 60_000))) : 1;
             floods.push({ id: room.id, floor: floor.id, points: room.points, level: 0.012 + 0.06 * k });
         }
+        // smoke in a room whose detector went off: it comes down from the ceiling over the first three minutes
+        for (const sm of input.smokes ?? []) {
+            if (sm.floorId !== floor.id) {
+                continue;
+            }
+            const room = floor.rooms.find(r => r.id === sm.roomId);
+            if (!room || room.points.length < 3 || smokes.some(x => x.id === room.id)) {
+                continue;
+            }
+            const from = Date.parse(hass.states[sm.entity]?.last_changed ?? '');
+            const k = Number.isFinite(from) ? Math.min(1, Math.max(0, (now - from) / (3 * 60_000))) : 1;
+            smokes.push({
+                id: room.id,
+                floor: floor.id,
+                points: room.points,
+                top: floor.height,
+                level: 0.25 + 0.75 * k,
+            });
+        }
+        // coffee machines: steam over the cup while they brew
+        for (const f of floor.furniture) {
+            if (f.type !== 'coffee_machine') {
+                continue;
+            }
+            const entity = f.entity && f.entity !== 'none' ? f.entity : null;
+            coffees.push({
+                id: f.id,
+                floor: floor.id,
+                x: f.x,
+                z: f.z,
+                y: f.mount_y ?? input.surface?.(floor, f.x, f.z, f.h) ?? 0,
+                angle: rad(f.rotation ?? 0),
+                w: f.w,
+                d: f.d,
+                h: f.h,
+                brewing: !!entity && brewing(hass.states[entity]),
+            });
+        }
         // water at taps and showers
         for (const f of floor.furniture) {
             if (!WATER_TYPES.has(f.type) || (!f.water && !f.water_house)) {
@@ -551,6 +606,41 @@ export function homeScene(input: HomeInput): HomeOutput {
                 const m = num(f.moisture ? hass.states[f.moisture]?.state : null);
                 if (lawn && m !== null) {
                     dry.set(lawn.id, Math.max(dry.get(lawn.id) ?? 0, dryness(m, f.moisture_min ?? 30)));
+                }
+            } else if (f.type === 'rain_tank') {
+                // on the ground (a cistern in it); its fill from the level sensor, the litres over it
+                const kind = rainTankKind(f.rain_kind);
+                const y = groundAt(f.x, f.z);
+                const cap =
+                    f.tank_capacity && f.tank_capacity > 0 ? f.tank_capacity : rainTankCapacity(kind, f.w, f.d, f.h);
+                const st = f.entity && f.entity !== 'none' ? hass.states[f.entity] : undefined;
+                const u = st?.attributes.unit_of_measurement;
+                const fill = st ? rainTankFill(st.state, typeof u === 'string' ? u : '', cap, f.h) : null;
+                rainTanks.push({
+                    id: f.id,
+                    floor: floor.id,
+                    kind,
+                    x: f.x,
+                    z: f.z,
+                    y,
+                    angle: rad(f.rotation ?? 0),
+                    w: f.w,
+                    d: f.d,
+                    h: f.h,
+                    fill,
+                    label: fill === null ? null : `${input.fmt(fill * cap, 0)} l · ${Math.round(fill * 100)} %`,
+                    warn: fill !== null && fill < RAIN_LOW,
+                });
+                if (input.raining) {
+                    streams.push({
+                        id: `${f.id}-rain`,
+                        floor: floor.id,
+                        x: f.x,
+                        y: y + (kind === 'barrel' ? f.h + 0.04 : 0.06) + 0.45,
+                        z: f.z,
+                        drop: 0.45,
+                        spread: 0.02,
+                    });
                 }
             } else if (isCarKind(f.type)) {
                 // on the room's floor in a garage, else on the ground outside
@@ -724,7 +814,22 @@ export function homeScene(input: HomeInput): HomeOutput {
         }
     }
     return {
-        scene: { airs, moulds, floods, sounds, streams, sprinklers, lawns, mowers, badges, cars, glow },
+        scene: {
+            airs,
+            moulds,
+            floods,
+            sounds,
+            streams,
+            sprinklers,
+            lawns,
+            mowers,
+            badges,
+            cars,
+            smokes,
+            coffees,
+            rainTanks,
+            glow,
+        },
         alerts,
         price,
         warning,

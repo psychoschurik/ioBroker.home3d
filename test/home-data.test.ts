@@ -537,3 +537,52 @@ test('health report: one device per physical device, per room', () => {
         devices: [{ name: 'SENSOR.DOOR', problem: 'unreach', battery: null }],
     });
 });
+
+test('home: smoke comes down from the ceiling, a brewing coffee machine on the worktop steams', () => {
+    const b = house();
+    const now = Date.parse('2026-11-17T12:00:00Z');
+    b.floors[0].furniture.push(
+        { id: 'top', type: 'worktop', x: 1, z: 1, w: 1.2, d: 0.6, h: 0.9, rotation: 0 },
+        { id: 'cof', type: 'coffee_machine', x: 1, z: 1, w: 0.28, d: 0.4, h: 0.38, rotation: 90, entity: 'sensor.coffee_power' },
+    );
+    const states: Record<string, StateLike> = {
+        'binary_sensor.smoke': st('on', {}, new Date(now - 90_000).toISOString()),
+        'sensor.coffee_power': st('1400', { unit_of_measurement: 'W' }),
+    };
+    const out = homeScene(
+        input(b, states, {
+            now,
+            smokes: [{ entity: 'binary_sensor.smoke', roomId: 'living', floorId: 'eg' }],
+            surface: (_f, x, z) => (Math.abs(x - 1) < 0.6 && Math.abs(z - 1) < 0.3 ? 0.9 : 0),
+        }),
+    );
+    const smoke = out.scene.smokes?.[0];
+    assert.equal(smoke?.id, 'living');
+    assert.equal(smoke?.top, 2.6);
+    // half way down after a minute and a half
+    near(smoke!.level, 0.625, 0.001);
+    const cof = out.scene.coffees?.[0];
+    assert.equal(cof?.brewing, true);
+    assert.equal(cof?.y, 0.9);
+    near(cof!.angle, Math.PI / 2, 1e-9);
+    // in standby it does not steam
+    states['sensor.coffee_power'] = st('2', { unit_of_measurement: 'W' });
+    assert.equal(homeScene(input(b, states, { now })).scene.coffees?.[0]?.brewing, false);
+});
+
+test('home: a rainwater tank shows its litres, warns when nearly empty and fills while it rains', () => {
+    const b = house();
+    b.floors[0].furniture.push({ id: 'rt', type: 'rain_tank', x: -1, z: -4, w: 0.7, d: 0.7, h: 1, rotation: 0, entity: 'sensor.rain_level', tank_capacity: 300 });
+    const states: Record<string, StateLike> = { 'sensor.rain_level': st('120', { unit_of_measurement: 'l' }) };
+    let out = homeScene(input(b, states, { raining: true, ground: () => 0.1 }));
+    const rt = out.scene.rainTanks?.[0];
+    assert.equal(rt?.fill, 0.4);
+    assert.equal(rt?.y, 0.1);
+    assert.equal(rt?.label, '120 l · 40 %');
+    assert.equal(rt?.warn, false);
+    assert.ok(out.scene.streams.some(s => s.id === 'rt-rain'), 'rain runs in');
+    states['sensor.rain_level'] = st('5', { unit_of_measurement: '%' });
+    out = homeScene(input(b, states));
+    assert.equal(out.scene.rainTanks?.[0]?.warn, true);
+    assert.ok(!out.scene.streams.some(s => s.id === 'rt-rain'), 'dry weather');
+});

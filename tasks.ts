@@ -3010,6 +3010,278 @@ function treesMore(name: string, code: string): string {
 }
 
 /**
+ * Rainwater tank (rain-tank.ts, home-view.ts, home-fx.ts): a rain barrel or a cistern in the garden, filled to the level
+ * of its sensor, with the litres over it; while it rains, water runs in from above.
+ */
+function rainTankMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "coffee_machine",\n] as const;',
+            '  "coffee_machine",\n  "rain_tank",\n] as const;',
+            'rain tank: furniture types',
+        );
+        code = replaceRequired(
+            code,
+            '"tree_fruit", "bush"],',
+            '"tree_fruit", "bush", "rain_tank"],',
+            'rain tank: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  coffee_machine: [0.28, 0.4, 0.38],',
+            '  coffee_machine: [0.28, 0.4, 0.38],\n  // a 300 l rain barrel (a cistern: deeper, wider, in the ground)\n  rain_tank: [0.7, 0.7, 1],',
+            'rain tank: sizes',
+        );
+        code = replaceRequired(
+            code,
+            '  car_plate?: string | null;',
+            [
+                '  car_plate?: string | null;',
+                '  /** A rainwater tank: "barrel" on the ground or "cistern" in it. */',
+                '  rain_kind?: string | null;',
+                '  /** What a rainwater tank holds when full (l); missing: from its size. */',
+                '  tank_capacity?: number | null;',
+            ].join('\n'),
+            'rain tank: fields',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  bush: ["outdoor", ["garden"]],',
+            '  bush: ["outdoor", ["garden"]],\n  rain_tank: ["outdoor", ["garden"]],',
+            'rain tank: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "coffee_machine":',
+            [
+                '    case "rain_tank":',
+                '      // a rain barrel from above: its rim and its lid',
+                '      return [circle(0, 0, Math.min(w, d) / 2, "fp3d-sym-strong"), circle(0, 0, Math.min(w, d) * 0.3)];',
+                '    case "coffee_machine":',
+            ].join('\n'),
+            'rain tank: symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "coffee_machine":\n',
+            '    case "rain_tank":\n    case "coffee_machine":\n',
+            'rain tank: drawn by the home looks',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_rain_tank: 'Regenwassertank',
+            rain_tank_kind: 'Art',
+            rain_tank_barrel: 'Regentonne',
+            rain_tank_cistern: 'Zisterne (im Boden)',
+            rain_tank_entity: 'Füllstand (%, l, m³ oder cm)',
+            rain_tank_capacity: 'Inhalt voll (l, 0: aus der Größe)',
+            rain_tank_hint:
+                'Das Wasser steht so hoch, wie der Sensor meldet: in %, in Litern oder m³ des Inhalts oder als Wasserhöhe in cm oder m (die Höhe des Tanks ist voll). Darüber stehen Liter und Prozent, unter 10 % in der Warnfarbe. Eine Zisterne liegt im Boden und ist durch die Erde zu sehen. Solange es laut Wetter regnet, läuft Wasser hinein.',
+        };
+        const en: Record<string, string> = {
+            furn_rain_tank: 'Rainwater tank',
+            rain_tank_kind: 'Kind',
+            rain_tank_barrel: 'Rain barrel',
+            rain_tank_cistern: 'Cistern (in the ground)',
+            rain_tank_entity: 'Level (%, l, m³ or cm)',
+            rain_tank_capacity: 'Capacity when full (l, 0: from its size)',
+            rain_tank_hint:
+                'The water stands as high as the sensor reports: in %, in litres or m³ of the capacity, or as the water height in cm or m (the tank height is full). Litres and percent are shown above it, below 10 % in the warning colour. A cistern lies in the ground and is seen through the earth. While the weather says it rains, water runs in.',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  furn_coffee_machine: "Kaffeemaschine",',
+            `  furn_coffee_machine: "Kaffeemaschine",${lines(de)}`,
+            'rain tank de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_coffee_machine: "Coffee machine",',
+            `  furn_coffee_machine: "Coffee machine",${lines(en)}`,
+            'rain tank en',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '"car_hatchback", "car_van"]);',
+            '"car_hatchback", "car_van", "coffee_machine", "rain_tank"]);',
+            'rain tank, coffee machine: no state links',
+        );
+        code = replaceRequired(
+            code,
+            '    if (f.type === "coffee_machine")\n',
+            [
+                '    if (f.type === "rain_tank")',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        <label class="fp3d-field"',
+                '          >${this.t("rain_tank_kind" as I18nKey)}',
+                '          <select ?disabled=${!this.isAdmin} @change=${(e: Event) => { const k = (e.target as HTMLSelectElement).value; set(k === "cistern" ? { rain_kind: k, w: 2.2, d: 1.6, h: 1.5 } : { rain_kind: null, w: 0.7, d: 0.7, h: 1 }); }}>',
+                '            ${["barrel", "cistern"].map((k) => html`<option value=${k} ?selected=${k === (f.rain_kind ?? "barrel")}>${this.t(`rain_tank_${k}` as I18nKey)}</option>`)}',
+                '          </select></label',
+                '        >',
+                '        ${this.num(this.t("rain_tank_capacity" as I18nKey), f.tank_capacity ?? 0, (v) => set({ tank_capacity: v > 0 ? Math.round(v) : null }), 50, 0)}',
+                '        ${this.entitySelect(this.t("rain_tank_entity" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => id.startsWith("sensor.")), (v) => set({ entity: pick(v) }))}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("rain_tank_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (f.type === "coffee_machine")',
+                '',
+            ].join('\n'),
+            'rain tank: form',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '      surface: (f, x, z, h) => surfaceHeight(f as Floor, x, z, h),\n',
+            [
+                '      surface: (f, x, z, h) => surfaceHeight(f as Floor, x, z, h),',
+                '      raining: /rain|pour/.test((weatherId ? hass.states[weatherId]?.state : "") ?? ""),',
+                '',
+            ].join('\n'),
+            'rain tank: rain to the home looks',
+        );
+    }
+    if (name === 'viewer/preview.ts') {
+        code = `import { buildRainTank as fp3dPrevRainTank } from "${root}/frontend/vendor-ext/rain-tank.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '        ? fp3dPrevCoffee(item.w, item.d, item.h)\n        : null;',
+            '        ? fp3dPrevCoffee(item.w, item.d, item.h)\n        : item.type === "rain_tank"\n          ? fp3dPrevRainTank("barrel", item.w, item.d, item.h, 0.6)\n          : null;',
+            'rain tank: library picture',
+        );
+    }
+    return code;
+}
+
+/**
+ * Smoke and steam (kitchen.ts, home-view.ts, home-fx.ts): a coffee machine on the worktop that steams while it brews
+ * (by its socket), and smoke that fills a room from the ceiling down when its smoke detector goes off.
+ */
+function kitchenMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "bush",\n] as const;',
+            '  "bush",\n  "coffee_machine",\n] as const;',
+            'kitchen: furniture types',
+        );
+        code = replaceRequired(
+            code,
+            '"dishwasher", "fridge"],',
+            '"dishwasher", "fridge", "coffee_machine"],',
+            'kitchen: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  bush: [1.6, 1.6, 1.3],',
+            '  bush: [1.6, 1.6, 1.3],\n  // a coffee machine on the worktop\n  coffee_machine: [0.28, 0.4, 0.38],',
+            'kitchen: sizes',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  bush: ["outdoor", ["garden"]],',
+            '  bush: ["outdoor", ["garden"]],\n  coffee_machine: ["appliance", ["kitchen"]],',
+            'kitchen: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "tree":\n    case "tree_fruit":',
+            [
+                '    case "coffee_machine":',
+                '      // a coffee machine from above: its body, the tank at the back and the cup at the front',
+                '      return [rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"), line(-w / 2, -d / 2 + d * 0.22, w / 2, -d / 2 + d * 0.22), circle(0, d / 2 - d * 0.22, Math.min(w, d) * 0.16)];',
+                '    case "tree":',
+                '    case "tree_fruit":',
+            ].join('\n'),
+            'kitchen: symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "tree":\n    case "tree_conifer":',
+            '    case "coffee_machine":\n    case "tree":\n    case "tree_conifer":',
+            'kitchen: drawn by the home looks',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_coffee_machine: 'Kaffeemaschine',
+            coffee_entity: 'Steckdose (Schalter oder Leistung)',
+            coffee_hint: `Dampf steigt aus der Tasse, solange sie brüht: ein Schalter, der an ist, oder eine Leistung ab 300 W (ein Messwert in W oder kW). Steht sie auf einer Arbeitsplatte, steht sie auf deren Höhe.`,
+        };
+        const en: Record<string, string> = {
+            furn_coffee_machine: 'Coffee machine',
+            coffee_entity: 'Socket (switch or power)',
+            coffee_hint:
+                'Steam rises from the cup while it brews: a switch that is on, or a power of 300 W or more (a reading in W or kW). Placed on a worktop, it stands at its height.',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(code, '  furn_bush: "Strauch",', `  furn_bush: "Strauch",${lines(de)}`, 'kitchen de');
+        code = replaceRequired(code, '  furn_bush: "Bush",', `  furn_bush: "Bush",${lines(en)}`, 'kitchen en');
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '    if (FP3D_WATER_TYPES.has(f.type))\n',
+            [
+                '    if (f.type === "coffee_machine")',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        ${this.entitySelect(this.t("coffee_entity" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => /^(switch|sensor|binary_sensor|input_boolean)\\./.test(id)), (v) => set({ entity: pick(v) }))}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("coffee_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (FP3D_WATER_TYPES.has(f.type))',
+                '',
+            ].join('\n'),
+            'kitchen: form',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '      leaks: own.filter((a) => a.kind === "water" && !!a.roomId && !!a.floorId).map((a) => ({ entity: a.entity, roomId: a.roomId as string, floorId: a.floorId as string })),\n',
+            [
+                '      leaks: own.filter((a) => a.kind === "water" && !!a.roomId && !!a.floorId).map((a) => ({ entity: a.entity, roomId: a.roomId as string, floorId: a.floorId as string })),',
+                '      smokes: own.filter((a) => a.kind === "smoke" && !!a.roomId && !!a.floorId).map((a) => ({ entity: a.entity, roomId: a.roomId as string, floorId: a.floorId as string })),',
+                '      surface: (f, x, z, h) => surfaceHeight(f as Floor, x, z, h),',
+                '',
+            ].join('\n'),
+            'kitchen: smoke and surfaces to the home looks',
+        );
+    }
+    if (name === 'viewer/preview.ts') {
+        code = `import { buildCoffeeMachine as fp3dPrevCoffee } from "${root}/frontend/vendor-ext/kitchen.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '      : null;\n  if (fp3dOwn) scene.add(fp3dOwn);',
+            '      : item.type === "coffee_machine"\n        ? fp3dPrevCoffee(item.w, item.d, item.h)\n        : null;\n  if (fp3dOwn) scene.add(fp3dOwn);',
+            'kitchen: library picture',
+        );
+    }
+    return code;
+}
+
+/**
  * The weather beyond the condition: wind from own sensors or the weather entity (wind indicators "wind_vane" that turn
  * with it; on the sea the waves run with it, whitecaps from 4 Bft, gusts ruffle the water), rain rings on the sea and
  * wet surfaces, cloud shadows drifting with the wind, fog from the visibility or the dew point, and a warning when the
@@ -4238,6 +4510,8 @@ const patches: Plugin = {
         code = weatherMore(name, code);
         code = homeMore(name, code);
         code = treesMore(name, code);
+        code = kitchenMore(name, code);
+        code = rainTankMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

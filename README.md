@@ -190,6 +190,11 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Obstbaum im Frühling, Äpfel im Spätsommer, gelbes, oranges und rotes Laub im Herbst, das im Wind fällt, Schnee auf
   Kronen und Ästen, solange es schneit. Im Wind neigen sie sich, die Krone schwingt, Böen schütteln sie; auch die
   Bibliothek zeigt jetzt Bilder der Bäume und Autos
+- (bluefox) Rauch: löst ein Rauchmelder aus, füllt Rauch den Raum von der Decke her, in drei Minuten immer tiefer
+- (bluefox) Kaffeemaschine (Küche): steht auf der Arbeitsplatte; solange sie brüht (Steckdose an oder ab 300 W), läuft
+  Kaffee in die Tasse und Dampf steigt auf
+- (bluefox) Regenwassertank (Garten): Regentonne oder Zisterne im Boden, gefüllt nach dem Füllstandssensor (%, l, m³,
+  cm oder m), darüber Liter und Prozent, unter 10 % in der Warnfarbe; solange es regnet, läuft Wasser hinein
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler
