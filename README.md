@@ -344,7 +344,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Player: Ein Tipp auf einen Player zeigt seine Glaskarte mit den Knöpfen 5 Minuten lang auch, wenn er
   nicht spielt (noch ein Tipp blendet sie aus, langes Drücken öffnet wie bisher die Details); mit dem Haken „Steuerung
   immer zeigen“ am Player oder am Möbel steht sie dauerhaft. Die Karte sagt „aus“ oder „bereit“ und hat ⏻ für Player,
-  die sich ein- und ausschalten lassen
+  die sich ein- und ausschalten lassen. Zeigt „Anzeige“ die Karten nur beim Überfahren, gilt das auch dort: der Haken
+  zeigt die Karte ganz, ein Tipp auf einen Player, der nur seinen Punkt zeigt, öffnet erst die Karte
 - (bluefox) Batterie und Landstrom: Glaskarte über einer Hausbatterie mit Ladestand, Laden/Entladen in W,
   Spannung, Strom, Rest-/Gesamtkapazität in Ah, wie lange sie noch reicht bzw. bis sie voll ist, Temperatur und
   dem Landstrom (verbunden, mit welcher Leistung; auf einem Boot sonst das Netz aus den Energie-Einstellungen);
