@@ -341,6 +341,10 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Kühlschrank/Tiefkühler: Glaskarte mit der Temperatur von Kühlfach und Tiefkühler (auch zwei getrennte
   Thermometer, nach ihren Namen gefunden), Luftfeuchte, Leistung und offener Tür; Warnung über 7 °C bzw. −16 °C,
   „viel zu warm“ über 9 °C bzw. −12 °C
+- (bluefox) Player: Ein Tipp auf einen Player zeigt seine Glaskarte mit den Knöpfen 5 Minuten lang auch, wenn er
+  nicht spielt (noch ein Tipp blendet sie aus, langes Drücken öffnet wie bisher die Details); mit dem Haken „Steuerung
+  immer zeigen“ am Player oder am Möbel steht sie dauerhaft. Die Karte sagt „aus“ oder „bereit“ und hat ⏻ für Player,
+  die sich ein- und ausschalten lassen
 
 ### 0.4.0 (2026-11-15)
 

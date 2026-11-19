@@ -3171,6 +3171,207 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * Players (Klang & Kino): a tap on a media player shows its card with the controls for a few minutes even while it
+ * does not play (tapped again: gone; long press: its details as before), and a player or media furniture marked
+ * "always show the controls" (`media_card`) keeps its card. A player that is off or ready says so on the card, and
+ * one that can be switched gets ⏻.
+ */
+function mediaMore(name: string, code: string): string {
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            'interface HoloCard {',
+            [
+                '/** How long a tapped player shows its card while it does not play (ms). */',
+                'const FP3D_MEDIA_PIN_MS = 5 * 60 * 1000;',
+                '',
+                'interface HoloCard {',
+            ].join('\n'),
+            'media pin: duration',
+        );
+        code = replaceRequired(
+            code,
+            '  media?: { id: string; title: string; artist: string; picture: string | null; volume: number; playing: boolean };',
+            '  media?: { id: string; title: string; artist: string; picture: string | null; volume: number; playing: boolean; state?: string; pinned?: boolean };',
+            'media pin: card type',
+        );
+        code = replaceRequired(
+            code,
+            '  private declare _holos: HoloCard[];',
+            [
+                '  private declare _holos: HoloCard[];',
+                '  /** Players tapped to show their card, until when (ms). */',
+                '  private fp3dMediaPins = new Map<string, number>();',
+                '  /** The players that have a card now. */',
+                '  private fp3dMediaCards = new Set<string>();',
+            ].join('\n'),
+            'media pin: fields',
+        );
+        code = replaceRequired(
+            code,
+            '      const seenMedia = new Set<string>();',
+            '      const seenMedia = new Set<string>();\n      this.fp3dMediaCards = new Set<string>();',
+            'media pin: cards seen',
+        );
+        code = replaceRequired(
+            code,
+            '      const add = (floor: Building["floors"][number], id: string, x: number, z: number, top: number, name: string) => {',
+            '      const add = (floor: Building["floors"][number], id: string, x: number, z: number, top: number, name: string, always = false) => {',
+            'media pin: always',
+        );
+        code = replaceRequired(
+            code,
+            / {8}const showing = (!isUnavailable\(st\) && \(st\.state === "playing".*?\));\n/,
+            [
+                '        // shown while it plays – or always (marked so), or for a while after a tap',
+                '        const fp3dPinned = !this.ro && !isUnavailable(st) && (always || (this.fp3dMediaPins.get(id) ?? 0) > Date.now());',
+                '        const fp3dByItself = $1;',
+                '        const showing = fp3dByItself || fp3dPinned;',
+                '',
+            ].join('\n'),
+            'media pin: showing',
+        );
+        code = replaceRequired(
+            code,
+            '        const title = label || translate(hass, "holo_media_playing");',
+            '        const title = label || translate(hass, st.state === "playing" ? "holo_media_playing" : st.state === "off" || st.state === "standby" ? ("holo_media_off" as I18nKey) : ("holo_media_ready" as I18nKey));',
+            'media pin: title',
+        );
+        code = replaceRequired(
+            code,
+            /( {10}media: \{ id, title, .*?, playing )\},\n/,
+            '$1, state: st.state, pinned: fp3dPinned },\n',
+            'media pin: state',
+        );
+        code = replaceRequired(
+            code,
+            '        anchors.push(anchor);\n        cards.push(card);\n',
+            '        anchors.push(anchor);\n        cards.push(card);\n        this.fp3dMediaCards.add(id);\n',
+            'media pin: card shown',
+        );
+        code = replaceRequired(
+            code,
+            '          if (e) add(floor, e, f.x, f.z, mountBase(floor, f) + f.h, f.name || furnitureName(hass, f.type));',
+            '          if (e) add(floor, e, f.x, f.z, mountBase(floor, f) + f.h, f.name || furnitureName(hass, f.type), !!(f as { media_card?: boolean }).media_card);',
+            'media pin: furniture always',
+        );
+        code = replaceRequired(
+            code,
+            '      for (const floor of b.floors) for (const pl of floor.placements) add(floor, pl.entity_id, pl.x, pl.z, pl.y ?? 1.1, pl.name || entityName(hass, pl.entity_id));',
+            '      for (const floor of b.floors) for (const pl of floor.placements) add(floor, pl.entity_id, pl.x, pl.z, pl.y ?? 1.1, pl.name || entityName(hass, pl.entity_id), !!(pl as { media_card?: boolean }).media_card);',
+            'media pin: placement always',
+        );
+        // a card shown only by a tap or the mark does not linger after it (the grace is for a player between two songs)
+        code = replaceRequired(
+            code,
+            '        if (!this.ro) this.mediaGrace.set(id, { until: Date.now() + 45000, card, source: sound[sound.length - 1], anchor });',
+            '        if (!this.ro && fp3dByItself) this.mediaGrace.set(id, { until: Date.now() + 45000, card, source: sound[sound.length - 1], anchor });',
+            'media pin: no grace',
+        );
+        // the card: what an idle player is doing, and ⏻ for one that can be switched
+        code = replaceRequired(
+            code,
+            '${playing ? `● ${t("holo_media_playing")}` : t("holo_media_paused")}',
+            '${playing ? `● ${t("holo_media_playing")}` : m.state === "off" || m.state === "standby" ? t("holo_media_off" as I18nKey) : m.state && m.state !== "paused" ? t("holo_media_ready" as I18nKey) : t("holo_media_paused")}',
+            'media pin: state text',
+        );
+        code = replaceRequired(
+            code,
+            '          ? html`<div class="fp3d-holo-media-controls">\n',
+            [
+                '          ? html`<div class="fp3d-holo-media-controls">',
+                '                ${typeof features === "number" && (features & 384) !== 0',
+                '                  ? html`<button aria-label=${t("holo_media_power" as I18nKey)} class=${m.state === "off" || m.state === "standby" ? "" : "fp3d-holo-on"} @pointerdown=${press.down} @pointerup=${press.up(() => call(m.state === "off" || m.state === "standby" ? "turn_on" : "turn_off"))} @click=${press.key(() => call(m.state === "off" || m.state === "standby" ? "turn_on" : "turn_off"))}>⏻</button>`',
+                '                  : nothing}',
+                '',
+            ].join('\n'),
+            'media pin: power',
+        );
+        // a tap on a player without a card shows it (again: hides it); with its card: the details as before
+        code = replaceRequired(
+            code,
+            '    // a detection pin opens its sensor\n    if (entityId.startsWith("detect:")) {\n      openMoreInfo(this, entityId.slice(7));\n      return;\n    }\n',
+            [
+                '    // a detection pin opens its sensor',
+                '    if (entityId.startsWith("detect:")) {',
+                '      openMoreInfo(this, entityId.slice(7));',
+                '      return;',
+                '    }',
+                '    if (hasFeature("sound") && kindOf(entityId) === "media" && this.hass?.states[entityId]) {',
+                '      if ((this.fp3dMediaPins.get(entityId) ?? 0) > Date.now()) {',
+                '        this.fp3dMediaPins.delete(entityId);',
+                '        this.mediaGrace.delete(entityId);',
+                '        this.syncDevices(true);',
+                '        return;',
+                '      }',
+                '      if (!this.fp3dMediaCards.has(entityId)) {',
+                '        this.fp3dMediaPins.set(entityId, Date.now() + FP3D_MEDIA_PIN_MS);',
+                '        if (!this.holoVisible()) this.toggleHolos();',
+                '        setTimeout(() => this.syncDevices(true), FP3D_MEDIA_PIN_MS + 300);',
+                '        this.syncDevices(true);',
+                '        return;',
+                '      }',
+                '    }',
+                '',
+            ].join('\n'),
+            'media pin: tap',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        const check = (scope: string, update: string): string =>
+            [
+                `\${/^media_player\\./.test(${scope}) && hasFeature("sound")`,
+                '          ? html`<label class="fp3d-check fp3d-wide" title=${this.t("media_card_hint" as I18nKey)}',
+                `              ><input type="checkbox" .checked=\${!!(${update.split('|')[0]} as { media_card?: boolean }).media_card} ?disabled=\${!this.isAdmin} @change=\${(ev: Event) => this.${update.split('|')[1]}({ media_card: (ev.target as HTMLInputElement).checked || undefined } as never)} />`,
+                '              ${this.t("media_card" as I18nKey)}</label',
+                '            >`',
+                '          : nothing}',
+            ].join('\n');
+        code = replaceRequired(
+            code,
+            '        ${hasFeature("energy_pro") && !lamp && !["grid_point", "meter", "inverter", "home_battery"].includes(f.type)',
+            `        ${check('f.entity ?? ""', 'f|updateFurniture')}\n        \${hasFeature("energy_pro") && !lamp && !["grid_point", "meter", "inverter", "home_battery"].includes(f.type)`,
+            'media card: furniture form',
+        );
+        code = replaceRequired(
+            code,
+            '        ${hasFeature("energy_pro") && powerSensorFor(this.hass!, pl.entity_id)',
+            `        ${check('pl.entity_id', 'pl|updateDevice')}\n        \${hasFeature("energy_pro") && powerSensorFor(this.hass!, pl.entity_id)`,
+            'media card: placement form',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  holo_media_paused: "Pause",',
+            [
+                '  holo_media_paused: "Pause",',
+                '  holo_media_off: "aus",',
+                '  holo_media_ready: "bereit",',
+                '  holo_media_power: "Ein/Aus",',
+                '  media_card: "Steuerung immer zeigen",',
+                '  media_card_hint: "Die Glaskarte mit den Knöpfen (Wiedergabe, Lautstärke, Ein/Aus) steht immer über dem Player, nicht nur solange er spielt. Ohne Haken zeigt ein Tipp auf den Player sie für 5 Minuten.",',
+            ].join('\n'),
+            'media card de',
+        );
+        code = replaceRequired(
+            code,
+            '  holo_media_paused: "paused",',
+            [
+                '  holo_media_paused: "paused",',
+                '  holo_media_off: "off",',
+                '  holo_media_ready: "ready",',
+                '  holo_media_power: "On/off",',
+                '  media_card: "Always show the controls",',
+                '  media_card_hint: "The glass card with the buttons (playback, volume, on/off) always stands over the player, not only while it plays. Without the tick a tap on the player shows it for 5 minutes.",',
+            ].join('\n'),
+            'media card en',
+        );
+    }
+    return code;
+}
+
+/**
  * Robot vacuums (device-cards.ts): the robot drives by the state of an ioBroker datapoint too (the codes of
  * Xiaomi/Roborock, plain words), and finds its datapoint by name when none is linked.
  */
@@ -5943,6 +6144,7 @@ const patches: Plugin = {
         code = airVentMore(name, code);
         code = poolMore(name, code);
         code = robotMore(name, code);
+        code = mediaMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
