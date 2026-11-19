@@ -5,6 +5,7 @@ import { isCarKind } from './cars';
 import { brewing } from './kitchen';
 import { RAIN_LOW, rainTankCapacity, rainTankFill, rainTankKind } from './rain-tank';
 import { mailBase, mailShape } from './mail-flag';
+import { frontRank, parcelWaits, ringAt } from './parcel';
 import { serverKind, serverLoad } from './server';
 import type {
     AirState,
@@ -13,6 +14,7 @@ import type {
     RainTankState,
     ServerState,
     MailFlagState,
+    ParcelState,
     SmokeState,
     HazeState,
     BadgeState,
@@ -86,6 +88,8 @@ export interface OpeningLike {
     type: string;
     sill: number;
     height: number;
+    /** A door's look (front door, interior …). */
+    style?: string | null;
 }
 
 export interface FurnitureLike {
@@ -290,6 +294,8 @@ export interface HomeInput {
     raining?: boolean;
     /** Smoke detectors that went off, by room. */
     smokes?: readonly { entity: string; roomId: string; floorId: string }[];
+    /** The doorbells (event or binary sensor entities): a parcel lies at the front door after a ring. */
+    bells?: readonly string[];
     /** Whether post lies in a mailbox (its flap and door sensors); without it the flag stays down. */
     mailPost?: (f: FurnitureLike) => boolean;
     /** The height of the surface under a point (a worktop, a table), for things put on it; without it 0. */
@@ -347,6 +353,64 @@ export function priceInfo(input: HomeInput): PriceInfo | null {
         level: priceLevel(value, slots, input.now),
         cheapest: forecast ? cheapestWindow(slots, input.now, 1) : null,
     };
+}
+
+/** The parcel outside the front door while one waits there after the doorbell rang (none, or one). */
+function parcelAtDoor(input: HomeInput, hass: HomeInput['hass'], b: HomeInput['building'], now: number): ParcelState[] {
+    const rings = (input.bells ?? []).map(id => ringAt(id, hass.states[id])).filter((t): t is number => t !== null);
+    if (!rings.length) {
+        return [];
+    }
+    const ring = Math.max(...rings);
+    // the front door: a front door's style first, then any outer door, the lowest floor first
+    let best: { floor: FloorLike; room: RoomLike; o: OpeningLike; rank: number } | null = null;
+    for (const floor of b.floors) {
+        const others = floor.rooms.map(r => r.points);
+        for (const o of floor.openings) {
+            const room = floor.rooms.find(r => r.id === o.room_id);
+            if (
+                o.type !== 'door' ||
+                o.wall ||
+                !room ||
+                o.edge >= room.points.length ||
+                !isOuterEdge(room.points, o.edge, others)
+            ) {
+                continue;
+            }
+            const rank = frontRank(o.style) * 1000 + floor.elevation;
+            if (!best || rank < best.rank) {
+                best = { floor, room, o, rank };
+            }
+        }
+    }
+    if (!best) {
+        return [];
+    }
+    const { floor, room, o } = best;
+    const contact = input.contacts.get(o.id);
+    if (!parcelWaits(ring, contact ? hass.states[contact] : null, now)) {
+        return [];
+    }
+    const a = room.points[o.edge];
+    const c = room.points[(o.edge + 1) % room.points.length];
+    const len = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+    const u: Vec2 = [(c[0] - a[0]) / len, (c[1] - a[1]) / len];
+    const n = edgeNormalOut(room.points, o.edge);
+    // on the doormat outside, a little to the side of the door
+    const along = o.offset + Math.min(0.35, o.width * 0.3);
+    const x = a[0] + u[0] * along + n[0] * 0.55;
+    const z = a[1] + u[1] * along + n[1] * 0.55;
+    return [
+        {
+            id: 'fp3d-parcel',
+            floor: floor.id,
+            x,
+            z,
+            y: input.ground?.(floor, x, z) ?? 0,
+            angle: Math.atan2(u[1], u[0]),
+            label: input.t('home_parcel', { time: input.time(ring) }),
+        },
+    ];
 }
 
 /** Everything of the home looks at this moment. */
@@ -903,6 +967,7 @@ export function homeScene(input: HomeInput): HomeOutput {
             rainTanks,
             servers,
             mailFlags,
+            parcels: parcelAtDoor(input, hass, b, now),
             glow,
         },
         alerts,

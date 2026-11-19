@@ -35,6 +35,7 @@ import { buildBay, buildCar, type CarKind, WHEEL } from './cars';
 import { lanes, pathLength, pointAt, pointIn, type Corner, type MowerPhase, type Rgb, type Vec2 } from './home-data';
 import { buildCoffeeMachine } from './kitchen';
 import { buildRainTank, type RainTankKind } from './rain-tank';
+import { buildParcel } from './parcel';
 import { buildMailFlag, FLAG_DOWN, type MailShape } from './mail-flag';
 import { buildServer, LED_OFF, ledColor, ledLit, type ServerKind, type ServerLed, type ServerLoad } from './server';
 
@@ -243,6 +244,18 @@ export interface RainTankState {
     warn: boolean;
 }
 
+/** A parcel outside the front door after the doorbell rang. */
+export interface ParcelState {
+    id: string;
+    floor: string;
+    x: number;
+    z: number;
+    y: number;
+    /** Along the wall (rad, as the plan turns). */
+    angle: number;
+    label: string;
+}
+
 /** A mailbox's flag: up while post lies in it. */
 export interface MailFlagState {
     id: string;
@@ -292,6 +305,7 @@ export interface HomeScene {
     rainTanks?: RainTankState[];
     servers?: ServerState[];
     mailFlags?: MailFlagState[];
+    parcels?: ParcelState[];
     glow: GlowState | null;
 }
 
@@ -694,6 +708,7 @@ export class HomeFx {
             (s.hazes ?? []).map(x => [x.id, x.floor, x.points, x.top, x.label]),
             (s.coffees ?? []).map(c => [c.id, c.floor, c.x, c.z, c.y, c.angle, c.w, c.d, c.h]),
             (s.servers ?? []).map(v => [v.id, v.floor, v.kind, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
+            (s.parcels ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.label]),
             (s.mailFlags ?? []).map(v => [v.id, v.floor, v.shape, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
             (s.rainTanks ?? []).map(r => [
                 r.id,
@@ -751,6 +766,15 @@ export class HomeFx {
                 m.add(label);
             }
             this.floorGroup(r.floor).add(m);
+        }
+        for (const v of s.parcels ?? []) {
+            const m = buildParcel(this.light);
+            m.position.set(v.x, v.y, v.z);
+            m.rotation.y = -v.angle;
+            const l = labelSprite(v.label, this.light, null, 0.024);
+            l.position.set(0, 0.75, 0);
+            m.add(l);
+            this.floorGroup(v.floor).add(m);
         }
         for (const v of s.mailFlags ?? []) {
             const m = buildMailFlag(v.shape, v.w, v.d, v.h, this.light);

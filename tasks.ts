@@ -2646,6 +2646,7 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
             home_window_heat: 'Fenster seit {min} min offen, Heizung läuft',
             home_water_run: 'Wasser läuft seit {min} min ({flow} l/min)',
             home_air_out: 'Lüften',
+            home_parcel: '📦 Paket · {time}',
             home_mower_error: 'Mähroboter: Fehler',
             home_adapter_stopped: 'Adapter gestoppt',
             home_adapter_disconnected: 'Adapter ohne Verbindung',
@@ -2719,6 +2720,7 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
             home_window_heat: 'Window open for {min} min while heating',
             home_water_run: 'Water running for {min} min ({flow} l/min)',
             home_air_out: 'Air the room',
+            home_parcel: '📦 Parcel · {time}',
             home_mower_error: 'Robot mower: error',
             home_adapter_stopped: 'adapter stopped',
             home_adapter_disconnected: 'adapter not connected',
@@ -3317,6 +3319,12 @@ function mailFlagMore(name: string, code: string): string {
             '      surface: (f, x, z, h) => surfaceHeight(f as Floor, x, z, h),\n',
             '      surface: (f, x, z, h) => surfaceHeight(f as Floor, x, z, h),\n      mailPost: (f) => mailboxPost(f as never, hass),\n',
             'mail flag: post to the home looks',
+        );
+        code = replaceRequired(
+            code,
+            '      mailPost: (f) => mailboxPost(f as never, hass),\n',
+            '      mailPost: (f) => mailboxPost(f as never, hass),\n      bells: doorbellEntities(hass, b.settings.director?.doorbell_entity),\n',
+            'parcel: the doorbells to the home looks',
         );
     }
     return code;

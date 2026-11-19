@@ -633,3 +633,23 @@ test('home: a mailbox raises its flag while post lies in it, on the wall at 1 m,
         ],
     );
 });
+
+test('home: after the doorbell a parcel lies outside the front door until the door opens', () => {
+    const b = house();
+    const now = Date.parse('2026-11-19T14:00:00Z');
+    b.floors[0].openings.push({ id: 'front', room_id: 'living', edge: 0, offset: 3.5, width: 1, type: 'door', sill: 0, height: 2.1, style: 'front' });
+    const states: Record<string, StateLike> = {
+        'binary_sensor.klingel': st('off', {}, new Date(now - 10 * 60_000).toISOString()),
+        'binary_sensor.front': st('off', {}, new Date(now - 3600_000).toISOString()),
+    };
+    const contacts = new Map([['front', 'binary_sensor.front']]);
+    const scene = (): ReturnType<typeof homeScene>['scene'] => homeScene(input(b, states, { now, bells: ['binary_sensor.klingel'], contacts })).scene;
+    const p = scene().parcels?.[0];
+    assert.ok(p);
+    assert.match(p.label, /home_parcel|Paket|Parcel/);
+    // outside the wall (edge 0 lies at z = 0, the room at z > 0)
+    assert.ok(p.z < 0);
+    // the door opened since: taken in
+    states['binary_sensor.front'] = st('off', {}, new Date(now - 60_000).toISOString());
+    assert.equal(scene().parcels?.length, 0);
+});
