@@ -345,6 +345,10 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   nicht spielt (noch ein Tipp blendet sie aus, langes Drücken öffnet wie bisher die Details); mit dem Haken „Steuerung
   immer zeigen“ am Player oder am Möbel steht sie dauerhaft. Die Karte sagt „aus“ oder „bereit“ und hat ⏻ für Player,
   die sich ein- und ausschalten lassen
+- (bluefox) Batterie und Landstrom: Glaskarte über einer Hausbatterie mit Ladestand, Laden/Entladen in W,
+  Spannung, Strom, Rest-/Gesamtkapazität in Ah, wie lange sie noch reicht bzw. bis sie voll ist, Temperatur und
+  dem Landstrom (verbunden, mit welcher Leistung; auf einem Boot sonst das Netz aus den Energie-Einstellungen);
+  die Werte werden neben dem Ladestand-Datenpunkt gefunden (z. B. wattcycle), Warnung unter 20 %
 
 ### 0.4.0 (2026-11-15)
 

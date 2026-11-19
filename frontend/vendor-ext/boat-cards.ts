@@ -20,6 +20,13 @@ interface WindSettings {
     pressure_entity?: string | null;
     sea_level?: number | null;
 }
+/** The plan's energy sensors: the battery's power (positive = discharging, unless inverted) and charge, the grid. */
+interface EnergyLike {
+    battery?: string | null;
+    battery_invert?: boolean;
+    battery_soc?: string | null;
+    grid?: string | null;
+}
 interface HassLike {
     states: Record<string, StateLike | undefined>;
 }
@@ -39,10 +46,24 @@ export interface BoatItem {
     /** Wind indicator: the apparent wind's speed and its angle to the bow (− port, + starboard). */
     wind_apparent_speed?: string | null;
     wind_apparent_angle?: string | null;
+    /** Home battery: its state of charge and power (the plan's own fields), and the datapoints of its card. */
+    soc?: string | null;
+    power?: string | null;
+    battery_voltage?: string | null;
+    battery_current?: string | null;
+    battery_remaining?: string | null;
+    battery_capacity?: string | null;
+    battery_temp?: string | null;
+    /** Shore power: the power it brings (a charger's, an inverter's AC input) and whether it is plugged in. */
+    shore_power?: string | null;
+    shore_connected?: string | null;
 }
 interface BoatHost {
     hass(): HassLike;
-    building(): { floors: { id: string; furniture: BoatItem[] }[]; settings?: WindSettings } | null | undefined;
+    building():
+        | { floors: { id: string; furniture: BoatItem[] }[]; settings?: WindSettings; energy?: EnergyLike }
+        | null
+        | undefined;
     language(): string;
 }
 
@@ -67,6 +88,31 @@ const TEXTS: Record<string, Record<string, string>> = {
         gas: 'Gas',
         grey: 'Grauwasser',
         black: 'Schwarzwasser',
+        battery: 'Batterie',
+        soc: 'Ladestand',
+        charging: 'lädt',
+        discharging: 'entlädt',
+        bat_full: 'voll',
+        idle: 'Ruhe',
+        battery_low: 'Batterie fast leer',
+        voltage: 'Spannung',
+        current: 'Strom',
+        capacity: 'Kapazität',
+        runtime: 'reicht noch',
+        until_full: 'voll in',
+        temperature: 'Temperatur',
+        shore: 'Landstrom',
+        shore_on: 'verbunden',
+        shore_off: 'nicht verbunden',
+        battery_hint:
+            'Ladestand und Leistung kommen aus dem Möbel bzw. aus ⚙ → Energie (Batterie). Die übrigen Datenpunkte werden neben dem Ladestand gesucht (Spannung, Strom, Rest- und Gesamtkapazität in Ah, Temperatur). Strom: positiv = laden. Landstrom: die Leistung, die er bringt (Ladegerät, AC-Eingang) – auf einem Boot sonst das Netz aus ⚙ → Energie – und ob er angesteckt ist.',
+        battery_voltage: 'Spannung',
+        battery_current: 'Strom (A, + = laden)',
+        battery_remaining: 'Restkapazität (Ah)',
+        battery_capacity: 'Gesamtkapazität (Ah)',
+        battery_temp: 'Temperatur',
+        shore_power: 'Landstrom: Leistung',
+        shore_connected: 'Landstrom: verbunden',
         wind: 'Wind',
         wind_true: 'wahrer Wind',
         wind_weather: 'laut Wetterdienst',
@@ -104,6 +150,31 @@ const TEXTS: Record<string, Record<string, string>> = {
         gas: 'Gas',
         grey: 'Grey water',
         black: 'Black water',
+        battery: 'Battery',
+        soc: 'Charge',
+        charging: 'charging',
+        discharging: 'discharging',
+        bat_full: 'full',
+        idle: 'idle',
+        battery_low: 'Battery nearly empty',
+        voltage: 'Voltage',
+        current: 'Current',
+        capacity: 'Capacity',
+        runtime: 'lasts',
+        until_full: 'full in',
+        temperature: 'Temperature',
+        shore: 'Shore power',
+        shore_on: 'connected',
+        shore_off: 'not connected',
+        battery_hint:
+            'Charge and power come from the furniture or from ⚙ → Energy (battery). The other datapoints are looked for beside the charge (voltage, current, remaining and total capacity in Ah, temperature). Current: positive = charging. Shore power: the power it brings (a charger, an AC input) – on a boat else the grid of ⚙ → Energy – and whether it is plugged in.',
+        battery_voltage: 'Voltage',
+        battery_current: 'Current (A, + = charging)',
+        battery_remaining: 'Remaining capacity (Ah)',
+        battery_capacity: 'Total capacity (Ah)',
+        battery_temp: 'Temperature',
+        shore_power: 'Shore power: power',
+        shore_connected: 'Shore power: connected',
         wind: 'Wind',
         wind_true: 'true wind',
         wind_weather: 'weather service',
@@ -141,6 +212,31 @@ const TEXTS: Record<string, Record<string, string>> = {
         gas: 'Газ',
         grey: 'Серые воды',
         black: 'Чёрные воды',
+        battery: 'Аккумулятор',
+        soc: 'Заряд',
+        charging: 'заряжается',
+        discharging: 'разряжается',
+        bat_full: 'полный',
+        idle: 'покой',
+        battery_low: 'Аккумулятор почти разряжен',
+        voltage: 'Напряжение',
+        current: 'Ток',
+        capacity: 'Ёмкость',
+        runtime: 'хватит на',
+        until_full: 'полный через',
+        temperature: 'Температура',
+        shore: 'Береговое питание',
+        shore_on: 'подключено',
+        shore_off: 'не подключено',
+        battery_hint:
+            'Заряд и мощность берутся из предмета или из ⚙ → Энергия (аккумулятор). Остальные точки данных ищутся рядом с зарядом (напряжение, ток, остаточная и полная ёмкость в Ач, температура). Ток: положительный = заряд. Береговое питание: мощность, которую оно даёт (зарядное устройство, вход AC) – на лодке иначе сеть из ⚙ → Энергия – и подключено ли оно.',
+        battery_voltage: 'Напряжение',
+        battery_current: 'Ток (А, + = заряд)',
+        battery_remaining: 'Остаточная ёмкость (Ач)',
+        battery_capacity: 'Полная ёмкость (Ач)',
+        battery_temp: 'Температура',
+        shore_power: 'Береговое питание: мощность',
+        shore_connected: 'Береговое питание: подключено',
         wind: 'Ветер',
         wind_true: 'истинный ветер',
         wind_weather: 'по прогнозу погоды',
@@ -390,11 +486,202 @@ export function windCard(
     };
 }
 
+/** The datapoint of a battery's value beside its state of charge (the same device of the adapter), else none. */
+const BATTERY_FIELDS = {
+    battery_voltage: (id: string, a: Record<string, unknown>): boolean =>
+        /voltage/.test(str(a.iobroker_role)) && !/max|min|cell/i.test(id),
+    battery_current: (id: string, a: Record<string, unknown>): boolean =>
+        /current/.test(str(a.iobroker_role)) && !/max|min/i.test(id),
+    battery_remaining: (id: string): boolean => /remain|rest/i.test(id) && /ah|capacity|kapaz/i.test(id),
+    battery_capacity: (id: string): boolean => /total_?ah|full_?capacity|capacity_?ah|nominal/i.test(id),
+    battery_temp: (id: string, a: Record<string, unknown>): boolean =>
+        /temperature/.test(str(a.iobroker_role)) && !/mos|pcb|cpu|board/i.test(id),
+} as const;
+type BatteryField = keyof typeof BATTERY_FIELDS;
+
+/** A value of the battery: chosen at the furniture ("none": off), else found beside its state of charge. */
+export function batteryLink(hass: HassLike, f: BoatItem, socId: string | null, key: BatteryField): string | null {
+    const own = f[key];
+    if (own === 'none') {
+        return null;
+    }
+    if (own) {
+        return own;
+    }
+    const socPath = socId ? str(hass.states[socId]?.attributes.iobroker_id) : '';
+    const base = socPath ? socPath.slice(0, socPath.lastIndexOf('.') + 1) : '';
+    if (!base) {
+        return null;
+    }
+    return (
+        Object.keys(hass.states)
+            .sort()
+            .find(id => {
+                const a = hass.states[id]!.attributes;
+                const path = str(a.iobroker_id);
+                return (
+                    id.startsWith('sensor.') &&
+                    path.startsWith(base) &&
+                    !path.slice(base.length).includes('.') &&
+                    BATTERY_FIELDS[key](path, a)
+                );
+            }) ?? null
+    );
+}
+
+/** Hours and minutes: "5 h 20 min", "45 min", "3 d" beyond two days. */
+function duration(lang: string, h: number): string {
+    if (h >= 48) {
+        return `${Math.round(h / 24).toLocaleString(lang)} d`;
+    }
+    const m = Math.round(h * 60);
+    return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
+}
+
+/** A battery's card (a home battery in the plan): charge, charging or discharging, voltage, current, how long it lasts, shore power. */
+export function batteryCard(host: BoatHost, floorId: string, f: BoatItem): Record<string, unknown> | null {
+    const hass = host.hass();
+    const lang = host.language();
+    const b = host.building();
+    const energy = b?.energy ?? {};
+    const socId = linked(f.soc) ? f.soc : linked(energy.battery_soc) ? energy.battery_soc : null;
+    const powerId = linked(f.power) ? f.power : linked(energy.battery) ? energy.battery : null;
+    const soc = num(hass, socId);
+    const rawPower = num(hass, powerId);
+    if (soc === null && rawPower === null) {
+        return null;
+    }
+    // the plan's battery sensor: positive = discharging (inverted: charging); a sensor of its own: positive = charging
+    const fromPlan = powerId === energy.battery && !linked(f.power);
+    const charge = rawPower === null ? null : fromPlan ? (energy.battery_invert ? rawPower : -rawPower) : rawPower;
+    const link = (key: BatteryField): string | null => batteryLink(hass, f, socId, key);
+    const voltage = num(hass, link('battery_voltage'));
+    const current = num(hass, link('battery_current'));
+    const remaining = num(hass, link('battery_remaining'));
+    const capacity = num(hass, link('battery_capacity'));
+    const temp = num(hass, link('battery_temp'));
+    const flow = charge ?? (current !== null && voltage !== null ? current * voltage : null);
+    const word =
+        flow !== null && flow > 15
+            ? soc !== null && soc >= 99.5
+                ? 'bat_full'
+                : 'charging'
+            : flow !== null && flow < -15
+              ? 'discharging'
+              : soc !== null && soc >= 99.5
+                ? 'bat_full'
+                : 'idle';
+    const low = soc !== null && soc < 20;
+    const color = low
+        ? RED
+        : soc !== null && soc < 35
+          ? ORANGE
+          : word === 'charging' || word === 'bat_full'
+            ? GREEN
+            : BLUE;
+    const fmt = (v: number, digits: number): string =>
+        v.toLocaleString(lang, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+    const watts = (w: number): string => `${Math.round(Math.abs(w)).toLocaleString(lang)} W`;
+    const rows: Record<string, unknown>[] = [];
+    if (soc !== null) {
+        rows.push({ label: text(lang, 'soc'), value: `${Math.round(soc)} %`, at: soc, fill: true, color });
+    }
+    if (remaining !== null && capacity !== null && capacity > 0) {
+        rows.push({
+            label: text(lang, 'capacity'),
+            value: `${Math.round(remaining).toLocaleString(lang)} / ${Math.round(capacity).toLocaleString(lang)} Ah`,
+        });
+    }
+    // how long it lasts (discharging) or until it is full (charging): from the Ah and the current, else from the power
+    const amps = current ?? (flow !== null && voltage ? flow / voltage : null);
+    if (amps !== null && Math.abs(amps) >= 0.2) {
+        const left = amps < 0 ? remaining : remaining !== null && capacity !== null ? capacity - remaining : null;
+        if (left !== null && left > 0) {
+            rows.push({
+                label: text(lang, amps < 0 ? 'runtime' : 'until_full'),
+                value: duration(lang, left / Math.abs(amps)),
+            });
+        }
+    }
+    const cells: Record<string, unknown>[] = [];
+    if (voltage !== null) {
+        cells.push({ label: text(lang, 'voltage'), value: `${fmt(voltage, 2)} V` });
+    }
+    if (current !== null) {
+        cells.push({ label: text(lang, 'current'), value: `${fmt(current, 1)} A` });
+    }
+    if (temp !== null) {
+        cells.push({ label: text(lang, 'temperature'), value: `${fmt(temp, 1)} °C` });
+    }
+    // shore power: its own datapoints, on a boat else the plan's grid (the charger)
+    const boat = typeof b?.settings?.sea_level === 'number';
+    const shoreOff = f.shore_power === 'none';
+    const shoreId = linked(f.shore_power)
+        ? f.shore_power
+        : !shoreOff && boat && linked(energy.grid)
+          ? energy.grid
+          : null;
+    const shoreW = num(hass, shoreId);
+    const plugSt = linked(f.shore_connected) ? hass.states[f.shore_connected] : undefined;
+    const plugged =
+        plugSt && !DEAD.test(plugSt.state)
+            ? /^(on|true|1|connected|verbunden)$/i.test(plugSt.state)
+            : shoreW !== null
+              ? Math.abs(shoreW) > 5
+              : null;
+    if (plugged !== null) {
+        rows.push({
+            label: text(lang, 'shore'),
+            value: plugged
+                ? `${text(lang, 'shore_on')}${shoreW !== null && Math.abs(shoreW) > 5 ? ` · ${watts(shoreW)}` : ''}`
+                : text(lang, 'shore_off'),
+            color: plugged ? GREEN : undefined,
+        });
+    }
+    return {
+        id: `boat:battery:${f.id}`,
+        anchor: { floorId, furnitureId: f.id },
+        icon: '🔋',
+        title: f.name || text(lang, 'battery'),
+        live: [soc !== null ? `${Math.round(soc)} %` : '', flow !== null && Math.abs(flow) > 15 ? watts(flow) : '']
+            .filter(Boolean)
+            .join(' · '),
+        liveColor: color,
+        status: {
+            icon: low ? '⚠' : word === 'charging' ? '⚡' : word === 'discharging' ? '↓' : '✓',
+            text: text(lang, word),
+            color,
+        },
+        main: {
+            text: soc !== null ? `${Math.round(soc)} %` : watts(flow ?? 0),
+            sub: text(lang, soc !== null ? 'soc' : word),
+            ...(soc !== null && flow !== null
+                ? {
+                      side: {
+                          text: `${flow > 0 ? '+' : flow < 0 ? '−' : ''}${watts(flow)}`,
+                          sub: text(lang, word),
+                          color,
+                      },
+                  }
+                : {}),
+        },
+        rows,
+        ...(cells.length ? { cells } : {}),
+        ...(low ? { hint: { text: text(lang, 'battery_low'), color: RED } } : {}),
+    };
+}
+
 /** The boat's cards: an anchor's, and one for the tanks of each floor (a furniture's device_card false leaves it out). */
 export function boatCards(host: BoatHost): unknown[] {
     const out: unknown[] = [];
     for (const fl of host.building()?.floors ?? []) {
         for (const f of fl.furniture) {
+            if (f.type === 'home_battery' && f.device_card !== false) {
+                const card = batteryCard(host, fl.id, f);
+                if (card) {
+                    out.push(card);
+                }
+            }
             if (f.type === 'anchor' && f.device_card !== false) {
                 const card = anchorCard(host, fl.id, f);
                 if (card) {
@@ -425,7 +712,16 @@ export function boatCards(host: BoatHost): unknown[] {
 /** The datapoints the boat's cards read. */
 export function boatWatched(host: BoatHost): string[] {
     const set = host.building()?.settings ?? {};
-    const out: string[] = [set.wind_speed, set.wind_dir, set.wind_gust, set.pressure_entity].filter(linked);
+    const energy = host.building()?.energy ?? {};
+    const out: string[] = [
+        set.wind_speed,
+        set.wind_dir,
+        set.wind_gust,
+        set.pressure_entity,
+        energy.battery,
+        energy.battery_soc,
+        energy.grid,
+    ].filter(linked);
     for (const fl of host.building()?.floors ?? []) {
         for (const f of fl.furniture) {
             const ids =
@@ -435,7 +731,22 @@ export function boatWatched(host: BoatHost): string[] {
                       ? [f.gear_entity, f.gear_liters]
                       : f.type === 'wind_vane'
                         ? [f.wind_apparent_speed, f.wind_apparent_angle]
-                        : [];
+                        : f.type === 'home_battery'
+                          ? [
+                                f.soc,
+                                f.power,
+                                f.shore_power,
+                                f.shore_connected,
+                                ...(Object.keys(BATTERY_FIELDS) as BatteryField[]).map(k =>
+                                    batteryLink(
+                                        host.hass(),
+                                        f,
+                                        linked(f.soc) ? f.soc : (energy.battery_soc ?? null),
+                                        k,
+                                    ),
+                                ),
+                            ]
+                          : [];
             out.push(...ids.filter(linked));
         }
     }
@@ -453,7 +764,7 @@ export function boatFields(
     host: BoatHost & { updateBuilding?(mutate: (b: { floors: { furniture: BoatItem[] }[] }) => void): void },
     item: BoatItem,
 ): unknown[] {
-    if (item.type !== 'anchor' && item.type !== 'tank' && item.type !== 'wind_vane') {
+    if (item.type !== 'anchor' && item.type !== 'tank' && item.type !== 'wind_vane' && item.type !== 'home_battery') {
         return [];
     }
     const lang = host.language();
@@ -479,6 +790,37 @@ export function boatFields(
                 }
             }),
     });
+    const energy = host.building()?.energy ?? {};
+    const socId = linked(item.soc) ? item.soc : (energy.battery_soc ?? null);
+    const pick = (
+        key: BatteryField | 'shore_power' | 'shore_connected',
+        auto: string | null,
+    ): Record<string, unknown> => ({
+        kind: 'entity',
+        label: text(lang, key),
+        value: item[key] ?? null,
+        auto,
+        filter: (id: string) => /^(sensor|binary_sensor)\./.test(id),
+        set: (v: string | null) =>
+            update(f => {
+                if (v === null) {
+                    delete f[key];
+                } else {
+                    f[key] = v;
+                }
+            }),
+    });
+    const batteryFields =
+        item.type === 'home_battery'
+            ? [
+                  ...(Object.keys(BATTERY_FIELDS) as BatteryField[]).map(k =>
+                      pick(k, batteryLink(host.hass(), { ...item, [k]: null }, socId, k)),
+                  ),
+                  pick('shore_power', null),
+                  pick('shore_connected', null),
+                  { kind: 'text', text: text(lang, 'battery_hint') },
+              ]
+            : [];
     const windFields =
         item.type === 'wind_vane'
             ? [
@@ -490,7 +832,7 @@ export function boatFields(
     return [
         {
             kind: 'check',
-            label: `${text(lang, item.type === 'anchor' ? 'anchor' : item.type === 'tank' ? 'tanks' : 'wind')}: ${CARD[lang.slice(0, 2)] ?? CARD.en}`,
+            label: `${text(lang, item.type === 'anchor' ? 'anchor' : item.type === 'tank' ? 'tanks' : item.type === 'home_battery' ? 'battery' : 'wind')}: ${CARD[lang.slice(0, 2)] ?? CARD.en}`,
             value: item.device_card !== false,
             set: (v: boolean) =>
                 host.updateBuilding?.(b => {
@@ -505,6 +847,7 @@ export function boatFields(
                 }),
         },
         ...windFields,
+        ...batteryFields,
     ];
 }
 

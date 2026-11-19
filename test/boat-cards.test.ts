@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { boatCards, boatFields, boatWatched, windCard, type BoatItem } from '../frontend/vendor-ext/boat-cards';
+import { batteryLink, boatCards, boatFields, boatWatched, windCard, type BoatItem } from '../frontend/vendor-ext/boat-cards';
 
 type St = { state: string; attributes: Record<string, unknown> };
 const st = (state: string, unit = ''): St => ({ state, attributes: unit ? { unit_of_measurement: unit } : {} });
@@ -110,4 +110,50 @@ test('wind card: true wind in knots on a boat, Beaufort, where from, apparent wi
     // the form finds the apparent wind by its datapoint
     const fields = boatFields(host, { id: 'v', type: 'wind_vane' }) as { auto?: string | null }[];
     assert.deepEqual(fields.slice(1, 3).map(f => f.auto), ['sensor.aws', 'sensor.awa']);
+});
+
+test('battery card: charge and power from the plan, values found beside the charge, how long it lasts, shore power', () => {
+    const io = (id: string, role: string, unit: string, state: string): St => ({ state, attributes: { iobroker_id: id, iobroker_role: role, unit_of_measurement: unit } });
+    const states: Record<string, St> = {
+        'sensor.soc': io('wattcycle.0.total.soc_min', 'value.battery', '%', '100'),
+        'sensor.pw': io('wattcycle.0.total.power', 'value.power', 'W', '0'),
+        'sensor.v': io('wattcycle.0.total.voltage', 'value.voltage', 'V', '14.01'),
+        'sensor.vmax': io('wattcycle.0.total.voltage_max', 'value.voltage', 'V', '14.1'),
+        'sensor.a': io('wattcycle.0.total.current', 'value.current', 'A', '0'),
+        'sensor.rem': io('wattcycle.0.total.remaining_ah', 'value', 'Ah', '1279'),
+        'sensor.tot': io('wattcycle.0.total.total_ah', 'value', 'Ah', '1280.8'),
+        'sensor.mos': io('wattcycle.0.total.mos_temp_max', 'value.temperature', '°C', '26.5'),
+        'sensor.charger': io('victron-cerbo.0.system.0.Dc.Charger.Power', 'value.power', 'W', '207.7'),
+    };
+    const bat: BoatItem = { id: 'bat', type: 'home_battery', name: 'Batteriebank' };
+    const building = {
+        settings: { sea_level: -1.3 },
+        energy: { battery: 'sensor.pw', battery_invert: true, battery_soc: 'sensor.soc', grid: 'sensor.charger' },
+        floors: [{ id: 'ud', furniture: [bat] }],
+    };
+    const host = { hass: () => ({ states }), building: () => building, language: () => 'de' };
+    type Card = { live: string; status: { text: string }; main: { text: string; side?: { text: string } }; rows: { label: string; value: string }[]; cells?: { label: string; value: string }[]; hint?: { text: string } };
+    assert.equal(batteryLink({ states }, bat, 'sensor.soc', 'battery_voltage'), 'sensor.v');
+    assert.equal(batteryLink({ states }, bat, 'sensor.soc', 'battery_temp'), null);
+    let [card] = boatCards(host) as Card[];
+    assert.equal(card.status.text, 'voll');
+    assert.equal(card.main.text, '100 %');
+    assert.deepEqual(card.rows.map(r => [r.label, r.value]), [
+        ['Ladestand', '100 %'],
+        ['Kapazität', '1.279 / 1.281 Ah'],
+        ['Landstrom', 'verbunden · 208 W'],
+    ]);
+    assert.deepEqual(card.cells?.map(c => c.value), ['14,01 V', '0,0 A']);
+    // discharging: the plan's sensor is inverted, positive = charging; 10 A out of 50 Ah: 5 h
+    states['sensor.pw'] = { ...states['sensor.pw'], state: '-130' };
+    states['sensor.a'] = { ...states['sensor.a'], state: '-10' };
+    states['sensor.rem'] = { ...states['sensor.rem'], state: '50' };
+    states['sensor.soc'] = { ...states['sensor.soc'], state: '15' };
+    states['sensor.charger'] = { ...states['sensor.charger'], state: '0' };
+    [card] = boatCards(host) as Card[];
+    assert.equal(card.status.text, 'entlädt');
+    assert.equal(card.main.side?.text, '−130 W');
+    assert.ok(card.rows.some(r => r.label === 'reicht noch' && r.value === '5 h'));
+    assert.ok(card.rows.some(r => r.label === 'Landstrom' && r.value === 'nicht verbunden'));
+    assert.equal(card.hint?.text, 'Batterie fast leer');
 });
