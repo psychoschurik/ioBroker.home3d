@@ -2,6 +2,9 @@
 //   toon     thick dark outlines where the depth jumps (silhouettes, furniture against walls), like a comic
 //   gouache  opaque watercolour: Kuwahara filter (flat, painted colour areas), wobbling brush edges, darker pigment at
 //            the edges of areas and paper grain
+//   cozy     a warm diorama (the look "Hygge"): soft shade where surfaces meet (corners, under and beside furniture),
+//            cold blues leaning to sage and teal, a little less colour, a warm tone curve from brown to cream and a
+//            faint warm darkening along silhouettes
 // The scene is drawn into a texture with its depth, then one full-screen pass draws it onto the canvas. The canvas is
 // transparent (the stage behind it is CSS): colours stay premultiplied like a direct render, so nothing changes there.
 // Frames are only drawn when something changes, so the pass costs nothing while the view stands still.
@@ -25,7 +28,7 @@ import {
     type WebGLRenderer,
 } from 'three';
 
-export type PostLook = 'toon' | 'gouache';
+export type PostLook = 'toon' | 'gouache' | 'cozy';
 
 const VERTEX = /* glsl */ `
 varying vec2 vUv;
@@ -169,6 +172,58 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
+const COZY = /* glsl */ `
+${COMMON}
+uniform vec3 uShade;
+uniform vec3 uLight;
+uniform float uOcclusion;
+// soft shade in hollows: the pixel lies behind the surface its neighbours on both sides span (a corner, the floor
+// beside a wall or a sofa). 1/depth changes evenly across a plane on screen, so a flat floor seen at a slant stays
+// light; ridges (the pixel in front) stay light too; big jumps (the house before the far ground) do not count
+float occlusion(vec2 uv, float c) {
+  float ic = 1.0 / max(c, 0.001);
+  float o = 0.0;
+  for (int i = 0; i < 4; i++) {
+    float ang = float(i) * 0.78539816 + 0.39;
+    for (int k = 1; k <= 3; k++) {
+      vec2 off = vec2(cos(ang), sin(ang)) * float(k * k) * 3.0 * uScale * uTexel;
+      vec2 a = uv + off;
+      vec2 b = uv - off;
+      if (texture2D(tColor, a).a < 0.5 || texture2D(tColor, b).a < 0.5) continue;
+      float hollow = (0.5 * (1.0 / max(viewDepth(a), 0.001) + 1.0 / max(viewDepth(b), 0.001)) - ic) / ic;
+      o += smoothstep(0.002, 0.02, hollow) * (1.0 - smoothstep(0.08, 0.16, hollow));
+    }
+  }
+  return o / 12.0;
+}
+void main() {
+  vec4 col = texture2D(tColor, vUv);
+  if (col.a > 0.001) {
+    vec3 rgb = col.rgb / col.a;
+    rgb *= 1.0 - uOcclusion * occlusion(vUv, viewDepth(vUv));
+    // cold blues lean to sage and teal and lose some colour; warm colours stay
+    float l = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+    float cold = smoothstep(0.0, 0.2, rgb.b - max(rgb.r, rgb.g));
+    rgb = mix(rgb, vec3(mix(rgb.r, l, 0.4), max(rgb.g, rgb.b * 0.95), rgb.b * 0.8), cold * 0.65);
+    // wood, terracotta and honey glow a little, everything else is a little muted
+    float warm = smoothstep(0.04, 0.25, rgb.r - rgb.b) * smoothstep(0.0, 0.1, rgb.r - rgb.g);
+    rgb = max(mix(vec3(l), rgb, mix(0.88, 1.1, warm)), 0.0);
+    // a faint warm darkening along silhouettes: the clean edges of an illustration, without black lines
+    rgb = mix(rgb, rgb * vec3(0.7, 0.6, 0.5), edge(vUv, 1.2 * uScale) * 0.3);
+    // the tone curve: dark is a warm brown, light a cream
+    rgb = uShade + (uLight - uShade) * rgb;
+    col = vec4(clamp(rgb, 0.0, 1.0) * col.a, col.a);
+  }
+  gl_FragColor = col;
+  #include <colorspace_fragment>
+}`;
+
+/** "#rrggbb" in sRGB to the linear colour the passes work in. */
+const linear = (hex: string): Vector3 => {
+    const n = parseInt(hex.slice(1), 16);
+    return new Vector3(...[16, 8, 0].map(s => (((n >> s) & 255) / 255) ** 2.2));
+};
+
 /** The uniforms both passes share. */
 const uniforms = (): Record<string, IUniform> => ({
     tColor: { value: null },
@@ -198,6 +253,18 @@ export class PostFx {
         vertexShader: VERTEX,
         fragmentShader: GOUACHE,
         uniforms: { ...uniforms(), uRadius: { value: 4 }, uPigment: { value: new Vector3(0.72, 0.62, 0.55) } },
+        depthTest: false,
+        depthWrite: false,
+    });
+    private readonly cozy = new ShaderMaterial({
+        vertexShader: VERTEX,
+        fragmentShader: COZY,
+        uniforms: {
+            ...uniforms(),
+            uShade: { value: linear('#3a2a1e') },
+            uLight: { value: linear('#fff6e4') },
+            uOcclusion: { value: 0.5 },
+        },
         depthTest: false,
         depthWrite: false,
     });
@@ -242,7 +309,7 @@ export class PostFx {
         } else if (this.target.width !== w || this.target.height !== h) {
             this.target.setSize(w, h);
         }
-        const material = look === 'toon' ? this.toon : this.gouache;
+        const material = look === 'toon' ? this.toon : look === 'cozy' ? this.cozy : this.gouache;
         const u = material.uniforms;
         u.tColor.value = this.target.texture;
         u.tDepth.value = this.target.depthTexture;
@@ -276,6 +343,7 @@ export class PostFx {
         this.disposeTarget();
         this.toon.dispose();
         this.gouache.dispose();
+        this.cozy.dispose();
         this.quad.geometry.dispose();
         this.owner = null;
     }

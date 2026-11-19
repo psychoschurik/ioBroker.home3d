@@ -305,6 +305,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Redox, Warnungen bei pH oder Chlor außerhalb des Bereichs. Technikraum und Rohre lassen sich zeichnen: das Wasser
   fließt vom Skimmer über Pumpe, Filter (nach Stellung des 6-Wege-Ventils) und Wärmepumpe oder Bypass zu den
   Einlässen, beim Rückspülen braun zum Abwasser
+- (bluefox) Neuer Stil „Hygge (Diorama)“ unter „Wohnlich“: Wände mit senkrechter Holzvertäfelung und Sockelleiste,
+  Holzdielen auch aus der Ferne, weiche Verschattung in Ecken und unter Möbeln, warme gedämpfte Farben vor olivgrünem
+  Hintergrund
 
 ### 0.4.0 (2026-11-15)
 

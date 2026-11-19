@@ -5516,8 +5516,10 @@ function looks(name: string, code: string): string {
   saturate?: number;
   /** The colour of the edges, natural materials. */
   line?: string;
-  /** A look over the whole picture: inked outlines or painted. */
-  post?: "toon" | "gouache";
+  /** A look over the whole picture: inked outlines, painted or a warm diorama. */
+  post?: "toon" | "gouache" | "cozy";
+  /** Walls of vertical boards with a skirting board (0–1, natural materials). */
+  walls?: number;
   /** The menu group. */`,
             'style fields',
         );
@@ -5529,6 +5531,7 @@ function looks(name: string, code: string): string {
   { id: "dollhouse", base: "day", group: "homely", natural: true, signal: true, shadows: true, floors: 1, sun: 0.5, ao: 0.5, glassWalls: 0.38, saturate: 0.12, bg: ["#f6efe6", "#ddd0bf"], aliases: ["puppenhaus", "puppenstube", "dollhouse", "glaswände", "durchsichtig"] },
   { id: "comic", base: "day", group: "designed", natural: true, signal: true, shadows: true, floors: 0.35, cutDark: true, sun: 0.6, ao: 0.25, toon: 3, saturate: 0.45, line: "#2a2420", post: "toon", bg: ["#fff8e6", "#ffe1b8"], aliases: ["comic", "zeichentrick", "trickfilm", "cartoon", "toon"] },
   { id: "gouache", base: "day", group: "designed", natural: true, signal: true, shadows: true, floors: 0.5, sun: 0.45, ao: 0.35, saturate: 0.3, line: "#8a6f58", post: "gouache", bg: ["#bfe3f2", "#f6e7cf"], aliases: ["gouache", "gemalt", "malerei", "aquarell", "painted", "watercolor"] },
+  { id: "hygge", base: "day", group: "homely", natural: true, signal: true, shadows: true, floors: 1, walls: 1, sun: 0.35, ao: 0.5, saturate: 0.05, line: "#a08462", post: "cozy", bg: ["#bcb184", "#a3986b"], aliases: ["hygge", "diorama", "kuschelig", "spielzeughaus", "isometrisch", "cosy", "dollhouse diorama"] },
 ];`,
             'own styles',
         );
@@ -5537,13 +5540,13 @@ function looks(name: string, code: string): string {
         code = replaceRequired(
             code,
             '  style_warm: "Warm / Holz & Papier",',
-            '  style_warm: "Warm / Holz & Papier",\n  style_dollhouse: "Puppenhaus",\n  style_comic: "Comic",\n  style_gouache: "Gouache",',
+            '  style_warm: "Warm / Holz & Papier",\n  style_dollhouse: "Puppenhaus",\n  style_comic: "Comic",\n  style_gouache: "Gouache",\n  style_hygge: "Hygge (Diorama)",',
             'style names de',
         );
         code = replaceRequired(
             code,
             '  style_warm: "Warm / Wood & paper",',
-            '  style_warm: "Warm / Wood & paper",\n  style_dollhouse: "Dollhouse",\n  style_comic: "Comic",\n  style_gouache: "Gouache",',
+            '  style_warm: "Warm / Wood & paper",\n  style_dollhouse: "Dollhouse",\n  style_comic: "Comic",\n  style_gouache: "Gouache",\n  style_hygge: "Hygge (diorama)",',
             'style names en',
         );
         // the energy view and the household are part of the adapter, not Pro add-ons
@@ -5589,8 +5592,79 @@ function looks(name: string, code: string): string {
       float fp3dK = fp3dStyleLight(n);
       // comic: the light in a few hard steps
       if (uStToon > 0.5) fp3dK = 0.55 + 0.45 * floor(clamp((fp3dK - 0.55) / 0.45, 0.0, 1.0) * uStToon + 0.5) / uStToon;
-      cc *= fp3dK * fp3dStyleFloor(cc, n);`,
+      cc *= fp3dK * fp3dStyleFloor(cc, n);
+      #ifdef FP3D_WALL
+      // Hygge: walls of vertical boards with a skirting board
+      if (vFp3dWall > 0.5) cc *= fp3dStyleWall(n);
+      #endif`,
             'style toon light',
+        );
+        // the wall boards (frontend/vendor-ext/hygge.ts): their own uniform, the wall mark per vertex, the GLSL
+        code = `import { WALL_ATTRIBUTE as FP3D_WALL_ATTRIBUTE, WALL_GLSL as FP3D_WALL_GLSL } from "${root}/frontend/vendor-ext/hygge.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    uStToon: { value: 0 },',
+            '    uStToon: { value: 0 },\n    uStWalls: { value: 0 },',
+            'style walls uniform',
+        );
+        code = replaceRequired(
+            code,
+            '  u.uStToon.value = s.natural ? (s.toon ?? 0) : 0;',
+            '  u.uStToon.value = s.natural ? (s.toon ?? 0) : 0;\n  u.uStWalls.value = s.natural ? (s.walls ?? 0) : 0;',
+            'style walls value',
+        );
+        code = replaceRequired(
+            code,
+            '#ifdef FP3D_LIT\nvarying float vFp3dLit;\n#endif\nfloat fp3dHash',
+            '#ifdef FP3D_LIT\nvarying float vFp3dLit;\n#endif\n#ifdef FP3D_WALL\nvarying float vFp3dWall;\n#endif\nuniform float uStWalls;\nfloat fp3dHash',
+            'style walls varying',
+        );
+        // Hygge: the planks of a wooden floor stay visible from further away, their joints at least a pixel wide
+        code = replaceRequired(
+            code,
+            '  float fade = (1.0 - smoothstep(0.006, 0.04, fwidth(p.x) + fwidth(p.y))) * uStFloors;',
+            '  float fp3dFw = fwidth(p.x) + fwidth(p.y);\n  float fade = (1.0 - (uStWalls > 0.0 ? smoothstep(0.03, 0.07, fp3dFw) : smoothstep(0.006, 0.04, fp3dFw))) * uStFloors;\n  float fp3dSeam = uStWalls > 0.0 ? max(0.006, fp3dFw * 0.6) : 0.006;',
+            'hygge floor fade',
+        );
+        code = replaceRequired(
+            code,
+            '    float seam = smoothstep(0.0, 0.006, min(fx, w - fx)) * smoothstep(0.0, 0.006, min(fz, L - fz));',
+            '    float seam = smoothstep(0.0, fp3dSeam, min(fx, w - fx)) * smoothstep(0.0, fp3dSeam, min(fz, L - fz));',
+            'hygge floor seams',
+        );
+        code = replaceRequired(
+            code,
+            'vec3 fp3dThemed(vec3 c, bool line, bool accent) {',
+            '${FP3D_WALL_GLSL}\nvec3 fp3dThemed(vec3 c, bool line, bool accent) {',
+            'style walls function',
+        );
+        code = replaceRequired(
+            code,
+            'attribute float ${LIT_ATTRIBUTE};\\nvarying float vFp3dLit;\\n#endif`)',
+            'attribute float ${LIT_ATTRIBUTE};\\nvarying float vFp3dLit;\\n#endif\\n#ifdef FP3D_WALL\\nattribute float ${FP3D_WALL_ATTRIBUTE};\\nvarying float vFp3dWall;\\n#endif`)',
+            'style walls vertex attribute',
+        );
+        code = replaceRequired(
+            code,
+            'vFp3dLit = ${LIT_ATTRIBUTE};\\n#endif`',
+            'vFp3dLit = ${LIT_ATTRIBUTE};\\n#endif\\n#ifdef FP3D_WALL\\nvFp3dWall = ${FP3D_WALL_ATTRIBUTE};\\n#endif`',
+            'style walls vertex varying',
+        );
+    }
+    if (name === 'viewer/build.ts') {
+        // Hygge: the walls are marked, so only they get boards, not the furniture in the same buffer
+        code = `import { markWalls as fp3dMarkWalls } from "${root}/frontend/vendor-ext/hygge.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  pushOutdoor(wallBuf, lines, floor, waterBuf);',
+            '  const fp3dWallTris = wallBuf.count;\n  pushOutdoor(wallBuf, lines, floor, waterBuf);',
+            'walls marked: count',
+        );
+        code = replaceRequired(
+            code,
+            '    walls: wallBuf.geometry(),',
+            '    walls: fp3dMarkWalls(wallBuf.geometry(), fp3dWallTris),',
+            'walls marked: attribute',
         );
     }
     if (name === 'viewer/fold.ts') {
@@ -5638,6 +5712,13 @@ export interface FoldMasks {
     }
     if (name === 'viewer/viewer3d.ts') {
         code = `import { PostFx } from "${root}/frontend/vendor-ext/post.ts";\n${code}`;
+        // Hygge: the wall material reads the wall mark of build.ts (boards only on walls, not on furniture)
+        code = replaceRequired(
+            code,
+            '      wall: themed(makeFoldable(new MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }), mask, "solid"), this.themeUniform),',
+            '      wall: Object.assign(themed(makeFoldable(new MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }), mask, "solid"), this.themeUniform), { defines: { FP3D_WALL: "" } }),',
+            'walls marked: material',
+        );
         code = replaceRequired(
             code,
             '  private style: StyleDef = styleById("neon")!;',
