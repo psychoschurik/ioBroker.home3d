@@ -3112,6 +3112,30 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * The flag of a mailbox (mail-flag.ts, home-view.ts, home-fx.ts): it swings up while post lies in the box and folds
+ * back once it is taken out, on every shape; the fixed flag of the US mailbox on a post goes.
+ */
+function mailFlagMore(name: string, code: string): string {
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    b.box(w / 2, w / 2 + 0.015, h - boxH * 0.4, h + 0.08, -d * 0.1, -d * 0.04, 0x8a1c1c);\n    b.box(w / 2, w / 2 + 0.015, h + 0.02, h + 0.08, -d * 0.04, d * 0.12, 0x8a1c1c);\n',
+            '    // its flag moves with the post (frontend/vendor-ext/mail-flag.ts)\n',
+            'mail flag: not fixed',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '      surface: (f, x, z, h) => surfaceHeight(f as Floor, x, z, h),\n',
+            '      surface: (f, x, z, h) => surfaceHeight(f as Floor, x, z, h),\n      mailPost: (f) => mailboxPost(f as never, hass),\n',
+            'mail flag: post to the home looks',
+        );
+    }
+    return code;
+}
+
+/**
  * Lying snow without the fun pack (pv-snow.ts): snow lies on roof and lawn whenever the weather reports snow and stays
  * while it freezes (up to three days, as the pack's `snowLevel` works it out); it lies on the roof's solar modules too
  * and goes from a field as soon as it produces. The pack's fairy lights and firework stay its own.
@@ -4958,6 +4982,7 @@ const patches: Plugin = {
         code = passThroughMore(name, code);
         code = mjpegStreams(name, code);
         code = snowMore(name, code);
+        code = mailFlagMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

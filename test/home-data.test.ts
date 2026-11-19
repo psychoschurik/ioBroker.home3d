@@ -616,3 +616,20 @@ test('home: stale air hazes a room from 1000 ppm CO2, with its label from 1400, 
     b.settings.home_air = false;
     assert.equal(homeScene(input(b, states, { climate: () => ({ t: null, rh: null, co2: 1800 }) })).scene.hazes?.length, 0);
 });
+
+test('home: a mailbox raises its flag while post lies in it, on the wall at 1 m, on a post from the ground', () => {
+    const b = house();
+    b.floors[0].furniture.push(
+        { id: 'mw', type: 'mailbox', x: 1, z: -0.2, w: 0.38, d: 0.14, h: 0.34, rotation: 0, entity: 'input_boolean.post' },
+        { id: 'mp', type: 'mailbox', variant: 'pole', x: 3, z: -3, w: 0.24, d: 0.5, h: 1.15, rotation: 90 },
+    );
+    const out = homeScene(input(b, {}, { mailPost: f => f.entity === 'input_boolean.post' }));
+    const flags = out.scene.mailFlags ?? [];
+    assert.deepEqual(
+        flags.map(m => [m.id, m.shape, m.y, m.up]),
+        [
+            ['mw', 'wall', 1, true],
+            ['mp', 'pole', 0, false],
+        ],
+    );
+});

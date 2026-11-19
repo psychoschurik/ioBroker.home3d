@@ -214,6 +214,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   bleiben es bei Frost bis zu drei Tage (bei Tauwetter schmilzt er in sechs Stunden); auch die PV-Module liegen unter
   Schnee, ein Feld wird frei, sobald es Leistung liefert. Die Leistung auf den Modulen der Dachfelder wird wieder
   aktualisiert
+- (bluefox) Briefkasten: ein rotes Fähnchen an der Seite klappt hoch, solange Post darin liegt, und legt sich wieder an,
+  wenn sie geholt ist – an jeder Form (bisher hatte nur der US-Briefkasten ein festes Fähnchen)
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler

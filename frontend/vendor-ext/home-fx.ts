@@ -35,6 +35,7 @@ import { buildBay, buildCar, type CarKind, WHEEL } from './cars';
 import { lanes, pathLength, pointAt, pointIn, type Corner, type MowerPhase, type Rgb, type Vec2 } from './home-data';
 import { buildCoffeeMachine } from './kitchen';
 import { buildRainTank, type RainTankKind } from './rain-tank';
+import { buildMailFlag, FLAG_DOWN, type MailShape } from './mail-flag';
 import { buildServer, LED_OFF, ledColor, ledLit, type ServerKind, type ServerLed, type ServerLoad } from './server';
 
 export interface AirState {
@@ -242,6 +243,22 @@ export interface RainTankState {
     warn: boolean;
 }
 
+/** A mailbox's flag: up while post lies in it. */
+export interface MailFlagState {
+    id: string;
+    floor: string;
+    shape: MailShape;
+    x: number;
+    z: number;
+    y: number;
+    /** Turn in the plan (rad, clockwise). */
+    angle: number;
+    w: number;
+    d: number;
+    h: number;
+    up: boolean;
+}
+
 /** A server (rack or NAS) whose LEDs follow its socket. */
 export interface ServerState {
     id: string;
@@ -274,6 +291,7 @@ export interface HomeScene {
     coffees?: CoffeeState[];
     rainTanks?: RainTankState[];
     servers?: ServerState[];
+    mailFlags?: MailFlagState[];
     glow: GlowState | null;
 }
 
@@ -571,6 +589,8 @@ export class HomeFx {
     private hazeParts = new Map<string, { p: Particles; base: Float32Array }>();
     /** Steam over a coffee machine's cup: its particles and where the cup is. */
     /** The LEDs of each server and the colour each shows now. */
+    /** The arm of each mailbox's flag and how far up it stands (0 … 1); kept over a rebuild. */
+    private mailFlags = new Map<string, { arm: Object3D; cur: number }>();
     private serverLeds = new Map<string, { leds: ServerLed[]; lit: number[] }>();
     private steamParts = new Map<
         string,
@@ -595,7 +615,7 @@ export class HomeFx {
 
     /**
      * The piece of furniture drawn here (a car, a mower and its dock, a sprinkler, a coffee machine, a rainwater tank,
-     * a server) under a ray: its id and how far
+     * a server, a mailbox's flag) under a ray: its id and how far
      * away it is; null: none, or only hidden ones.
      */
     furnitureAt(ray: Raycaster): { id: string; distance: number } | null {
@@ -674,6 +694,7 @@ export class HomeFx {
             (s.hazes ?? []).map(x => [x.id, x.floor, x.points, x.top, x.label]),
             (s.coffees ?? []).map(c => [c.id, c.floor, c.x, c.z, c.y, c.angle, c.w, c.d, c.h]),
             (s.servers ?? []).map(v => [v.id, v.floor, v.kind, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
+            (s.mailFlags ?? []).map(v => [v.id, v.floor, v.shape, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
             (s.rainTanks ?? []).map(r => [
                 r.id,
                 r.floor,
@@ -730,6 +751,18 @@ export class HomeFx {
                 m.add(label);
             }
             this.floorGroup(r.floor).add(m);
+        }
+        for (const v of s.mailFlags ?? []) {
+            const m = buildMailFlag(v.shape, v.w, v.d, v.h, this.light);
+            m.userData.fp3dFurniture = v.id;
+            m.position.set(v.x, v.y, v.z);
+            m.rotation.y = -v.angle;
+            this.floorGroup(v.floor).add(m);
+            // a rebuild keeps where the flag stood, so it does not swing again
+            const was = this.mailFlags.get(v.id)?.cur;
+            const cur = was ?? (v.up ? 1 : 0);
+            this.mailFlags.set(v.id, { arm: m.userData.arm as Object3D, cur });
+            (m.userData.arm as Object3D).rotation.x = FLAG_DOWN * (1 - cur);
         }
         for (const v of s.servers ?? []) {
             const m = buildServer(v.kind, v.w, v.d, v.h, this.light);
@@ -1109,6 +1142,26 @@ export class HomeFx {
             }
             moving ||= !calm;
             this.haze(e.p, e.base, hz, tt);
+        }
+        for (const v of s.mailFlags ?? []) {
+            const e = this.mailFlags.get(v.id);
+            if (!e) {
+                continue;
+            }
+            const goal = v.up ? 1 : 0;
+            if (e.cur === goal) {
+                continue;
+            }
+            // it swings in about a second; calm: at once
+            e.cur =
+                calm || !shown(v.floor)
+                    ? goal
+                    : goal > e.cur
+                      ? Math.min(goal, e.cur + dt * 1.2)
+                      : Math.max(goal, e.cur - dt * 1.2);
+            const k = e.cur * e.cur * (3 - 2 * e.cur);
+            e.arm.rotation.x = FLAG_DOWN * (1 - k);
+            moving ||= e.cur !== goal;
         }
         for (const v of s.servers ?? []) {
             const e = this.serverLeds.get(v.id);

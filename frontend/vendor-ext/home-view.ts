@@ -4,6 +4,7 @@
 import { isCarKind } from './cars';
 import { brewing } from './kitchen';
 import { RAIN_LOW, rainTankCapacity, rainTankFill, rainTankKind } from './rain-tank';
+import { mailBase, mailShape } from './mail-flag';
 import { serverKind, serverLoad } from './server';
 import type {
     AirState,
@@ -11,6 +12,7 @@ import type {
     CoffeeState,
     RainTankState,
     ServerState,
+    MailFlagState,
     SmokeState,
     HazeState,
     BadgeState,
@@ -109,6 +111,8 @@ export interface FurnitureLike {
     tank_capacity?: number | null;
     /** A server: "rack" or "nas". */
     server_kind?: string | null;
+    /** The model's variant (a mailbox's shape …). */
+    variant?: string | null;
     /** A boat's gear: the sensor of a hatch, a tank … */
     gear_entity?: string | null;
 }
@@ -286,6 +290,8 @@ export interface HomeInput {
     raining?: boolean;
     /** Smoke detectors that went off, by room. */
     smokes?: readonly { entity: string; roomId: string; floorId: string }[];
+    /** Whether post lies in a mailbox (its flap and door sensors); without it the flag stays down. */
+    mailPost?: (f: FurnitureLike) => boolean;
     /** The height of the surface under a point (a worktop, a table), for things put on it; without it 0. */
     surface?: (floor: FloorLike, x: number, z: number, h: number) => number;
     /** Price slots from the history of the price entity (when there is no forecast). */
@@ -354,6 +360,7 @@ export function homeScene(input: HomeInput): HomeOutput {
     const coffees: CoffeeState[] = [];
     const rainTanks: RainTankState[] = [];
     const servers: ServerState[] = [];
+    const mailFlags: MailFlagState[] = [];
     const sounds: SoundState[] = [];
     const streams: StreamState[] = [];
     const sprinklers: HomeScene['sprinklers'] = [];
@@ -640,6 +647,22 @@ export function homeScene(input: HomeInput): HomeOutput {
                 if (lawn && m !== null) {
                     dry.set(lawn.id, Math.max(dry.get(lawn.id) ?? 0, dryness(m, f.moisture_min ?? 30)));
                 }
+            } else if (f.type === 'mailbox') {
+                // its flag swings up while post lies in it
+                const shape = mailShape(f.variant);
+                mailFlags.push({
+                    id: f.id,
+                    floor: floor.id,
+                    shape,
+                    x: f.x,
+                    z: f.z,
+                    y: f.mount_y ?? mailBase(shape),
+                    angle: rad(f.rotation ?? 0),
+                    w: f.w,
+                    d: f.d,
+                    h: f.h,
+                    up: !!input.mailPost?.(f),
+                });
             } else if (f.type === 'server') {
                 // a rack on the floor, a NAS on a shelf or desk; its LEDs from its socket
                 const linked = !!f.entity && f.entity !== 'none';
@@ -879,6 +902,7 @@ export function homeScene(input: HomeInput): HomeOutput {
             coffees,
             rainTanks,
             servers,
+            mailFlags,
             glow,
         },
         alerts,
