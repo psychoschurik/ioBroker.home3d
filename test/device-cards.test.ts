@@ -218,3 +218,78 @@ test('the wallbox: its status, the car, full at, charging on and off, current an
     await new Promise(r => setTimeout(r, 0));
     assert.deepEqual(calls, ['sensor.set_value:sensor.w_amp=6', 'sensor.set_value:sensor.car_mode=now', 'switch.turn_off:switch.w_allow=']);
 });
+
+test('heating and air conditioning: room and target, valve, window, −/+, boost, modes', async () => {
+    const cl: Record<string, St> = {
+        'sensor.t_set': st('21', io('hm-rpc.0.ABC.1.SET_POINT_TEMPERATURE', 'Sollwert', 'level.temperature', { unit_of_measurement: '°C', iobroker_write: true, iobroker_min: 4.5, iobroker_max: 30.5, iobroker_type: 'number' })),
+        'sensor.t_act': st('19.4', io('hm-rpc.0.ABC.1.ACTUAL_TEMPERATURE', 'Isttemperatur', 'value.temperature', { unit_of_measurement: '°C' })),
+        'sensor.t_hum': st('48', io('hm-rpc.0.ABC.1.HUMIDITY', 'Luftfeuchte', 'value.humidity', { unit_of_measurement: '%' })),
+        'sensor.t_valve': st('35', io('hm-rpc.0.ABC.1.LEVEL_VALVE', 'Ventil', 'value', { unit_of_measurement: '%' })),
+        'switch.t_boost': st('off', io('hm-rpc.0.ABC.1.BOOST_MODE', 'Boost', 'switch')),
+        'sensor.t_mode': st('0', io('hm-rpc.0.ABC.1.SET_POINT_MODE', 'Modus', 'level.mode', { iobroker_write: true, iobroker_type: 'number', iobroker_states: { 0: 'AUTOMATIC', 1: 'MANUAL', 2: 'PARTY' } })),
+        'sensor.t_win': st('1', io('hm-rpc.0.ABC.1.WINDOW_STATE', 'Fenster', 'value.window')),
+        'climate.ac': st('cool', { friendly_name: 'Klima', current_temperature: 27, temperature: 23, hvac_action: 'cooling', hvac_modes: ['off', 'cool', 'heat', 'auto'], min_temp: 16, max_temp: 30 }),
+        'sensor.lawn': st('5', io('worx.0.1.mower.status', 'Landroid', 'value')),
+    };
+    const clHass = { states: cl };
+    const radiator: DeviceItem = { id: 'r', type: 'radiator', entity: 'sensor.t_set' };
+    const acUnit: DeviceItem = { id: 'a', type: 'ac_unit', entity: 'climate.ac' };
+    const bare: DeviceItem = { id: 'b', type: 'radiator' };
+    assert.equal(deviceKind('ac_unit'), 'climate');
+    assert.equal(mainEntity(clHass, bare), null);
+    assert.equal(autoRole(clHass, radiator, 'actual'), 'sensor.t_act');
+    assert.equal(autoRole(clHass, radiator, 'valve'), 'sensor.t_valve');
+    assert.equal(autoRole(clHass, radiator, 'mode'), 'sensor.t_mode');
+    assert.equal(autoRole(clHass, radiator, 'window'), 'sensor.t_win');
+    assert.equal(autoRole(clHass, radiator, 'boost'), 'switch.t_boost');
+    const calls: string[] = [];
+    const host: DeviceHost = {
+        hass: () => clHass,
+        building: () => ({ floors: [{ id: 'eg', furniture: [radiator, acUnit, bare] }] }),
+        language: () => 'de',
+        callService: (d, s, data) => {
+            calls.push(`${d}.${s}:${String(data?.entity_id)}=${String(data?.value ?? data?.temperature ?? data?.hvac_mode ?? '')}`);
+            return Promise.resolve();
+        },
+    };
+    type Card = {
+        title: string;
+        live: string;
+        main: { text: string; side?: { text: string } };
+        rows?: { label: string; value: string }[];
+        hint?: { text: string };
+        chips?: { title: string; items: { label: string; on: boolean; onTap(): void }[] }[];
+        buttons: { label: string; on?: boolean; onTap(): void }[];
+    };
+    const cards = deviceCards(host) as Card[];
+    assert.equal(cards.length, 2);
+    const [r, a] = cards;
+    assert.equal(r.title, 'Heizung / Klima');
+    assert.equal(r.live, 'heizt · 21,0 °C');
+    assert.equal(r.main.text, '19,4 °C');
+    assert.equal(r.main.side?.text, '21,0 °C');
+    assert.deepEqual(r.rows?.map(x => x.value), ['35 %', '48 %']);
+    assert.equal(r.hint?.text, 'Fenster offen');
+    assert.deepEqual(r.buttons.map(b => b.label), ['−', '+', '🔥']);
+    assert.deepEqual(r.chips?.[0].items.map(i => [i.label, i.on]), [
+        ['Automatic', true],
+        ['Manual', false],
+        ['Party', false],
+    ]);
+    assert.equal(r.chips?.[0].title, 'Betriebsart');
+    r.buttons[1].onTap();
+    r.buttons[2].onTap();
+    r.chips?.[0].items[1].onTap();
+    assert.equal(a.live, 'kühlt · 23,0 °C');
+    assert.deepEqual(a.chips?.[0].items.map(i => i.label), ['Aus', 'Kühlen', 'Heizen', 'Auto']);
+    a.buttons[0].onTap();
+    a.chips?.[0].items[0].onTap();
+    await new Promise(res => setTimeout(res, 0));
+    assert.deepEqual(calls, [
+        'sensor.set_value:sensor.t_set=21.5',
+        'switch.turn_on:switch.t_boost=',
+        'sensor.set_value:sensor.t_mode=1',
+        'climate.set_temperature:climate.ac=22.5',
+        'climate.set_hvac_mode:climate.ac=off',
+    ]);
+});

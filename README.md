@@ -320,6 +320,11 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Autos mit Ladeziel, Ladeleistung, Reichweite, in diesem Ladevorgang geladene kWh und „voll um“ (mit der Akkugröße des
   Autos); Laden starten/stoppen, Chips für den Ladestrom (6–16 A) und den Lademodus von evcc (Aus, Sofort, Min+PV, PV).
   Beschreibbare Zahlen- und Text-Datenpunkte lassen sich dafür über `set_value` setzen (Typ und min/max werden geprüft)
+- (bluefox) Glaskarte für Heizkörper und Klimaanlage: heizt/kühlt/hält/aus seit wann, Raum- und Solltemperatur,
+  Ventilöffnung und Luftfeuchte als Balken, Hinweis bei offenem Fenster; − / + (halbe Grad, im Bereich des
+  Datenpunkts), Boost, Ein/Aus und die Betriebsart als Chips (aus den Zustandstexten des Datenpunkts, bei einer
+  Klima-Entität Heizen/Kühlen/Auto/Aus). Gezeigt, sobald am Gerät ein Datenpunkt verbunden ist; die übrigen werden unter
+  demselben ioBroker-Gerät gefunden (z. B. alles eines Homematic-IP-Thermostats)
 
 ### 0.4.0 (2026-11-15)
 

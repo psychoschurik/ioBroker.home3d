@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { entities, execute, validateMappings, wmoCondition } from '../frontend/entities';
+import { entities, execute, stateTexts, validateMappings, wmoCondition } from '../frontend/entities';
 import { mappedIds } from '../frontend/store';
 import {
     historyDuringPeriod,
@@ -403,4 +403,11 @@ test('own marker colours: the writing reads on them, the offered symbols exist',
     const known = mdi as unknown as Record<string, string>;
     const missing = ICON_PICKS.filter(n => !known[`mdi${n.replace(/(^|-)([a-z0-9])/g, (_, _d: string, c: string) => c.toUpperCase())}`]);
     assert.deepEqual(missing, []);
+});
+
+test('the texts of a datapoint’s values in every form ioBroker knows', () => {
+    assert.deepEqual(stateTexts({ 0: 'AUTO', 1: 'MANUAL' }), { 0: 'AUTO', 1: 'MANUAL' });
+    assert.deepEqual(stateTexts('0:aus; 1:an'), { 0: 'aus', 1: 'an' });
+    assert.deepEqual(stateTexts(['off', 'on']), { 0: 'off', 1: 'on' });
+    assert.equal(stateTexts(undefined), null);
 });

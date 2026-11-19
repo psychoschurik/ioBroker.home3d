@@ -22,6 +22,24 @@ function hash(text: string): string {
     }
     return out;
 }
+/** The texts of a datapoint's values (common.states as object, "0:auto;1:manual" or a list), at most 20; null without. */
+export function stateTexts(states: unknown): Record<string, string> | null {
+    let out: Record<string, string> = {};
+    if (Array.isArray(states)) {
+        states.forEach((label, i) => (out[String(i)] = String(label)));
+    } else if (typeof states === 'string') {
+        for (const part of states.split(';')) {
+            const at = part.indexOf(':');
+            if (at > 0) {
+                out[part.slice(0, at).trim()] = part.slice(at + 1).trim();
+            }
+        }
+    } else if (states && typeof states === 'object') {
+        out = Object.fromEntries(Object.entries(states as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
+    }
+    const n = Object.keys(out).length;
+    return n && n <= 20 ? out : null;
+}
 const nameOf = (o: { _id?: string; common?: { name?: string | Record<string, string> } } | undefined): string =>
     typeof o?.common?.name === 'object'
         ? o.common.name.de || o.common.name.en || o._id || ''
@@ -206,6 +224,12 @@ function entities(
             iobroker_type: objects[m.state]?.common?.type || '',
             // writable: a card may set it (set_value through execute(), see there)
             ...(objects[m.state]?.common?.write === true ? { iobroker_write: true } : {}),
+            // its range and the texts of its values: a card's +/− and its mode chips
+            ...(typeof objects[m.state]?.common?.min === 'number' ? { iobroker_min: objects[m.state].common.min } : {}),
+            ...(typeof objects[m.state]?.common?.max === 'number' ? { iobroker_max: objects[m.state].common.max } : {}),
+            ...(stateTexts(objects[m.state]?.common?.states)
+                ? { iobroker_states: stateTexts(objects[m.state]?.common?.states) }
+                : {}),
             ...(m.reach !== undefined ? { iobroker_reach: m.reach } : {}),
             ...(m.reach_connected ? { iobroker_reach_connected: true } : {}),
             ...(m.battery ? { iobroker_battery_own: m.battery } : {}),

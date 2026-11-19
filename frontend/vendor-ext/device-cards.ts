@@ -40,7 +40,7 @@ export interface DeviceHost {
     callService?(domain: string, service: string, data?: Record<string, unknown>): Promise<unknown>;
 }
 
-export type DeviceKind = 'vacuum' | 'mower' | 'coffee' | 'wallbox';
+export type DeviceKind = 'vacuum' | 'mower' | 'coffee' | 'wallbox' | 'climate';
 export type DeviceRole =
     | 'battery'
     | 'start'
@@ -60,13 +60,21 @@ export type DeviceRole =
     | 'soc'
     | 'target'
     | 'range'
-    | 'energy';
+    | 'energy'
+    | 'setpoint'
+    | 'actual'
+    | 'humidity'
+    | 'valve'
+    | 'boost'
+    | 'window'
+    | 'onoff';
 
 export const DEVICE_ROLES: Record<DeviceKind, DeviceRole[]> = {
     vacuum: ['battery', 'start', 'pause', 'home'],
     mower: ['battery', 'start', 'pause', 'home'],
     coffee: ['power', 'water', 'beans', 'descale', 'cups', 'drink1', 'drink2', 'drink3'],
     wallbox: ['power', 'charge', 'current', 'mode', 'soc', 'target', 'range', 'energy'],
+    climate: ['setpoint', 'actual', 'humidity', 'valve', 'mode', 'boost', 'window', 'onoff'],
 };
 
 /** Which card a piece of furniture gets. */
@@ -82,6 +90,9 @@ export function deviceKind(type: string): DeviceKind | null {
     }
     if (type === 'wallbox' || /wallbox|ev_charger/.test(type)) {
         return 'wallbox';
+    }
+    if (type === 'radiator' || type === 'ac_unit' || /radiator|ac_unit|thermostat/.test(type)) {
+        return 'climate';
     }
     return null;
 }
@@ -127,6 +138,31 @@ const TEXTS: Record<string, Record<string, string>> = {
         empty: 'leer',
         ok: 'ok',
         due: 'fällig',
+        climate: 'Heizung / Klima',
+        climate_mode: 'Betriebsart',
+        setpoint: 'Solltemperatur',
+        actual: 'Raumtemperatur',
+        humidity: 'Luftfeuchte',
+        valve: 'Ventil',
+        boost: 'Boost',
+        window: 'Fenster',
+        onoff: 'Ein/Aus',
+        heats: 'heizt',
+        cools: 'kühlt',
+        holds: 'hält',
+        climate_off: 'aus',
+        room: 'Raum',
+        target_short: 'Soll',
+        window_open: 'Fenster offen',
+        warmer: 'Wärmer',
+        cooler: 'Kühler',
+        hvac_heat: 'Heizen',
+        hvac_cool: 'Kühlen',
+        hvac_auto: 'Auto',
+        hvac_off: 'Aus',
+        hvac_dry: 'Entfeuchten',
+        hvac_fan_only: 'Lüften',
+        hvac_heat_cool: 'Heizen/Kühlen',
         wallbox: 'Wallbox',
         charge: 'Laden (Start/Stop)',
         current: 'Ladestrom (A)',
@@ -193,6 +229,31 @@ const TEXTS: Record<string, Record<string, string>> = {
         empty: 'empty',
         ok: 'ok',
         due: 'due',
+        climate: 'Heating / AC',
+        climate_mode: 'Mode',
+        setpoint: 'Target temperature',
+        actual: 'Room temperature',
+        humidity: 'Humidity',
+        valve: 'Valve',
+        boost: 'Boost',
+        window: 'Window',
+        onoff: 'On/off',
+        heats: 'heating',
+        cools: 'cooling',
+        holds: 'holding',
+        climate_off: 'off',
+        room: 'Room',
+        target_short: 'Target',
+        window_open: 'Window open',
+        warmer: 'Warmer',
+        cooler: 'Cooler',
+        hvac_heat: 'Heat',
+        hvac_cool: 'Cool',
+        hvac_auto: 'Auto',
+        hvac_off: 'Off',
+        hvac_dry: 'Dry',
+        hvac_fan_only: 'Fan',
+        hvac_heat_cool: 'Heat/cool',
         wallbox: 'Wallbox',
         charge: 'Charging (start/stop)',
         current: 'Charging current (A)',
@@ -259,6 +320,31 @@ const TEXTS: Record<string, Record<string, string>> = {
         empty: 'пусто',
         ok: 'ок',
         due: 'пора',
+        climate: 'Отопление / климат',
+        climate_mode: 'Режим работы',
+        setpoint: 'Заданная температура',
+        actual: 'Температура в комнате',
+        humidity: 'Влажность',
+        valve: 'Клапан',
+        boost: 'Буст',
+        window: 'Окно',
+        onoff: 'Вкл./выкл.',
+        heats: 'греет',
+        cools: 'охлаждает',
+        holds: 'держит',
+        climate_off: 'выкл.',
+        room: 'Комната',
+        target_short: 'Цель',
+        window_open: 'Окно открыто',
+        warmer: 'Теплее',
+        cooler: 'Холоднее',
+        hvac_heat: 'Нагрев',
+        hvac_cool: 'Охлаждение',
+        hvac_auto: 'Авто',
+        hvac_off: 'Выкл.',
+        hvac_dry: 'Осушение',
+        hvac_fan_only: 'Вентиляция',
+        hvac_heat_cool: 'Нагрев/охл.',
         wallbox: 'Зарядная станция',
         charge: 'Зарядка (старт/стоп)',
         current: 'Ток зарядки (А)',
@@ -384,6 +470,8 @@ const KIND_WORD: Record<DeviceKind, RegExp> = {
     coffee: /kaffee|coffee|espresso|jura|melitta|delonghi|de'longhi|nespresso|siemens eq|кофе/i,
     wallbox:
         /wallbox|wall box|evcc|go-?e|keba|easee|wallbe|openwb|charger|ladestation|ladepunkt|loadpoint|ladesäule|зарядн/i,
+    // a radiator's or air conditioner's datapoints only below its own linked datapoint (a name would fit every room)
+    climate: /(?!)/,
 };
 
 /** Whether an entity may serve a role (its domain, then its ioBroker role or name). */
@@ -436,7 +524,7 @@ function fits(role: DeviceRole, id: string, st: StateLike): boolean {
             return (
                 (/^(select|input_select)$/.test(d) || st.attributes.iobroker_write === true) &&
                 /mode|modus|режим/.test(n) &&
-                !/[^a-z]?power/.test(n)
+                !/[^a-z]?power|temp/.test(n)
             );
         case 'soc':
             return (
@@ -451,6 +539,28 @@ function fits(role: DeviceRole, id: string, st: StateLike): boolean {
             return d === 'sensor' && (unit === 'km' || unit === 'mi' || /reichweite|range|запас/.test(n));
         case 'energy':
             return d === 'sensor' && /^k?Wh$/.test(unit) && /session|sitzung|geladen|charged|ladevorgang|сесси/.test(n);
+        case 'setpoint':
+            return (
+                (d === 'number' || st.attributes.iobroker_write === true) &&
+                (/^°[CF]$/.test(unit) || /level\.temperature/.test(r))
+            );
+        case 'actual':
+            return (
+                d === 'sensor' &&
+                st.attributes.iobroker_write !== true &&
+                (/^°[CF]$/.test(unit) || /value\.temperature/.test(r)) &&
+                !/soll|target|setpoint|set_point|ziel/.test(n)
+            );
+        case 'humidity':
+            return d === 'sensor' && (/humidity/.test(r) || (unit === '%' && /humid|feucht|влажн/.test(n)));
+        case 'valve':
+            return d === 'sensor' && unit === '%' && /valve|ventil|stellgr|клапан/.test(n);
+        case 'boost':
+            return WRITABLE.test(d) && /boost|turbo|party/.test(n);
+        case 'window':
+            return /^(sensor|binary_sensor)$/.test(d) && /window|fenster|окн/.test(n);
+        case 'onoff':
+            return WRITABLE.test(d) && (/switch\.power/.test(r) || /power|ein\/aus|an\/aus|on\/off|питан/.test(n));
         case 'cups':
             return d === 'sensor' && /tasse|cup|bezug|bezüge|getränke|counter|zähler|drinks|чаш|напит/.test(n);
         default:
@@ -500,6 +610,10 @@ export function mainEntity(hass: HassLike, f: DeviceItem): string | null {
                     ),
             ) ?? null
         );
+    }
+    // a radiator or air conditioner only by its own link (an entity found by name would belong to any room)
+    if (kind === 'climate') {
+        return null;
     }
     const own = kind === 'vacuum' ? 'vacuum' : 'lawn_mower';
     return (
@@ -672,11 +786,25 @@ export function deviceCard(host: DeviceHost, floorId: string, f: DeviceItem): Re
     const base = {
         id: `devices:${f.id}`,
         anchor: { floorId, furnitureId: f.id },
-        icon: kind === 'vacuum' ? '🧹' : kind === 'mower' ? '🌱' : kind === 'wallbox' ? '🔌' : '☕',
+        icon:
+            kind === 'vacuum'
+                ? '🧹'
+                : kind === 'mower'
+                  ? '🌱'
+                  : kind === 'wallbox'
+                    ? '🔌'
+                    : kind === 'climate'
+                      ? f.type === 'ac_unit'
+                          ? '❄️'
+                          : '🌡️'
+                      : '☕',
         title: f.name || text(lang, kind),
     };
     if (kind === 'wallbox') {
         return wallboxCard(host, f, base, main, links);
+    }
+    if (kind === 'climate') {
+        return mainSt ? climateCard(host, f, base, main!, links) : null;
     }
     if (kind === 'coffee') {
         const watts = links.power ? num(hass.states[links.power]) : null;
@@ -1011,6 +1139,183 @@ function wallboxCard(
     };
 }
 
+/** A value as the datapoint wants it: a number for a number datapoint, a boolean for a boolean one. */
+function typed(st: StateLike | undefined, key: string): number | string | boolean {
+    const type = str(st?.attributes.iobroker_type);
+    return type === 'number' && Number.isFinite(Number(key)) ? Number(key) : type === 'boolean' ? key === 'true' : key;
+}
+
+function climateCard(
+    host: DeviceHost,
+    f: DeviceItem,
+    base: Record<string, unknown>,
+    main: string,
+    links: Partial<Record<DeviceRole, string | null>>,
+): Record<string, unknown> {
+    const hass = host.hass();
+    const lang = host.language();
+    const mainSt = hass.states[main]!;
+    const own = domain(main) === 'climate';
+    const a = mainSt.attributes;
+    // the linked datapoint itself may be the target or the room temperature
+    const setId = links.setpoint ?? (!own && fits('setpoint', main, mainSt) ? main : null);
+    const actualId = links.actual ?? (!own && fits('actual', main, mainSt) ? main : null);
+    const setSt = setId ? hass.states[setId] : undefined;
+    const target = own ? (typeof a.temperature === 'number' ? a.temperature : null) : num(setSt);
+    const actual = own
+        ? typeof a.current_temperature === 'number'
+            ? a.current_temperature
+            : null
+        : actualId
+          ? num(hass.states[actualId])
+          : null;
+    const valve = links.valve ? num(hass.states[links.valve]) : null;
+    const humidity = links.humidity
+        ? num(hass.states[links.humidity])
+        : typeof a.current_humidity === 'number'
+          ? a.current_humidity
+          : null;
+    const onoffId = links.onoff;
+    const switchedOff = onoffId ? !ON.test(str(hass.states[onoffId]?.state)) : own && mainSt.state === 'off';
+    const ac = f.type === 'ac_unit';
+    const action = str(a.hvac_action);
+    const phase = switchedOff
+        ? 'climate_off'
+        : action === 'heating' ||
+            (valve !== null ? valve > 5 : !ac && !own && target !== null && actual !== null && target > actual + 0.3)
+          ? 'heats'
+          : action === 'cooling' || (ac && !own && target !== null && actual !== null && target < actual - 0.3)
+            ? 'cools'
+            : 'holds';
+    const color = { heats: '#ff8a3d', cools: '#37b6ff', holds: '#4cd97b', climate_off: '#9fb3c8' }[phase];
+    const icon = { heats: '♨', cools: '❄', holds: '✓', climate_off: '○' }[phase];
+    const unit = str(own ? '°C' : hass.states[actualId ?? setId ?? main]?.attributes.unit_of_measurement) || '°C';
+    const fmt = (n: number, digits = 1): string =>
+        n.toLocaleString(lang, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+    const rows: Record<string, unknown>[] = [];
+    if (valve !== null) {
+        rows.push({
+            label: text(lang, 'valve'),
+            value: `${Math.round(valve)} %`,
+            at: Math.max(0, Math.min(100, valve)),
+            fill: true,
+            color: '#ff8a3d',
+        });
+    }
+    if (humidity !== null) {
+        rows.push({
+            label: text(lang, 'humidity'),
+            value: `${Math.round(humidity)} %`,
+            at: Math.max(0, Math.min(100, humidity)),
+            minor: true,
+        });
+    }
+    const windowSt = links.window ? hass.states[links.window] : undefined;
+    const windowOpen =
+        !!windowSt &&
+        !DEAD.test(windowSt.state) &&
+        (ON.test(windowSt.state) || /open|offen|tilt|kipp|открыт/i.test(windowSt.state) || (num(windowSt) ?? 0) > 0);
+    // − and +: half a degree (or the climate's own step), within its range
+    const step = typeof a.target_temp_step === 'number' ? a.target_temp_step : 0.5;
+    const min =
+        typeof (own ? a.min_temp : setSt?.attributes.iobroker_min) === 'number'
+            ? ((own ? a.min_temp : setSt?.attributes.iobroker_min) as number)
+            : 5;
+    const max =
+        typeof (own ? a.max_temp : setSt?.attributes.iobroker_max) === 'number'
+            ? ((own ? a.max_temp : setSt?.attributes.iobroker_max) as number)
+            : 30;
+    const setTo = (v: number): void => {
+        const next = Math.min(max, Math.max(min, Math.round(v / step) * step));
+        if (own) {
+            void Promise.resolve(
+                host.callService?.('climate', 'set_temperature', { entity_id: main, temperature: next }),
+            ).catch((e: unknown) => console.warn('home3d: climate.set_temperature', e));
+        } else if (setId) {
+            setValue(host, setId, next);
+        }
+    };
+    const buttons: Record<string, unknown>[] = [];
+    if (target !== null && (own || setId)) {
+        buttons.push({ label: '−', title: text(lang, 'cooler'), onTap: () => setTo(target - step) });
+        buttons.push({ label: '+', title: text(lang, 'warmer'), onTap: () => setTo(target + step) });
+    }
+    const boostId = links.boost;
+    if (boostId) {
+        const on = ON.test(str(hass.states[boostId]?.state));
+        buttons.push({
+            label: '🔥',
+            title: text(lang, 'boost'),
+            on,
+            onTap: () => press(host, boostId, on ? 'turn_off' : 'turn_on'),
+        });
+    }
+    if (onoffId) {
+        buttons.push({
+            label: '⏻',
+            title: text(lang, switchedOff ? 'on' : 'off_btn'),
+            on: !switchedOff,
+            onTap: () => press(host, onoffId, switchedOff ? 'turn_on' : 'turn_off'),
+        });
+    }
+    const chips: { title: string; items: Record<string, unknown>[] }[] = [];
+    if (own && Array.isArray(a.hvac_modes) && a.hvac_modes.length > 1) {
+        chips.push({
+            title: text(lang, 'climate_mode'),
+            items: (a.hvac_modes as unknown[])
+                .map(str)
+                .filter(Boolean)
+                .map(m => ({
+                    label: TEXTS[lang.slice(0, 2)]?.[`hvac_${m}`] ?? TEXTS.en[`hvac_${m}`] ?? m,
+                    on: mainSt.state === m,
+                    onTap: () =>
+                        void Promise.resolve(
+                            host.callService?.('climate', 'set_hvac_mode', { entity_id: main, hvac_mode: m }),
+                        ).catch((e: unknown) => console.warn('home3d: climate.set_hvac_mode', e)),
+                })),
+        });
+    } else if (links.mode) {
+        const modeId = links.mode;
+        const modeSt = hass.states[modeId];
+        const texts = modeSt?.attributes.iobroker_states;
+        if (texts && typeof texts === 'object') {
+            chips.push({
+                title: text(lang, 'climate_mode'),
+                items: Object.entries(texts as Record<string, string>).map(([key, label]) => ({
+                    label: label.charAt(0).toUpperCase() + label.slice(1).toLowerCase(),
+                    on: modeSt?.state === key || modeSt?.state === label,
+                    onTap: () => setValue(host, modeId, typed(modeSt, key) as number | string),
+                })),
+            });
+        }
+    }
+    return {
+        ...base,
+        title: f.name || text(lang, 'climate'),
+        live:
+            target !== null && phase !== 'climate_off'
+                ? `${text(lang, phase)} · ${fmt(target)} ${unit}`
+                : text(lang, phase),
+        liveColor: color,
+        status: { icon, text: text(lang, phase), since: since(lang, mainSt), color },
+        ...(actual !== null || target !== null
+            ? {
+                  main: {
+                      text: actual !== null ? `${fmt(actual)} ${unit}` : `${fmt(target!)} ${unit}`,
+                      sub: text(lang, actual !== null ? 'room' : 'target_short'),
+                      ...(actual !== null && target !== null
+                          ? { side: { text: `${fmt(target)} ${unit}`, sub: text(lang, 'target_short'), color } }
+                          : {}),
+                  },
+              }
+            : {}),
+        ...(rows.length ? { rows } : {}),
+        ...(windowOpen ? { hint: { text: text(lang, 'window_open'), color: '#37b6ff' } } : {}),
+        ...(chips.length ? { chips } : {}),
+        buttons,
+    };
+}
+
 function devicesOf(b: BuildingLike | null): { floorId: string; f: DeviceItem }[] {
     return (b?.floors ?? []).flatMap(fl =>
         fl.furniture.filter(f => deviceKind(f.type)).map(f => ({ floorId: fl.id, f })),
@@ -1052,6 +1357,13 @@ const ROLE_DOMAIN: Record<DeviceRole, RegExp> = {
     beans: /^(sensor|binary_sensor)$/,
     descale: /^(sensor|binary_sensor)$/,
     cups: /^sensor$/,
+    setpoint: /^(sensor|number)$/,
+    actual: /^sensor$/,
+    humidity: /^sensor$/,
+    valve: /^sensor$/,
+    boost: WRITABLE,
+    window: /^(sensor|binary_sensor)$/,
+    onoff: WRITABLE,
     charge: WRITABLE,
     current: /^(sensor|number)$/,
     mode: /^(sensor|select|input_select)$/,
@@ -1096,7 +1408,7 @@ export function deviceFields(host: DeviceHost, item: DeviceItem): unknown[] {
         },
         ...DEVICE_ROLES[kind].map(role => ({
             kind: 'entity',
-            label: text(lang, role),
+            label: text(lang, kind === 'climate' && role === 'mode' ? 'climate_mode' : role),
             value: item.device_links?.[role] ?? null,
             auto: autoRole(hass, item, role),
             filter: (id: string) => ROLE_DOMAIN[role].test(domain(id)),
