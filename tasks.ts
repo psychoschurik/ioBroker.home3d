@@ -3112,6 +3112,58 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * MJPEG camera streams (camera-url.ts): a camera's `entity_picture` that is a stream (e.g. the web extension of
+ * ioBroker.frigate, `../frigate.0/<camera>/stream.mjpeg`) keeps its URL in every <img>, so the stream runs on instead of
+ * being closed and opened again by the refresh counter `fp3d=` every few seconds. Stills and data URLs as before.
+ * The camera projection (`projectedCameras`) and the picture rules (`pictureUrl`) keep the counter: their URL becomes a
+ * WebGL texture through a TextureLoader, which reads only the first frame of a stream, so only a new URL refreshes it.
+ */
+function mjpegStreams(name: string, code: string): string {
+    const still = (tick: string): string =>
+        `(picture.startsWith("data:") ? picture : \`\${picture}\${picture.includes("?") ? "&" : "?"}fp3d=\${${tick}}\`)`;
+    if (name === 'components/quick-menu.ts') {
+        code = `import { cameraSrc as fp3dCameraSrc } from "${root}/frontend/vendor-ext/camera-url.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            `const src = picture ? ${still('this._tick')} : null;`,
+            'const src = picture ? fp3dCameraSrc(picture, this._tick) : null;',
+            'mjpeg: quick menu',
+        );
+    }
+    if (name === 'components/room-panel.ts') {
+        code = `import { cameraSrc as fp3dCameraSrc } from "${root}/frontend/vendor-ext/camera-url.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            `const src = picture && !isUnavailable(st) ? ${still('this._tick')} : null;`,
+            'const src = picture && !isUnavailable(st) ? fp3dCameraSrc(picture, this._tick) : null;',
+            'mjpeg: room panel',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = `import { cameraSrc as fp3dCameraSrc } from "${root}/frontend/vendor-ext/camera-url.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            `return picture && st && !isUnavailable(st) ? ${still('this.cameraTick')} : null;`,
+            'return picture && st && !isUnavailable(st) ? fp3dCameraSrc(picture, this.cameraTick) : null;',
+            'mjpeg: camera wall',
+        );
+        code = replaceRequired(
+            code,
+            `const src = picture && !isUnavailable(cam) ? ${still('Date.now()')} : null;`,
+            'const src = picture && !isUnavailable(cam) ? fp3dCameraSrc(picture, Date.now()) : null;',
+            'mjpeg: detection pop-up',
+        );
+        code = replaceRequired(
+            code,
+            `const src = picture && !isUnavailable(st) ? ${still('this.cameraTick')} : null;`,
+            'const src = picture && !isUnavailable(st) ? fp3dCameraSrc(picture, this.cameraTick) : null;',
+            'mjpeg: look through',
+        );
+    }
+    return code;
+}
+
+/**
  * Window style "pass_through": a pass-through (e.g. from the kitchen into the living room) — a window with its sill
  * and height, drawn only as the gap in the wall: no frame, no glass, no sash, no blind.
  */
@@ -4824,6 +4876,7 @@ const patches: Plugin = {
         code = serverMore(name, code);
         code = tapMore(name, code);
         code = passThroughMore(name, code);
+        code = mjpegStreams(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

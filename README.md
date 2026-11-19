@@ -206,6 +206,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Steckdose nicht erreichbar, blinkt die Betriebs-LED orange
 - (bluefox) Fensterstil „Durchreiche (ohne Rahmen und Glas)“: eine Öffnung mit Brüstung und Höhe, nur als Loch in der
   Wand, z. B. von der Küche ins Wohnzimmer
+- (bluefox) MJPEG-Kamerastreams (z. B. `stream.mjpeg` von Frigate) laufen durch, statt sich alle paar Sekunden neu zu
+  verbinden; Standbilder werden weiter aufgefrischt
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler
