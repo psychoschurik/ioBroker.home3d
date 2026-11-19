@@ -3234,7 +3234,7 @@ function mediaMore(name: string, code: string): string {
         code = replaceRequired(
             code,
             '        const title = label || translate(hass, "holo_media_playing");',
-            '        const title = label || translate(hass, st.state === "playing" ? "holo_media_playing" : st.state === "off" || st.state === "standby" ? ("holo_media_off" as I18nKey) : ("holo_media_ready" as I18nKey));',
+            '        const title = label || translate(hass, st.state === "playing" ? "holo_media_playing" : st.state === "paused" ? "holo_media_paused" : st.state === "off" || st.state === "standby" ? ("holo_media_off" as I18nKey) : ("holo_media_ready" as I18nKey));',
             'media pin: title',
         );
         code = replaceRequired(
