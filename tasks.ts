@@ -3168,6 +3168,165 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * Air vent of a ventilation (air-vent.ts, home-view.ts, home-fx.ts): a new piece under switches and tech, drawn by the
+ * home looks; a disc valve under the ceiling or a grille on the wall, fresh air streaming out of it (supply) or used air
+ * drawn into it (exhaust) while its fan runs, thicker and faster the higher its stage.
+ */
+function airVentMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "heat_store",\n] as const;',
+            '  "heat_store",\n  "air_vent",\n] as const;',
+            'vent: furniture type',
+        );
+        code = replaceRequired(
+            code,
+            '"water_heater", "heat_store"',
+            '"water_heater", "heat_store", "air_vent"',
+            'vent: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  heat_store: [0.75, 0.75, 1.9],',
+            '  heat_store: [0.75, 0.75, 1.9],\n  // a disc valve under the ceiling (a grille on the wall: 0.3 × 0.04 × 0.15)\n  air_vent: [0.2, 0.2, 0.05],',
+            'vent: size',
+        );
+        code = replaceRequired(
+            code,
+            '  store_heat?: string | null;',
+            '  store_heat?: string | null;\n  /** An air vent: "exhaust" (used air into it), else supply (fresh air out of it). */\n  vent_flow?: string | null;',
+            'vent: fields',
+        );
+        code = replaceRequired(
+            code,
+            '  if (f.type === "wifi_ap") return f.variant === "wall" ? 2.1 : Math.max(0, ceiling - f.h);',
+            '  if (f.type === "wifi_ap") return f.variant === "wall" ? 2.1 : Math.max(0, ceiling - f.h);\n  if (f.type === "air_vent") return f.variant === "wall" ? 2.0 : Math.max(0, ceiling - f.h);',
+            'vent: mount height',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  heat_store: ["tech", ["utility"]],',
+            '  heat_store: ["tech", ["utility"]],\n  air_vent: ["tech", ["bath", "kitchen", "utility"]],',
+            'vent: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "heat_store":',
+            [
+                '    case "air_vent":',
+                '      // a grille on the wall (flat) with its slats, else the disc valve from below',
+                '      return d < 0.1',
+                '        ? [rect(-w / 2, -d / 2, w / 2, d / 2), line(-w * 0.3, 0, w * 0.3, 0)]',
+                '        : [circle(0, 0, Math.min(w, d) / 2), circle(0, 0, Math.min(w, d) * 0.33)];',
+                '    case "heat_store":',
+            ].join('\n'),
+            'vent: symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "heat_store":\n    case "ebike":\n',
+            '    case "air_vent":\n    case "heat_store":\n    case "ebike":\n',
+            'vent: drawn by the home looks',
+        );
+    }
+    if (name === 'viewer/preview.ts') {
+        code = `import { buildAirVent as fp3dPrevAirVent } from "${root}/frontend/vendor-ext/air-vent.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '                  ? fp3dPrevHeatStore(item.w, item.d, item.h)\n                  : null;',
+            '                  ? fp3dPrevHeatStore(item.w, item.d, item.h)\n                  : item.type === "air_vent"\n                    ? fp3dPrevAirVent(item.w, item.d, item.h, false, "supply")\n                    : null;',
+            'vent: library picture',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_air_vent: 'Lüftungsauslass',
+            vent_mount: 'Montage',
+            vent_ceiling: 'Tellerventil an der Decke',
+            vent_wall: 'Gitter an der Wand',
+            vent_flow: 'Luft',
+            vent_supply: 'Zuluft (frische Luft strömt heraus)',
+            vent_exhaust: 'Abluft (verbrauchte Luft wird abgesaugt)',
+            vent_fan: 'Lüfter (Stufe, Leistung, Schalter)',
+            vent_hint:
+                'Solange der Lüfter läuft, strömt an einem Zuluft-Auslass hellblaue frische Luft heraus und wird an einem Abluft-Auslass graue Luft angesaugt – dichter, schneller und weiter mit der Stufe. Es zählen ein Lüfter (mit Prozent), eine Stufe (bis 4 als 0–4, bis 10 als 0–10, sonst %), eine Leistung (W), ein Luftvolumen (m³/h), eine Drehzahl, ein Betriebsmodus mit Namen (niedrig, normal, hoch, Intensiv …) oder ein Schalter.',
+        };
+        const en: Record<string, string> = {
+            furn_air_vent: 'Air vent',
+            vent_mount: 'Mounting',
+            vent_ceiling: 'Disc valve on the ceiling',
+            vent_wall: 'Grille on the wall',
+            vent_flow: 'Air',
+            vent_supply: 'Supply (fresh air streams out)',
+            vent_exhaust: 'Exhaust (used air is drawn in)',
+            vent_fan: 'Fan (stage, power, switch)',
+            vent_hint:
+                'While the fan runs, light blue fresh air streams out of a supply vent and grey air is drawn into an exhaust vent – thicker, faster and farther with the stage. A fan (with its percentage), a stage (up to 4 as 0–4, up to 10 as 0–10, else %), a power (W), an air volume (m³/h), a speed, an operating mode by name (low, normal, high, boost …) or a switch count.',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Mülltonne",',
+            `  furn_waste_bin: "Mülltonne",${lines(de)}`,
+            'vent de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Waste bin",',
+            `  furn_waste_bin: "Waste bin",${lines(en)}`,
+            'vent en',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '"heat_pump", "ebike", "heat_store"]);',
+            '"heat_pump", "ebike", "heat_store", "air_vent"]);',
+            'vent: no state links',
+        );
+        code = replaceRequired(
+            code,
+            '    if (f.type === "heat_store")\n',
+            [
+                '    if (f.type === "air_vent")',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        <label class="fp3d-field"',
+                '          >${this.t("vent_mount" as I18nKey)}',
+                '          <select ?disabled=${!this.isAdmin} @change=${(e: Event) => { const v = (e.target as HTMLSelectElement).value; const [w, d, h] = v === "wall" ? [0.3, 0.04, 0.15] : [0.2, 0.2, 0.05]; set({ variant: v === "wall" ? "wall" : null, w, d, h, mount_y: null }); }}>',
+                '            <option value="" ?selected=${f.variant !== "wall"}>${this.t("vent_ceiling" as I18nKey)}</option>',
+                '            <option value="wall" ?selected=${f.variant === "wall"}>${this.t("vent_wall" as I18nKey)}</option>',
+                '          </select></label',
+                '        >',
+                '        <label class="fp3d-field"',
+                '          >${this.t("vent_flow" as I18nKey)}',
+                '          <select ?disabled=${!this.isAdmin} @change=${(e: Event) => set({ vent_flow: (e.target as HTMLSelectElement).value === "exhaust" ? "exhaust" : null })}>',
+                '            <option value="" ?selected=${f.vent_flow !== "exhaust"}>${this.t("vent_supply" as I18nKey)}</option>',
+                '            <option value="exhaust" ?selected=${f.vent_flow === "exhaust"}>${this.t("vent_exhaust" as I18nKey)}</option>',
+                '          </select></label',
+                '        >',
+                '        ${this.entitySelect(this.t("vent_fan" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => /^(fan|switch|sensor|number|input_number|select|input_select|input_boolean|binary_sensor|climate)\\./.test(id)), (v) => set({ entity: pick(v) }))}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("vent_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (f.type === "heat_store")',
+                '',
+            ].join('\n'),
+            'vent: form',
+        );
+    }
+    return code;
+}
+
+/**
  * Hot water or buffer store (heat-store.ts, home-view.ts, home-fx.ts): a new piece under switches and tech, drawn by
  * the home looks; a window in its jacket shows its water's layers coloured by temperature (from its sensors at the
  * top, the middle and the bottom), and while it is heated a flame burns under it.
@@ -5641,6 +5800,7 @@ const patches: Plugin = {
         code = heatPumpMore(name, code);
         code = ebikeMore(name, code);
         code = heatStoreMore(name, code);
+        code = airVentMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

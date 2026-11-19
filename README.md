@@ -295,6 +295,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) „Eigenes Symbol“ bietet jetzt gut 200 Symbole in Gruppen an (Licht, Haushaltsgeräte wie Spülmaschine und
   Saugroboter, Klima, Wasser, Strom, Türen und Fenster, Sicherheit, Medien, Garten mit Bewässerung, Fahrzeuge mit
   Fahrrad, Boot, Räume); alle erscheinen sofort, ohne den ganzen Symbolsatz nachzuladen
+- (bluefox) Neues Möbel „Lüftungsauslass“ (Schalter & Technik): ein Tellerventil an der Decke oder ein Gitter an der
+  Wand, als Zu- oder Abluft; solange sein Lüfter läuft, strömt hellblaue frische Luft heraus bzw. wird graue Luft
+  angesaugt – dichter, schneller und weiter mit der Stufe (Lüfter mit Prozent, Stufe, Leistung, m³/h, Drehzahl, Modus)
 
 ### 0.4.0 (2026-11-15)
 

@@ -9,6 +9,7 @@ import { frontRank, parcelWaits, ringAt } from './parcel';
 import { heatPumpDefrost, heatPumpRun } from './heat-pump';
 import { ebikeCharging, ebikeLevel } from './ebike';
 import { storeHeating, storeLayers, storeTemp } from './heat-store';
+import { ventBase, ventFlow, ventRate } from './air-vent';
 import { serverKind, serverLoad } from './server';
 import type {
     AirState,
@@ -21,6 +22,7 @@ import type {
     HeatPumpState,
     EbikeState,
     StoreState,
+    VentState,
     SmokeState,
     HazeState,
     BadgeState,
@@ -130,6 +132,8 @@ export interface FurnitureLike {
     store_mid?: string | null;
     store_bottom?: string | null;
     store_heat?: string | null;
+    /** An air vent: "supply" (fresh air out of it) or "exhaust" (used air into it). */
+    vent_flow?: string | null;
     /** The model's variant (a mailbox's shape …). */
     variant?: string | null;
     /** A boat's gear: the sensor of a hatch, a tank … */
@@ -256,6 +260,9 @@ export function homeWatched(
                 add(x.store_mid);
                 add(x.store_bottom);
                 add(x.store_heat);
+            }
+            if (x.type === 'air_vent') {
+                add(x.entity);
             }
             if (x.type === 'ebike') {
                 add(x.entity);
@@ -458,6 +465,7 @@ export function homeScene(input: HomeInput): HomeOutput {
     const heatPumps: HeatPumpState[] = [];
     const ebikes: EbikeState[] = [];
     const stores: StoreState[] = [];
+    const vents: VentState[] = [];
     const sounds: SoundState[] = [];
     const streams: StreamState[] = [];
     const sprinklers: HomeScene['sprinklers'] = [];
@@ -812,6 +820,24 @@ export function homeScene(input: HomeInput): HomeOutput {
                         low: level !== null && level <= 20 && !charging,
                     });
                 }
+            } else if (f.type === 'air_vent') {
+                // under the ceiling of its room or on the wall; its air while its fan runs
+                const wall = f.variant === 'wall';
+                const room = floor.rooms.find(r => r.points.length >= 3 && pointIn([f.x, f.z], r.points));
+                vents.push({
+                    id: f.id,
+                    floor: floor.id,
+                    x: f.x,
+                    z: f.z,
+                    y: f.mount_y ?? ventBase(wall, room?.ceiling_height ?? floor.height, f.h),
+                    angle: rad(f.rotation ?? 0),
+                    w: f.w,
+                    d: f.d,
+                    h: f.h,
+                    wall,
+                    flow: ventFlow(f.vent_flow),
+                    rate: f.entity && f.entity !== 'none' ? ventRate(hass.states[f.entity]) : 0,
+                });
             } else if (f.type === 'heat_pump') {
                 // on the ground; its fan from its power or switch, steam while it defrosts
                 const linked = (id: string | null | undefined): StateLike | null =>
@@ -1072,6 +1098,7 @@ export function homeScene(input: HomeInput): HomeOutput {
             heatPumps,
             ebikes,
             stores,
+            vents,
             parcels: parcelAtDoor(input, hass, b, now),
             glow,
         },

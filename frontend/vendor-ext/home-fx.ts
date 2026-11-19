@@ -38,6 +38,7 @@ import { buildRainTank, type RainTankKind } from './rain-tank';
 import { buildParcel } from './parcel';
 import { buildHeatPump, type HeatPumpRun } from './heat-pump';
 import { buildHeatStore, storeColor } from './heat-store';
+import { buildAirVent, ventColor, type VentFlow } from './air-vent';
 import { buildEbike, ebikeColor, ebikeLit, EBIKE_LED_OFF } from './ebike';
 import { buildMailFlag, FLAG_DOWN, type MailShape } from './mail-flag';
 import { buildServer, LED_OFF, ledColor, ledLit, type ServerKind, type ServerLed, type ServerLoad } from './server';
@@ -265,6 +266,26 @@ export interface StoreState {
     label: string;
 }
 
+/** An air vent of a ventilation: fresh air streams out of it (supply) or used air into it (exhaust) while its fan runs. */
+export interface VentState {
+    id: string;
+    floor: string;
+    x: number;
+    z: number;
+    /** Its bottom (m above the floor). */
+    y: number;
+    /** Turn in the plan (rad, clockwise). */
+    angle: number;
+    w: number;
+    d: number;
+    h: number;
+    /** On the wall (the air leaves at its front), else under the ceiling (the air leaves downwards). */
+    wall: boolean;
+    flow: VentFlow;
+    /** How hard its fan runs, 0 (still) … 1. */
+    rate: number;
+}
+
 /** An e-bike while it is home: its battery's LEDs show the charge, the charger stands beside it while it charges. */
 export interface EbikeState {
     id: string;
@@ -364,6 +385,7 @@ export interface HomeScene {
     heatPumps?: HeatPumpState[];
     ebikes?: EbikeState[];
     stores?: StoreState[];
+    vents?: VentState[];
     glow: GlowState | null;
 }
 
@@ -665,6 +687,11 @@ export class HomeFx {
     private mailFlags = new Map<string, { arm: Object3D; cur: number }>();
     /** The flame of each store and its tongues. */
     private stores = new Map<string, { flame: Object3D; tongues: Mesh[] }>();
+    /** The air of each vent: its particles, where it leaves and which way. */
+    private vents = new Map<
+        string,
+        { p: Particles; at: Vector3; fwd: Vector3; wall: boolean; flow: VentFlow; w: number; h: number }
+    >();
     /** The battery LEDs and the charger of each e-bike, and the colour each LED shows now. */
     private ebikes = new Map<string, { leds: Mesh[]; charger: Object3D; shown: number[] }>();
     /** The fans and the defrost steam of each heat pump. */
@@ -699,7 +726,7 @@ export class HomeFx {
     /**
      * The piece of furniture drawn here (a car, a mower and its dock, a sprinkler, a coffee machine, a rainwater tank,
      * a server, a mailbox's flag, a heat pump, an e-bike,
-     * a store) under a ray: its id and how far
+     * a store, an air vent) under a ray: its id and how far
      * away it is; null: none, or only hidden ones.
      */
     furnitureAt(ray: Raycaster): { id: string; distance: number } | null {
@@ -792,6 +819,7 @@ export class HomeFx {
                 v.label,
             ]),
             (s.ebikes ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.w, v.d, v.h, v.label, v.low]),
+            (s.vents ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.w, v.d, v.h, v.wall, v.flow]),
             (s.heatPumps ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
             (s.parcels ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.label]),
             (s.mailFlags ?? []).map(v => [v.id, v.floor, v.shape, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
@@ -867,6 +895,24 @@ export class HomeFx {
             }
             this.floorGroup(v.floor).add(m);
             this.stores.set(v.id, { flame: m.userData.flame as Object3D, tongues: m.userData.tongues as Mesh[] });
+        }
+        for (const v of s.vents ?? []) {
+            const m = buildAirVent(v.w, v.d, v.h, v.wall, v.flow, this.light);
+            m.userData.fp3dFurniture = v.id;
+            m.position.set(v.x, v.y, v.z);
+            m.rotation.y = -v.angle;
+            this.floorGroup(v.floor).add(m);
+            const up = new Vector3(0, 1, 0);
+            const fwd = new Vector3(0, 0, 1).applyAxisAngle(up, -v.angle);
+            const at = v.wall
+                ? new Vector3(0, v.h / 2, v.d / 2).applyAxisAngle(up, -v.angle).add(m.position)
+                : m.position.clone();
+            const p = particles(90, 0.12, 4);
+            p.points.visible = false;
+            // over the glass walls of a room, as the air at a window
+            p.points.renderOrder = 12;
+            this.floorGroup(v.floor).add(p.points);
+            this.vents.set(v.id, { p, at, fwd, wall: v.wall, flow: v.flow, w: v.w, h: v.h });
         }
         for (const v of s.ebikes ?? []) {
             const m = buildEbike(v.w, v.d, v.h, this.light);
@@ -1203,6 +1249,7 @@ export class HomeFx {
         this.heatPumps.clear();
         this.ebikes.clear();
         this.stores.clear();
+        this.vents.clear();
         this.tips = [];
         if (all) {
             this.carIn.clear();
@@ -1346,6 +1393,17 @@ export class HomeFx {
                 const f = Math.sin(t * 13 + k * 2.1) * 0.5 + Math.sin(t * 7.3 + k * 4.7) * 0.5;
                 m.scale.set(1 + 0.08 * f, 0.8 + 0.25 * f, 1);
             });
+        }
+        for (const v of s.vents ?? []) {
+            const e = this.vents.get(v.id);
+            if (!e) {
+                continue;
+            }
+            e.p.points.visible = v.rate > 0;
+            if (v.rate > 0 && shown(v.floor)) {
+                moving ||= !calm;
+                this.ventAir(e, v.rate, tt);
+            }
         }
         for (const v of s.ebikes ?? []) {
             const e = this.ebikes.get(v.id);
@@ -1532,6 +1590,57 @@ export class HomeFx {
             const y = at.y + 0.005 + 0.05 * Math.min(1, s * 2.6) + Math.max(0, s - 0.38) * 0.55;
             p.pos.set([x, y, z], i * 3);
             const alpha = Math.pow(Math.sin(Math.PI * Math.min(1, s * 1.3)), 1.3) * (1 - s) * 0.95;
+            p.col.set([c[0], c[1], c[2], alpha], i * 4);
+        }
+        flush(p);
+    }
+
+    /**
+     * The air of a vent: out of a supply vent it streams away, widening and fading (from the ceiling downwards and to
+     * the sides, from the wall into the room, sinking a little); into an exhaust vent it is drawn from around it. The
+     * harder the fan runs, the more puffs, the faster and the farther.
+     */
+    private ventAir(
+        e: { p: Particles; at: Vector3; fwd: Vector3; wall: boolean; flow: VentFlow; w: number; h: number },
+        rate: number,
+        t: number,
+    ): void {
+        const p = e.p;
+        const n = p.pos.length / 3;
+        const c = ventColor(e.flow, this.light);
+        const speed = 0.2 + 0.5 * rate;
+        const len = 0.5 + 1.1 * rate;
+        const count = 0.3 + 0.7 * rate;
+        const supply = e.flow === 'supply';
+        const sx = -e.fwd.z;
+        const sz = e.fwd.x;
+        for (let i = 0; i < n; i++) {
+            const u = p.seeds[i * 3];
+            const v = p.seeds[i * 3 + 1];
+            const ph = p.seeds[i * 3 + 2];
+            const s = (t * speed + ph) % 1;
+            // how far from the vent: out of it, or towards it
+            const k = supply ? s : 1 - s;
+            const sway = Math.sin(t * 1.3 + ph * 7) * 0.03 * k;
+            let x: number;
+            let y: number;
+            let z: number;
+            if (e.wall) {
+                const out = k * len;
+                const side = (u - 0.5) * (e.w * 0.8 + k * len * 0.5) + sway;
+                const up = (v - 0.5) * (e.h * 0.8 + k * len * 0.3) - (supply ? k * k * 0.25 : 0);
+                x = e.at.x + e.fwd.x * out + sx * side;
+                y = e.at.y + up;
+                z = e.at.z + e.fwd.z * out + sz * side;
+            } else {
+                const ang = u * Math.PI * 2 + sway;
+                const r = e.w * 0.3 + k * len * (0.3 + 0.4 * v);
+                x = e.at.x + Math.cos(ang) * r;
+                z = e.at.z + Math.sin(ang) * r;
+                y = e.at.y - k * len * (0.45 + 0.35 * (1 - v));
+            }
+            p.pos.set([x, y, z], i * 3);
+            const alpha = i / n < count ? Math.pow(Math.sin(Math.PI * s), 0.6) * (0.6 + 0.4 * rate) : 0;
             p.col.set([c[0], c[1], c[2], alpha], i * 4);
         }
         flush(p);
