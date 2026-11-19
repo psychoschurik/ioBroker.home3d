@@ -348,7 +348,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Batterie und Landstrom: Glaskarte über einer Hausbatterie mit Ladestand, Laden/Entladen in W,
   Spannung, Strom, Rest-/Gesamtkapazität in Ah, wie lange sie noch reicht bzw. bis sie voll ist, Temperatur und
   dem Landstrom (verbunden, mit welcher Leistung; auf einem Boot sonst das Netz aus den Energie-Einstellungen);
-  die Werte werden neben dem Ladestand-Datenpunkt gefunden (z. B. wattcycle), Warnung unter 20 %
+  die Werte werden neben dem Ladestand-Datenpunkt gefunden (z. B. wattcycle), Warnung unter 20 %; „verbunden“ versteht
+  auch die Quelle eines AC-Eingangs (Victron `Ac.ActiveIn.Source`: 1 Netz, 2 Generator, 3 Landstrom, 240 nicht verbunden)
 
 ### 0.4.0 (2026-11-15)
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { batteryLink, boatCards, boatFields, boatWatched, windCard, type BoatItem } from '../frontend/vendor-ext/boat-cards';
+import { batteryLink, boatCards, shoreConnected, boatFields, boatWatched, windCard, type BoatItem } from '../frontend/vendor-ext/boat-cards';
 
 type St = { state: string; attributes: Record<string, unknown> };
 const st = (state: string, unit = ''): St => ({ state, attributes: unit ? { unit_of_measurement: unit } : {} });
@@ -156,4 +156,19 @@ test('battery card: charge and power from the plan, values found beside the char
     assert.ok(card.rows.some(r => r.label === 'reicht noch' && r.value === '5 h'));
     assert.ok(card.rows.some(r => r.label === 'Landstrom' && r.value === 'nicht verbunden'));
     assert.equal(card.hint?.text, 'Batterie fast leer');
+});
+
+test('shore power connected: on/true or the source of an AC input (Victron: 1 grid, 2 generator, 3 shore, 240 not connected)', () => {
+    assert.deepEqual(['3', '1', '240', '0', 'true', 'false', 'on', 'off', 'connected', 'not connected'].map(shoreConnected), [
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+    ]);
 });

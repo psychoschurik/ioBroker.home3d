@@ -529,6 +529,18 @@ export function batteryLink(hass: HassLike, f: BoatItem, socId: string | null, k
     );
 }
 
+/**
+ * Whether shore power is plugged in by its datapoint: on/true/connected, or a number as the AC input's source of an
+ * inverter/charger reports it (Victron: 1 grid, 2 generator, 3 shore; 0 unknown and 240 not connected).
+ */
+export function shoreConnected(state: string): boolean {
+    const n = Number(state);
+    if (state.trim() !== '' && Number.isFinite(n)) {
+        return n > 0 && n < 240;
+    }
+    return /^(on|true|connected|verbunden|подключ)/i.test(state.trim());
+}
+
 /** Hours and minutes: "5 h 20 min", "45 min", "3 d" beyond two days. */
 function duration(lang: string, h: number): string {
     if (h >= 48) {
@@ -625,7 +637,7 @@ export function batteryCard(host: BoatHost, floorId: string, f: BoatItem): Recor
     const plugSt = linked(f.shore_connected) ? hass.states[f.shore_connected] : undefined;
     const plugged =
         plugSt && !DEAD.test(plugSt.state)
-            ? /^(on|true|1|connected|verbunden)$/i.test(plugSt.state)
+            ? shoreConnected(plugSt.state)
             : shoreW !== null
               ? Math.abs(shoreW) > 5
               : null;
