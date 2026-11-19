@@ -1,25 +1,30 @@
 // Wind indicators, drawn by the viewer (furniture type "wind_vane", added in tasks.ts) and turned by the wind every frame:
 // - "windex": the arrow at a masthead, pointing into the wind;
 // - "sock": a windsock in red and white that lifts with the wind (straight out from 15 kn) and streams downwind;
-// - "flag": a flag that flies downwind and flutters, harder in gusts.
+// - "flag": a flag that flies downwind and flutters, harder in gusts; a country's flag or a plain one (flags.ts).
 // Gusts make all of them swing.
 import {
     BoxGeometry,
     Color,
     ConeGeometry,
     CylinderGeometry,
+    DataTexture,
     DoubleSide,
     Float32BufferAttribute,
     Group,
+    LinearFilter,
+    LinearMipmapLinearFilter,
     Mesh,
     MeshBasicMaterial,
     PlaneGeometry,
+    SRGBColorSpace,
     Sprite,
     type BufferAttribute,
     type BufferGeometry,
     type Object3D,
 } from 'three';
 import { labelSprite, shade } from './anchor';
+import { flagAspect, flagDesign, flagPixels } from './flags';
 import { sockLift } from './weather-data';
 
 /** One wind indicator as the 3D view reports it. */
@@ -31,6 +36,8 @@ export interface VaneState {
     z: number;
     /** windex, sock or flag. */
     kind: string;
+    /** Which flag it flies (flags.ts), for the kind flag. */
+    flag: string;
     /** Length of the arrow, the sock or the flag (m). */
     size: number;
     /** Height above the floor (m): the masthead, the top of the pole. */
@@ -62,6 +69,7 @@ export function vaneKey(v: VaneState, s: VaneScene): string {
     return [
         v.id,
         v.kind,
+        v.flag,
         v.size.toFixed(2),
         v.x.toFixed(2),
         v.z.toFixed(2),
@@ -124,14 +132,36 @@ function sock(pitch: Group, l: number): void {
     part(pitch, new CylinderGeometry(l * 0.155, l * 0.155, 0.03, 18, 1, true).rotateX(Math.PI / 2), 0x9aa3ad);
 }
 
-/** A flag: a cloth from the pole (local origin, top edge) along -z, dark blue over white. */
-function flag(pitch: Group, l: number): void {
-    const h = l * 0.62;
+/** The pictures of the flags, made once each: an indicator is rebuilt with every new wind text and takes it again. */
+const flagTextures = new Map<string, DataTexture>();
+
+function flagTexture(design: string): DataTexture {
+    const id = flagDesign(design);
+    let tex = flagTextures.get(id);
+    if (!tex) {
+        const w = 256;
+        const h = Math.round(w * flagAspect(id));
+        tex = new DataTexture(flagPixels(id, w, h), w, h);
+        tex.colorSpace = SRGBColorSpace;
+        tex.magFilter = LinearFilter;
+        tex.minFilter = LinearMipmapLinearFilter;
+        tex.generateMipmaps = true;
+        tex.anisotropy = 4;
+        tex.userData.fp3dShared = true;
+        tex.needsUpdate = true;
+        flagTextures.set(id, tex);
+    }
+    return tex;
+}
+
+/** A flag: a cloth from the pole (local origin, top edge) along -z, its height by the flag's proportions. */
+function flag(pitch: Group, l: number, design: string): void {
+    const h = l * flagAspect(design);
     const geo = new PlaneGeometry(l, h, 14, 5).rotateY(Math.PI / 2).translate(0, -h / 2, -l / 2);
-    const blue = new Color(0x1f4fbf);
-    const white = new Color(0xf2f4f7);
-    paint(geo, (_x, y) => (y > -h / 2 ? blue : white));
-    const m = new Mesh(geo, new MeshBasicMaterial({ vertexColors: true, side: DoubleSide }));
+    // the picture runs from the pole (u = 0) to the free end; the vertex colours only shade it
+    const white = new Color(0xffffff);
+    paint(geo, () => white);
+    const m = new Mesh(geo, new MeshBasicMaterial({ map: flagTexture(design), vertexColors: true, side: DoubleSide }));
     m.name = 'fp3dVaneCloth';
     m.userData.fp3dRest = Float32Array.from((geo.getAttribute('position') as BufferAttribute).array);
     pitch.add(m);
@@ -161,7 +191,7 @@ export function buildVane(v: VaneState, s: VaneScene): Group {
     if (v.kind === 'sock') {
         sock(pitch, l);
     } else if (v.kind === 'flag') {
-        flag(pitch, l);
+        flag(pitch, l, v.flag);
     } else {
         head.position.y = 0.16;
         windex(head, l);
@@ -283,7 +313,7 @@ export function flagCloth(rest: ArrayLike<number>, out: Float32Array, p: FlagPos
     }
 }
 
-/** Frees the geometries, materials and textures of the indicators (sprites share one geometry: it stays). */
+/** Frees the geometries, materials and textures of the indicators (sprites share one geometry, the flags' pictures are kept). */
 export function disposeVanes(root: Object3D): void {
     root.traverse(o => {
         const m = o as Mesh;
@@ -292,7 +322,10 @@ export function disposeVanes(root: Object3D): void {
         }
         const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [];
         for (const mat of mats) {
-            (mat as MeshBasicMaterial).map?.dispose();
+            const map = (mat as MeshBasicMaterial).map;
+            if (map && !map.userData.fp3dShared) {
+                map.dispose();
+            }
             mat.dispose();
         }
     });

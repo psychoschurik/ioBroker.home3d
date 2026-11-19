@@ -350,6 +350,12 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   dem Landstrom (verbunden, mit welcher Leistung; auf einem Boot sonst das Netz aus den Energie-Einstellungen);
   die Werte werden neben dem Ladestand-Datenpunkt gefunden (z. B. wattcycle), Warnung unter 20 %; „verbunden“ versteht
   auch die Quelle eines AC-Eingangs (Victron `Ac.ActiveIn.Source`: 1 Netz, 2 Generator, 3 Landstrom, 240 nicht verbunden)
+- (bluefox) Windanzeiger „Flagge“: Die Flagge ist wählbar – Deutschland, Österreich, Schweiz, Frankreich, Italien,
+  Russland, Ukraine und weitere Länder (u. a. Griechenland, Großbritannien, USA, Niederlande, Skandinavien) und die EU,
+  jede in ihren eigenen Proportionen (die Schweiz quadratisch); ohne Wahl bleibt die bisherige blau-weiße
+- (bluefox) Glaskarten: unter „Anzeige“ drei Modi – „Karten immer“, „Karten beim Zeigen“ (am Gerät nur ein
+  Leuchtpunkt, die Karte erscheint unter der Maus, ein Klick oder Tipp auf den Punkt hält sie offen) und „Ohne Karten“;
+  ohne Wahl erscheinen die Karten jetzt beim Zeigen statt alle auf einmal
 
 ### 0.4.0 (2026-11-15)
 

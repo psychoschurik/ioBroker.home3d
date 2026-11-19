@@ -1237,6 +1237,8 @@ function boatGear(name: string, code: string): string {
                 '  gear_kind?: string | null;',
                 '  gear_y?: number | null;',
                 '  gear_mast?: boolean;',
+                '  /** A wind indicator of the kind flag: which flag it flies (frontend/vendor-ext/flags.ts; missing: the plain one). */',
+                '  gear_flag?: string | null;',
                 '  /** A hatch: how far it opens (°, default 70). */',
                 '  gear_angle?: number | null;',
             ].join('\n'),
@@ -3372,6 +3374,247 @@ function mediaMore(name: string, code: string): string {
 }
 
 /**
+ * How the glass cards over the devices show (frontend/vendor-ext/card-peek.ts): always, only while pointed at, or not
+ * at all, chosen in the menu "Anzeige" (per browser). In the mode "hover" each card leaves its dot on the device: the
+ * mouse on the dot or on the card shows it, a tap or click on the dot keeps it until the next one.
+ */
+function cardModes(name: string, code: string): string {
+    if (name === 'components/view3d.ts') {
+        code = `import { CardPeek as Fp3dCardPeek, holoKey as fp3dHoloKey, holoModeOf as fp3dHoloModeOf, holoModeValue as fp3dHoloModeValue, type HoloMode as Fp3dHoloMode } from "${root}/frontend/vendor-ext/card-peek.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '      this._holoShow = localStorage.getItem("home3d.holos") !== "0";\n',
+            [
+                '      const fp3dHolos = fp3dHoloModeOf(localStorage.getItem("home3d.holos"));',
+                '      this._holoShow = fp3dHolos !== "off";',
+                '      this.fp3dHoloHover = fp3dHolos !== "always";',
+                '',
+            ].join('\n'),
+            'card modes: stored',
+        );
+        code = replaceRequired(
+            code,
+            '      localStorage.setItem("home3d.holos", this._holoShow ? "1" : "0");\n',
+            '      localStorage.setItem("home3d.holos", fp3dHoloModeValue(this.fp3dHoloMode()));\n',
+            'card modes: toggle keeps the mode',
+        );
+        code = replaceRequired(
+            code,
+            '  private holoVisible(): boolean {\n',
+            [
+                '  /** The cards only while pointed at (else always, while they show at all). */',
+                '  private fp3dHoloHover = true;',
+                '  private fp3dPeek = new Fp3dCardPeek(() => this.viewer?.fp3dPlaceCards());',
+                '  private fp3dPeekEvents = false;',
+                '',
+                '  fp3dHoloMode(): Fp3dHoloMode {',
+                '    return !this._holoShow ? "off" : this.fp3dHoloHover ? "hover" : "always";',
+                '  }',
+                '',
+                '  /** How many glass cards there are (the menu offers their modes only then). */',
+                '  fp3dHoloCount(): number {',
+                '    return this._holos.filter((c) => c.kind !== "bin").length;',
+                '  }',
+                '',
+                '  fp3dSetHoloMode(mode: Fp3dHoloMode): void {',
+                '    this._holoShow = mode !== "off";',
+                '    if (mode !== "off") this.fp3dHoloHover = mode === "hover";',
+                '    this.fp3dPeek.clear();',
+                '    try {',
+                '      localStorage.setItem("home3d.holos", fp3dHoloModeValue(mode));',
+                '    } catch {',
+                '      // private mode: the choice lasts for this page only',
+                '    }',
+                '    this.viewer?.fp3dPlaceCards();',
+                '  }',
+                '',
+                '  /** In the mode "hover": whether card `index` shows only its dot now. */',
+                '  private fp3dPeeking(index: number): boolean {',
+                '    if (this.holograms !== null || !this.fp3dHoloHover) return false;',
+                '    const card = this._holos[index];',
+                '    if (!card || card.kind === "bin") return false;',
+                '    if (this.fp3dPeek.shows(fp3dHoloKey(card))) return false;',
+                '    // a player tapped to show its card shows it',
+                '    const pins = (this as unknown as { fp3dMediaPins?: Map<string, number> }).fp3dMediaPins;',
+                '    return !(card.kind === "media" && card.media && (pins?.get(card.media.id) ?? 0) > Date.now());',
+                '  }',
+                '',
+                "  /** The pointer on a card's dot or on the card, a tap on the dot (once, for the whole view). */",
+                '  private fp3dPeekListen(): void {',
+                '    if (this.fp3dPeekEvents) return;',
+                '    this.fp3dPeekEvents = true;',
+                '    const keyOf = (e: Event, dotOnly = false): string | null => {',
+                '      const el = (e.target as Element | null)?.closest?.("[data-holo]");',
+                '      if (!el || !(el.classList.contains("fp3d-holo-hover") || (!dotOnly && el.classList.contains("fp3d-holo")))) return null;',
+                '      const card = this._holos[Number(el.getAttribute("data-holo"))];',
+                '      return card && card.kind !== "bin" ? fp3dHoloKey(card) : null;',
+                '    };',
+                '    this.renderRoot.addEventListener("pointerover", (e) => {',
+                '      const key = keyOf(e);',
+                '      if (key) this.fp3dPeek.enter(key);',
+                '    });',
+                '    this.renderRoot.addEventListener("pointerout", (e) => {',
+                '      const key = keyOf(e);',
+                '      if (key) this.fp3dPeek.leave(key);',
+                '    });',
+                '    this.renderRoot.addEventListener("click", (e) => {',
+                '      const key = keyOf(e, true);',
+                '      if (!key) return;',
+                '      e.stopPropagation();',
+                '      this.fp3dPeek.tap(key);',
+                '    });',
+                '  }',
+                '',
+                '  private holoVisible(): boolean {',
+                '',
+            ].join('\n'),
+            'card modes: methods',
+        );
+        code = replaceRequired(
+            code,
+            '      this.viewer.setAnchorCallback((i, x, y, on, scale, facing) => this.placeHolo(i, x, y, on, scale, facing));\n',
+            '      this.viewer.setAnchorCallback((i, x, y, on, scale, facing) => this.placeHolo(i, x, y, on, scale, facing));\n      this.fp3dPeekListen();\n',
+            'card modes: listen',
+        );
+        code = replaceRequired(
+            code,
+            '    if (main && on !== this._holoOn) this._holoOn = on;\n',
+            [
+                '    // the mode "hover": only the card\'s dot, until pointed at',
+                '    const fp3dDot = on && this.fp3dPeeking(index);',
+                '    if (main && (on && !fp3dDot) !== this._holoOn) this._holoOn = on && !fp3dDot;',
+                '',
+            ].join('\n'),
+            'card modes: the energy bar while only the dot shows',
+        );
+        code = replaceRequired(
+            code,
+            '    const hidden = !on;\n    if (el.hidden !== hidden) el.hidden = hidden;\n',
+            [
+                '    if (link) {',
+                '      link.classList.toggle("fp3d-holo-hover", on && this.holograms === null && this.fp3dHoloHover && card?.kind !== "bin");',
+                '      link.classList.toggle("fp3d-holo-peek", fp3dDot && on);',
+                '      (link.lastElementChild as SVGCircleElement | null)?.setAttribute("r", fp3dDot && on ? "5" : "3");',
+                '    }',
+                '    if (fp3dDot && on) {',
+                '      if (!el.hidden) el.hidden = true;',
+                '      if (link) {',
+                '        if (link.hasAttribute("hidden")) link.toggleAttribute("hidden", false);',
+                '        const dot = link.lastElementChild as SVGCircleElement | null;',
+                '        dot?.setAttribute("cx", x.toFixed(1));',
+                '        dot?.setAttribute("cy", y.toFixed(1));',
+                '      }',
+                '      return;',
+                '    }',
+                '    const hidden = !on;',
+                '    if (el.hidden !== hidden) el.hidden = hidden;',
+                '',
+            ].join('\n'),
+            'card modes: only the dot',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-holo-min {\n        width: 150px;\n      }\n',
+            [
+                '      /* the mode "hover": a card\'s dot answers the pointer, with a halo while it stands alone */',
+                '      .fp3d-holo-hover circle {',
+                '        pointer-events: all;',
+                '        cursor: pointer;',
+                '      }',
+                '      .fp3d-holo-peek line {',
+                '        display: none;',
+                '      }',
+                '      .fp3d-holo-peek circle {',
+                '        stroke: rgba(55, 224, 255, 0.3);',
+                '        stroke-width: 10;',
+                '      }',
+                '      .fp3d-holo-min {',
+                '        width: 150px;',
+                '      }',
+                '',
+            ].join('\n'),
+            'card modes: the dot',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = replaceRequired(
+            code,
+            '  setAnchorCallback(cb: ((index: number, x: number, y: number, visible: boolean, scale: number, facing: boolean) => void) | null): void {\n',
+            [
+                '  /** The cards are placed again now (one shows or leaves only its dot), not only when the view moves. */',
+                '  fp3dPlaceCards(): void {',
+                '    this.labelsDirty = true;',
+                '    this.invalidate();',
+                '  }',
+                '',
+                '  setAnchorCallback(cb: ((index: number, x: number, y: number, visible: boolean, scale: number, facing: boolean) => void) | null): void {',
+                '',
+            ].join('\n'),
+            'card modes: place the cards again',
+        );
+    }
+    if (name === 'panel.ts') {
+        code = replaceRequired(
+            code,
+            '            <button aria-pressed=${this._plain} @click=${() => this.setPlain(true)}>${this.t("plain_on")}</button>\n          </div>\n',
+            [
+                '            <button aria-pressed=${this._plain} @click=${() => this.setPlain(true)}>${this.t("plain_on")}</button>',
+                '          </div>',
+                '          ${(this.view3d() as unknown as { fp3dHoloCount?(): number } | null)?.fp3dHoloCount?.()',
+                '            ? html`<div class="fp3d-seg" role="group" aria-label=${this.t("holo_mode" as I18nKey)} title=${this.t("holo_mode_hint" as I18nKey)}>',
+                '                ${(["always", "hover", "off"] as const).map(',
+                '                  (m) =>',
+                '                    html`<button',
+                '                      aria-pressed=${(this.view3d() as unknown as { fp3dHoloMode?(): string } | null)?.fp3dHoloMode?.() === m}',
+                '                      @click=${() => {',
+                '                        (this.view3d() as unknown as { fp3dSetHoloMode?(mode: string): void } | null)?.fp3dSetHoloMode?.(m);',
+                '                        this.requestUpdate();',
+                '                      }}',
+                '                    >',
+                '                      ${this.t(`holo_mode_${m}` as I18nKey)}',
+                '                    </button>`,',
+                '                )}',
+                '              </div>`',
+                '            : nothing}',
+                '',
+            ].join('\n'),
+            'card modes: menu',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  holos_hint: "Hologramme der Anlage und der Geräte ein- oder ausblenden",\n',
+            [
+                '  holos_hint: "Hologramme der Anlage und der Geräte ein- oder ausblenden",',
+                '  holo_mode: "Glaskarten",',
+                '  holo_mode_always: "Karten immer",',
+                '  holo_mode_hover: "Karten beim Zeigen",',
+                '  holo_mode_off: "Ohne Karten",',
+                '  holo_mode_hint: "Glaskarten der Geräte: immer sichtbar, nur solange die Maus auf ihrem Punkt oder der Karte steht (ein Klick oder Tipp auf den Punkt hält sie offen), oder gar nicht",',
+                '',
+            ].join('\n'),
+            'card modes: de',
+        );
+        code = replaceRequired(
+            code,
+            '  holos_hint: "Show or hide the holograms of the plant and the devices",\n',
+            [
+                '  holos_hint: "Show or hide the holograms of the plant and the devices",',
+                '  holo_mode: "Glass cards",',
+                '  holo_mode_always: "Cards always",',
+                '  holo_mode_hover: "Cards on hover",',
+                '  holo_mode_off: "No cards",',
+                '  holo_mode_hint: "Glass cards of the devices: always shown, only while the mouse is on their dot or the card (a click or tap on the dot keeps one open), or not at all",',
+                '',
+            ].join('\n'),
+            'card modes: en',
+        );
+    }
+    return code;
+}
+
+/**
  * Robot vacuums (device-cards.ts): the robot drives by the state of an ioBroker datapoint too (the codes of
  * Xiaomi/Roborock, plain words), and finds its datapoint by name when none is linked.
  */
@@ -5182,6 +5425,7 @@ function weatherMore(name: string, code: string): string {
                 '              x: f.x,',
                 '              z: f.z,',
                 '              kind,',
+                '              flag: f.gear_flag ?? "plain",',
                 '              size: f.w,',
                 '              base: f.gear_y ?? fp3dVaneY(kind),',
                 '              mast: !!f.gear_mast,',
@@ -5257,7 +5501,7 @@ function weatherMore(name: string, code: string): string {
         );
     }
     if (name === 'components/editor.ts') {
-        code = `import { defaultVaneY as fp3dVaneY, VANE_KINDS as FP3D_VANE_KINDS } from "${data}";\n${code}`;
+        code = `import { defaultVaneY as fp3dVaneY, VANE_KINDS as FP3D_VANE_KINDS } from "${data}";\nimport { flagChoices as fp3dFlagChoices } from "${root}/frontend/vendor-ext/flags.ts";\n${code}`;
         code = replaceRequired(
             code,
             '"propeller", "nav_light"]);',
@@ -5284,6 +5528,14 @@ function weatherMore(name: string, code: string): string {
                 '          ${FP3D_VANE_KINDS.map((k) => html`<option value=${k} ?selected=${k === kind}>${this.t(`vane_${k}` as I18nKey)}</option>`)}',
                 '        </select></label',
                 '      >',
+                '      ${kind === "flag"',
+                '        ? html`<label class="fp3d-field fp3d-wide"',
+                '            >${this.t("vane_design" as I18nKey)}',
+                '            <select ?disabled=${!this.isAdmin} @change=${(e: Event) => this.updateFurniture({ gear_flag: (e.target as HTMLSelectElement).value })}>',
+                '              ${fp3dFlagChoices(this.hass?.language ?? "en", this.t("flag_plain" as I18nKey)).map((c) => html`<option value=${c.id} ?selected=${c.id === (f.gear_flag ?? "plain")}>${c.name}</option>`)}',
+                '            </select></label',
+                '          >`',
+                '        : nothing}',
                 '      ${this.num(this.t("gear_y" as I18nKey), f.gear_y ?? fp3dVaneY(kind), (v) => this.updateFurniture({ gear_y: Math.round(Math.min(40, Math.max(0, v)) * 100) / 100 }), 0.1, 0)}',
                 '      <label class="fp3d-check fp3d-wide"',
                 '        ><input type="checkbox" ?disabled=${!this.isAdmin} .checked=${!!f.gear_mast} @change=${(e: Event) => this.updateFurniture({ gear_mast: (e.target as HTMLInputElement).checked || undefined })} />',
@@ -5322,9 +5574,11 @@ function weatherMore(name: string, code: string): string {
             vane_windex: 'Verklicker (Masttopp)',
             vane_sock: 'Windsack',
             vane_flag: 'Flagge',
+            vane_design: 'Welche Flagge',
+            flag_plain: 'Blau-Weiß (ohne Land)',
             vane_mast: 'Mast bzw. Stange bis zur Etage zeichnen',
             vane_hint:
-                'Dreht sich mit dem Wind aus ⚙ → Haus (Wind-Sensoren) oder aus der Wetter-Entität: Der Verklicker zeigt in den Wind, Windsack und Flagge wehen mit ihm. Der Windsack steht ab 15 kn waagerecht, Böen lassen alle schwingen. Darüber stehen Wind, Richtung und Beaufort. Breite = Länge von Pfeil, Sack oder Flagge.',
+                'Dreht sich mit dem Wind aus ⚙ → Haus (Wind-Sensoren) oder aus der Wetter-Entität: Der Verklicker zeigt in den Wind, Windsack und Flagge wehen mit ihm. Der Windsack steht ab 15 kn waagerecht, Böen lassen alle schwingen. Darüber stehen Wind, Richtung und Beaufort. Breite = Länge von Pfeil, Sack oder Flagge; die Höhe der Flagge folgt ihrem Land.',
             wind_speed: 'Wind (Sensor)',
             wind_dir: 'Windrichtung (Sensor, ° woher)',
             wind_gust: 'Böen (Sensor)',
@@ -5341,9 +5595,11 @@ function weatherMore(name: string, code: string): string {
             vane_windex: 'Windex (masthead)',
             vane_sock: 'Windsock',
             vane_flag: 'Flag',
+            vane_design: 'Which flag',
+            flag_plain: 'Blue and white (no country)',
             vane_mast: 'Draw a mast or pole down to the floor',
             vane_hint:
-                'Turns with the wind from ⚙ → House (wind sensors) or from the weather entity: the windex points into the wind, the windsock and the flag fly with it. The windsock stands out straight from 15 kn, gusts make them all swing. Above it: wind, direction and Beaufort. Width = length of the arrow, sock or flag.',
+                'Turns with the wind from ⚙ → House (wind sensors) or from the weather entity: the windex points into the wind, the windsock and the flag fly with it. The windsock stands out straight from 15 kn, gusts make them all swing. Above it: wind, direction and Beaufort. Width = length of the arrow, sock or flag; the height of the flag follows its country.',
             wind_speed: 'Wind (sensor)',
             wind_dir: 'Wind direction (sensor, ° from)',
             wind_gust: 'Gusts (sensor)',
@@ -6145,6 +6401,7 @@ const patches: Plugin = {
         code = poolMore(name, code);
         code = robotMore(name, code);
         code = mediaMore(name, code);
+        code = cardModes(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
