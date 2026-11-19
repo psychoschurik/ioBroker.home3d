@@ -49,6 +49,8 @@ export interface BoatItem {
     /** Home battery: its state of charge and power (the plan's own fields), and the datapoints of its card. */
     soc?: string | null;
     power?: string | null;
+    /** A separate sensor of the charging power (then `power` reports only the discharging). */
+    charge?: string | null;
     battery_voltage?: string | null;
     battery_current?: string | null;
     battery_remaining?: string | null;
@@ -401,6 +403,15 @@ function points(lang: string): string[] {
     return [n, n + e, e, s + e, s, s + w, w, n + w];
 }
 
+/** The weather entity of the plan, else the first one there is (as the 3D view takes it). */
+function weatherOf(states: Record<string, unknown>, chosen: string | null | undefined): string | null {
+    return linked(chosen)
+        ? chosen
+        : (Object.keys(states)
+              .sort()
+              .find(id => id.startsWith('weather.')) ?? null);
+}
+
 /** The wind's card over a wind indicator: speed (knots on a boat), Beaufort, where from, gusts, apparent wind, pressure. */
 export function windCard(
     host: BoatHost,
@@ -414,7 +425,12 @@ export function windCard(
     const states = hass.states as unknown as States;
     const wind = windOf(
         states,
-        { speed: set.wind_speed, dir: set.wind_dir, gust: set.wind_gust, weather: set.weather_entity },
+        {
+            speed: set.wind_speed,
+            dir: set.wind_dir,
+            gust: set.wind_gust,
+            weather: weatherOf(states, set.weather_entity),
+        },
         now,
     );
     if (!wind) {
@@ -560,12 +576,20 @@ export function batteryCard(host: BoatHost, floorId: string, f: BoatItem): Recor
     const powerId = linked(f.power) ? f.power : linked(energy.battery) ? energy.battery : null;
     const soc = num(hass, socId);
     const rawPower = num(hass, powerId);
-    if (soc === null && rawPower === null) {
+    const chargeIn = linked(f.charge) ? num(hass, f.charge) : null;
+    if (soc === null && rawPower === null && chargeIn === null) {
         return null;
     }
-    // the plan's battery sensor: positive = discharging (inverted: charging); a sensor of its own: positive = charging
-    const fromPlan = powerId === energy.battery && !linked(f.power);
-    const charge = rawPower === null ? null : fromPlan ? (energy.battery_invert ? rawPower : -rawPower) : rawPower;
+    // as everywhere in the plan: positive = discharging (inverted on request); with a charging sensor of its own the
+    // power reports only the discharging and the signs do not matter. Here: positive = charging.
+    const charge =
+        linked(f.charge) && (chargeIn !== null || rawPower !== null)
+            ? Math.max(0, chargeIn ?? 0) - Math.max(0, rawPower ?? 0)
+            : rawPower === null
+              ? null
+              : energy.battery_invert
+                ? rawPower
+                : -rawPower;
     const link = (key: BatteryField): string | null => batteryLink(hass, f, socId, key);
     const voltage = num(hass, link('battery_voltage'));
     const current = num(hass, link('battery_current'));
@@ -747,6 +771,7 @@ export function boatWatched(host: BoatHost): string[] {
                           ? [
                                 f.soc,
                                 f.power,
+                                f.charge,
                                 f.shore_power,
                                 f.shore_connected,
                                 ...(Object.keys(BATTERY_FIELDS) as BatteryField[]).map(k =>

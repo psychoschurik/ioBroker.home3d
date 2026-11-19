@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { batteryLink, boatCards, shoreConnected, boatFields, boatWatched, windCard, type BoatItem } from '../frontend/vendor-ext/boat-cards';
 
-type St = { state: string; attributes: Record<string, unknown> };
+type St = { state: string; attributes: Record<string, unknown>; last_changed?: string; last_updated?: string };
 const st = (state: string, unit = ''): St => ({ state, attributes: unit ? { unit_of_measurement: unit } : {} });
 
 test('boat cards: the anchor (distance against the radius, chain, depth, scope, alarm) and the tanks', () => {
@@ -171,4 +171,43 @@ test('shore power connected: on/true or the source of an AC input (Victron: 1 gr
         true,
         false,
     ]);
+});
+
+test('battery card: a power sensor of the furniture counts as in the plan (+ = discharging), or with a charging sensor', () => {
+    const w = (state: string): St => ({ state, attributes: { unit_of_measurement: 'W' } });
+    const states: Record<string, St> = {
+        'sensor.soc': { state: '60', attributes: { unit_of_measurement: '%' } },
+        'sensor.p': w('500'),
+        'sensor.in': w('800'),
+    };
+    const bat: BoatItem = { id: 'bat', type: 'home_battery', soc: 'sensor.soc', power: 'sensor.p' };
+    const building = { energy: {}, floors: [{ id: 'eg', furniture: [bat] }] };
+    const host = { hass: () => ({ states }), building: () => building, language: () => 'de' };
+    type Card = { status: { text: string }; main: { side?: { text: string } } };
+    let [card] = boatCards(host) as Card[];
+    assert.equal(card.status.text, 'entlädt');
+    assert.equal(card.main.side?.text, '−500 W');
+    bat.charge = 'sensor.in';
+    states['sensor.p'] = w('0');
+    [card] = boatCards(host) as Card[];
+    assert.equal(card.status.text, 'lädt');
+    assert.equal(card.main.side?.text, '+800 W');
+});
+
+test('wind card: without a weather entity in the plan the first one there is counts', () => {
+    const now = Date.parse('2026-11-19T22:00:00Z');
+    const at = new Date(now - 60000).toISOString();
+    const states: Record<string, St> = {
+        'weather.zuhause': {
+            state: 'fog',
+            attributes: { wind_speed: 18, wind_speed_unit: 'km/h', wind_bearing: 204, wind_gust_speed: 30 },
+            last_changed: at,
+            last_updated: at,
+        },
+    };
+    const vane: BoatItem = { id: 'v', type: 'wind_vane' };
+    const host = { hass: () => ({ states }), building: () => ({ settings: {}, floors: [{ id: 'eg', furniture: [vane] }] }), language: () => 'de' };
+    const card = windCard(host, 'eg', vane, now) as { main: { text: string; side?: { text: string } } } | null;
+    assert.equal(card?.main.text, '18 km/h');
+    assert.equal(card?.main.side?.text, 'SW 204°');
 });
