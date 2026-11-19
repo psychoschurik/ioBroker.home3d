@@ -325,8 +325,14 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Datenpunkts), Boost, Ein/Aus und die Betriebsart als Chips (aus den Zustandstexten des Datenpunkts, bei einer
   Klima-Entität Heizen/Kühlen/Auto/Aus). Gezeigt, sobald am Gerät ein Datenpunkt verbunden ist; die übrigen werden unter
   demselben ioBroker-Gerät gefunden (z. B. alles eines Homematic-IP-Thermostats)
+<<<<<<< Updated upstream
 - (bluefox) Der Mond mit seiner Phase ist auch über dem Meer um ein Boot zu sehen (das Meer verdeckte ihn, wenn man von
   oben schaut) und bei bedecktem Himmel schwach statt gar nicht
+=======
+- (bluefox) Saugroboter: Chips „Raum saugen“ auf seiner Glaskarte, einer je Raum seiner Etage; der Knopf wird unter
+  dem Roboter nach dem Raumnamen gefunden (z. B. rooms.Küche.roomClean bei mihome-vacuum) oder im Editor je Raum gewählt,
+  der Raum, den er gerade saugt, leuchtet
+>>>>>>> Stashed changes
 
 ### 0.4.0 (2026-11-15)
 

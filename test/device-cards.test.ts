@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
     autoRole,
+    autoRoomCleaner,
+    roomCleaners,
     deviceCards,
     deviceFields,
     deviceKind,
@@ -292,4 +294,64 @@ test('heating and air conditioning: room and target, valve, window, −/+, boost
         'climate.set_temperature:climate.ac=22.5',
         'climate.set_hvac_mode:climate.ac=off',
     ]);
+});
+
+test('clean a room: a chip per room of the floor, found below the robot by the room name or chosen by hand', async () => {
+    const rs: Record<string, St> = {
+        'sensor.v_state': st('5', io('mihome-vacuum.0.info.state', 'Saugroboter Status', 'value.state')),
+        'switch.r_kueche': st('off', io('mihome-vacuum.0.rooms.Küche.roomClean', 'roomClean', 'button')),
+        'switch.r_bad': st('off', io('mihome-vacuum.0.rooms.Badezimmer.roomClean', 'roomClean', 'button')),
+        'switch.r_16': st('off', io('mihome-vacuum.0.rooms.16.roomClean', 'roomClean', 'button')),
+        'switch.other': st('off', io('hm-rpc.0.X.Kueche', 'Küche Licht', 'switch')),
+        'sensor.v_room': st('Küche', io('mihome-vacuum.0.info.room', 'Raum', 'value')),
+    };
+    const rHass = { states: rs };
+    const rooms = [
+        { id: 'k', name: 'Küche' },
+        { id: 'b', name: 'Bad' },
+        { id: 'w', name: 'Wohnzimmer' },
+        { id: 'f', name: 'Flur' },
+    ];
+    const robot: DeviceItem & { room_sensor: string } = { id: 'v', type: 'robot_vacuum', entity: 'sensor.v_state', room_sensor: 'sensor.v_room', device_rooms: { w: 'switch.r_16', f: 'none' } };
+    // "Küche" in the datapoint's path, "Bad" in "Badezimmer"; the living room chosen by hand, the hall switched off
+    assert.equal(autoRoomCleaner(rHass, robot, rooms[0]), 'switch.r_kueche');
+    assert.equal(autoRoomCleaner(rHass, robot, rooms[1]), 'switch.r_bad');
+    assert.deepEqual(roomCleaners(rHass, robot, rooms).map(c => [c.room.id, c.id]), [
+        ['k', 'switch.r_kueche'],
+        ['b', 'switch.r_bad'],
+        ['w', 'switch.r_16'],
+    ]);
+    const calls: string[] = [];
+    let saved: unknown = null;
+    const b = { floors: [{ id: 'eg', rooms, furniture: [robot] }] };
+    const host: DeviceHost = {
+        hass: () => rHass,
+        building: () => b,
+        language: () => 'de',
+        callService: (d, s, data) => {
+            calls.push(`${d}.${s}:${String(data?.entity_id)}`);
+            return Promise.resolve();
+        },
+        updateBuilding: m => {
+            const next = structuredClone(b);
+            m(next);
+            saved = next;
+        },
+    };
+    const [card] = deviceCards(host) as { chips: { title: string; items: { label: string; on: boolean; onTap(): void }[] }[] }[];
+    assert.equal(card.chips[0].title, 'Raum saugen');
+    assert.deepEqual(card.chips[0].items.map(i => [i.label, i.on]), [
+        ['Küche', true],
+        ['Bad', false],
+        ['Wohnzimmer', false],
+    ]);
+    card.chips[0].items[1].onTap();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(calls, ['switch.turn_on:switch.r_bad']);
+    // the form: a field per room
+    const fields = deviceFields(host, robot) as { label?: string; auto?: string | null; set?: (v: string | null) => void }[];
+    const bad = fields.find(f => f.label === 'Raum saugen: Bad');
+    assert.equal(bad?.auto, 'switch.r_bad');
+    bad?.set?.('switch.r_16');
+    assert.equal((saved as typeof b).floors[0].furniture[0].device_rooms?.b, 'switch.r_16');
 });

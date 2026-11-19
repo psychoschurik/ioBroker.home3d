@@ -24,10 +24,17 @@ export interface DeviceItem {
     power?: string | null;
     status?: string | null;
     device_capacity?: number | null;
+    /** Robot vacuum: per room of its floor the datapoint that cleans just that room ("none": no chip). */
+    device_rooms?: Record<string, string> | null;
+}
+export interface RoomLike {
+    id: string;
+    name?: string;
 }
 interface FloorLike {
     id: string;
     furniture: DeviceItem[];
+    rooms?: RoomLike[];
 }
 interface BuildingLike {
     floors: FloorLike[];
@@ -138,6 +145,9 @@ const TEXTS: Record<string, Record<string, string>> = {
         empty: 'leer',
         ok: 'ok',
         due: 'fällig',
+        clean_room: 'Raum saugen',
+        rooms_hint:
+            'Raum saugen: je Raum der Knopf, der genau diesen Raum saugen lässt (z. B. rooms.<Raum>.roomClean bei mihome-vacuum, cleanSpotArea bei ecovacs-deebot). Leer gelassen wird ein Knopf unter dem Roboter gesucht, der den Raum im Namen trägt.',
         climate: 'Heizung / Klima',
         climate_mode: 'Betriebsart',
         setpoint: 'Solltemperatur',
@@ -229,6 +239,9 @@ const TEXTS: Record<string, Record<string, string>> = {
         empty: 'empty',
         ok: 'ok',
         due: 'due',
+        clean_room: 'Clean room',
+        rooms_hint:
+            'Clean a room: per room the button that cleans just that room (e.g. rooms.<room>.roomClean of mihome-vacuum, cleanSpotArea of ecovacs-deebot). Left empty, a button below the robot that names the room is used.',
         climate: 'Heating / AC',
         climate_mode: 'Mode',
         setpoint: 'Target temperature',
@@ -320,6 +333,9 @@ const TEXTS: Record<string, Record<string, string>> = {
         empty: 'пусто',
         ok: 'ок',
         due: 'пора',
+        clean_room: 'Убрать комнату',
+        rooms_hint:
+            'Уборка комнаты: для каждой комнаты кнопка, запускающая уборку только этой комнаты (например rooms.<комната>.roomClean у mihome-vacuum, cleanSpotArea у ecovacs-deebot). Если поле пустое, ищется кнопка робота с названием комнаты.',
         climate: 'Отопление / климат',
         climate_mode: 'Режим работы',
         setpoint: 'Заданная температура',
@@ -733,6 +749,86 @@ const PHASE_ICON: Record<string, string> = {
     ready: '✓',
 };
 
+/** A name as it is compared with a room's: lower case, umlauts written out, letters and digits only. */
+const norm = (v: string): string =>
+    v
+        .toLowerCase()
+        .replace(/ä/g, 'ae')
+        .replace(/ö/g, 'oe')
+        .replace(/ü/g, 'ue')
+        .replace(/ß/g, 'ss')
+        .replace(/[^a-z0-9а-яё]/g, '');
+
+/** A datapoint that cleans one room or segment (mihome-vacuum's roomClean, ecovacs-deebot's cleanSpotArea …). */
+const ROOM_WORD = /room|raum|zimmer|segment|spot.?area|zone|комнат/i;
+
+/** The datapoint that cleans a room by itself: a button below the robot's device that names the room. */
+export function autoRoomCleaner(hass: HassLike, f: DeviceItem, room: RoomLike): string | null {
+    const main = mainEntity(hass, f);
+    const mainSt = main ? hass.states[main] : undefined;
+    const name = norm(room.name ?? '');
+    if (name.length < 3) {
+        return null;
+    }
+    for (const levels of [3, 2]) {
+        const base = baseOf(mainSt, levels);
+        if (!base) {
+            continue;
+        }
+        const hit = Object.keys(hass.states)
+            .sort()
+            .find(id => {
+                const st = hass.states[id]!;
+                const path = str(st.attributes.iobroker_id);
+                const words = `${nameOf(id, st)} ${path}`;
+                return (
+                    WRITABLE.test(domain(id)) &&
+                    path.startsWith(base) &&
+                    ROOM_WORD.test(words) &&
+                    norm(words).includes(name)
+                );
+            });
+        if (hit) {
+            return hit;
+        }
+    }
+    return null;
+}
+
+/** The rooms a robot vacuum can clean one by one: the rooms of its floor with a datapoint each (chosen, else found). */
+export function roomCleaners(
+    hass: HassLike,
+    f: DeviceItem,
+    rooms: readonly RoomLike[],
+): { room: RoomLike; id: string }[] {
+    const out: { room: RoomLike; id: string }[] = [];
+    for (const room of rooms) {
+        const chosen = f.device_rooms?.[room.id];
+        if (chosen === 'none') {
+            continue;
+        }
+        const id = chosen || autoRoomCleaner(hass, f, room);
+        if (id) {
+            out.push({ room, id });
+        }
+    }
+    return out;
+}
+
+/** The room a robot vacuum reports cleaning (its room sensor: a room's name or id), null without one. */
+function currentRoomOf(
+    hass: HassLike,
+    f: DeviceItem & { room_sensor?: string | null },
+    rooms: readonly RoomLike[],
+): string | null {
+    const id = f.room_sensor && f.room_sensor !== 'none' ? f.room_sensor : null;
+    const v = id ? norm(str(hass.states[id]?.state)) : '';
+    return v ? (rooms.find(r => norm(r.name ?? '') === v || norm(r.id) === v)?.id ?? null) : null;
+}
+
+const floorOf = (host: DeviceHost, floorId: string): FloorLike | undefined =>
+    host.building()?.floors.find(fl => fl.id === floorId);
+
 /** Switches a datapoint: a button is pressed, a switch turned on; a device's own entity gets its own service. */
 function press(host: DeviceHost, id: string, service = 'turn_on'): void {
     const d = domain(id);
@@ -904,6 +1000,10 @@ export function deviceCard(host: DeviceHost, floorId: string, f: DeviceItem): Re
         button('pause', '⏸', phase === 'paused'),
         button('home', '⌂', phase === 'returning' || phase === 'docked'),
     ].filter(Boolean);
+    // a robot vacuum: a chip per room it cleans by itself
+    const cleaners = kind === 'vacuum' ? roomCleaners(hass, f, floorOf(host, floorId)?.rooms ?? []) : [];
+    // the room it cleans now, when its own room sensor names one (else none is lit)
+    const currentRoom = currentRoomOf(hass, f, floorOf(host, floorId)?.rooms ?? []);
     const error = phase === 'error' && mainSt && !/^\d+$/.test(mainSt.state) ? mainSt.state : null;
     return {
         ...base,
@@ -928,6 +1028,21 @@ export function deviceCard(host: DeviceHost, floorId: string, f: DeviceItem): Re
                   ]
                 : [],
         ...(error ? { hint: { text: error, color: '#ff5d5d' } } : {}),
+        ...(cleaners.length
+            ? {
+                  chips: [
+                      {
+                          title: text(lang, 'clean_room'),
+                          items: cleaners.map(c => ({
+                              label: c.room.name ?? c.room.id,
+                              title: `${text(lang, 'clean_room')}: ${c.room.name ?? c.room.id}`,
+                              on: working && currentRoom === c.room.id,
+                              onTap: () => press(host, c.id),
+                          })),
+                      },
+                  ],
+              }
+            : {}),
         buttons,
     };
 }
@@ -1376,6 +1491,41 @@ const ROLE_DOMAIN: Record<DeviceRole, RegExp> = {
     drink3: WRITABLE,
 };
 
+/** The robot vacuum's form: per room of its floor the datapoint that cleans just that room. */
+function roomFields(host: DeviceHost, item: DeviceItem, update: (mutate: (f: DeviceItem) => void) => void): unknown[] {
+    const hass = host.hass();
+    const lang = host.language();
+    const floor = host.building()?.floors.find(fl => fl.furniture.some(x => x.id === item.id));
+    const rooms = (floor?.rooms ?? []).filter(r => r.name);
+    if (!rooms.length) {
+        return [];
+    }
+    return [
+        { kind: 'text', text: text(lang, 'rooms_hint') },
+        ...rooms.map(room => ({
+            kind: 'entity',
+            label: `${text(lang, 'clean_room')}: ${room.name}`,
+            value: item.device_rooms?.[room.id] ?? null,
+            auto: autoRoomCleaner(hass, item, room),
+            filter: (id: string) => WRITABLE.test(domain(id)),
+            set: (v: string | null) =>
+                update(f => {
+                    const links = { ...(f.device_rooms ?? {}) };
+                    if (v === null) {
+                        delete links[room.id];
+                    } else {
+                        links[room.id] = v;
+                    }
+                    if (Object.keys(links).length) {
+                        f.device_rooms = links;
+                    } else {
+                        delete f.device_rooms;
+                    }
+                }),
+        })),
+    ];
+}
+
 /** The device's form in the editor: whether it has a card, and a field per datapoint. */
 export function deviceFields(host: DeviceHost, item: DeviceItem): unknown[] {
     const kind = deviceKind(item.type);
@@ -1427,6 +1577,7 @@ export function deviceFields(host: DeviceHost, item: DeviceItem): unknown[] {
                     }
                 }),
         })),
+        ...(kind === 'vacuum' ? roomFields(host, item, update) : []),
         ...(kind === 'wallbox'
             ? [
                   {
