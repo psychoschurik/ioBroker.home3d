@@ -2,7 +2,8 @@
 // the celestial pole with the sidereal time, and the moon in its direction with its phase, its lit side towards the
 // sun. Both lie at infinity, so they travel with the camera (only the direction counts). The view looks down on a
 // model, where the real sky lies above the picture: the stars fill the upper part of the picture, and the moon is
-// drawn bigger than it is and no higher than just under the top edge, so it shows whenever one looks its way.
+// drawn bigger than it is and no higher than just under the top edge, so it shows whenever one looks its way (over
+// the sea around a boat too, and faintly through an overcast sky).
 // One draw for the stars, one for the moon, one for its halo.
 import {
     BufferGeometry,
@@ -64,6 +65,26 @@ export function starStrength(
     const dark = smooth(-3, -12, sunElevation);
     return dark * (1 - smooth(0.2, 0.95, cover)) * (moonUp ? 1 - 0.35 * moonFraction : 1);
 }
+
+/**
+ * How strongly the moon shows (0 … 1) while it is up: pale by day, full at night. Clouds dim it but never hide it
+ * quite: under an overcast sky it still shows faintly with its phase (a sky that is always cloudy would otherwise
+ * never show the moon at all).
+ */
+export function moonStrength(sunElevation: number | null, cover: number, moonElevation: number): number {
+    if (sunElevation === null || moonElevation <= -1) {
+        return 0;
+    }
+    const night = smooth(2, -6, sunElevation);
+    return (0.45 + 0.55 * night) * (1 - 0.7 * smooth(0.5, 0.95, cover)) * smooth(-1, 1.5, moonElevation);
+}
+
+/**
+ * Render order of the halo and the moon: after the sea (4, see-through without depth: drawn later, it covered the
+ * moon, which stands just under the top edge of the picture and so below the horizon when one looks down on a boat),
+ * before the clouds (5), which pass in front of it. Whatever stands in front still hides it by depth.
+ */
+export const MOON_ORDER = 4.5;
 
 /** Radius of the drawn moon (°): far bigger than the real half degree. */
 export const MOON_R = 2.6;
@@ -263,7 +284,7 @@ export class NightSky {
             new PlaneGeometry(2, 2),
             new MeshBasicMaterial({ transparent: true, depthWrite: false, fog: false }),
         );
-        this.moon.renderOrder = -1;
+        this.moon.renderOrder = MOON_ORDER;
         this.moon.frustumCulled = false;
         this.halo = new Mesh(
             new PlaneGeometry(2, 2),
@@ -274,7 +295,8 @@ export class NightSky {
                 fog: false,
             }),
         );
-        this.halo.renderOrder = -1;
+        // just before the moon, so the moon lies on its glow
+        this.halo.renderOrder = MOON_ORDER - 0.1;
         this.halo.frustumCulled = false;
         this.group.add(this.halo, this.moon);
     }
@@ -300,12 +322,8 @@ export class NightSky {
         const pole = skyDir(0, lat, f.north);
         const spin = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -(m?.sidereal ?? 0) * RAD);
         this.sky.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), pole).multiply(spin);
-        // the moon: while it is up; pale by day, behind thick clouds gone
-        let moonA = 0;
-        if (m && moonUp && sunEl !== null) {
-            const night = smooth(2, -6, sunEl);
-            moonA = (0.45 + 0.55 * night) * (1 - smooth(0.6, 0.95, f.cover)) * smooth(-1, 1.5, m.elevation);
-        }
+        // the moon: while it is up; pale by day, faint behind thick clouds
+        const moonA = m ? moonStrength(sunEl, f.cover, m.elevation) : 0;
         this.moon.visible = moonA > 0.01;
         this.halo.visible = this.moon.visible && sunEl !== null && sunEl < -2;
         if (this.moon.visible && m) {

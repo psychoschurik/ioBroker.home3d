@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 import { moonAt, moonAttributes, siderealTime } from '../frontend/moon';
-import { drawnElevation, litAt, MOON_R, starStrength } from '../frontend/vendor-ext/night-sky';
+import { drawnElevation, litAt, MOON_ORDER, MOON_R, moonStrength, starStrength } from '../frontend/vendor-ext/night-sky';
 
 // Munich
 const LAT = 48.14;
@@ -69,4 +71,24 @@ test('the moon is drawn just under the top edge of the picture, as high as it st
     assert.equal(drawnElevation(40, 5), 5 - MOON_R * 1.6);
     // steeply down: not deeper than -35°
     assert.equal(drawnElevation(40, -60), -35);
+});
+
+test('the moon shows while it is up, pale by day and faint but never gone behind clouds', () => {
+    assert.equal(moonStrength(null, 0, 30), 0);
+    assert.equal(moonStrength(-20, 0, -5), 0);
+    assert.equal(moonStrength(-20, 0, 30), 1);
+    assert.ok(moonStrength(20, 0, 30) < 0.5);
+    // overcast (95 %, as the weather on the boat said): faint, its phase still to be seen
+    const overcast = moonStrength(-20, 0.95, 30);
+    assert.ok(overcast > 0.25 && overcast < 0.35, String(overcast));
+    assert.ok(moonStrength(-20, 1, 30) > 0.25);
+    assert.ok(moonStrength(-20, 0.6, 30) > overcast);
+});
+
+test('the moon is drawn after the sea and before the clouds', () => {
+    const read = (file: string): string => readFileSync(join(__dirname, '..', file), 'utf8');
+    const sea = Number(/mesh\.renderOrder = (\d+);/.exec(read('frontend/vendor-ext/sea.ts'))?.[1]);
+    const clouds = Number(/this\.mesh\.renderOrder = (\d+);/.exec(read('frontend/vendor-ext/clouds.ts'))?.[1]);
+    assert.ok(MOON_ORDER - 0.1 > sea, `sea ${sea}`);
+    assert.ok(MOON_ORDER < clouds, `clouds ${clouds}`);
 });
