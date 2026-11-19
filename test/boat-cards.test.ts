@@ -77,7 +77,7 @@ test('wind card: true wind in knots on a boat, Beaufort, where from, apparent wi
         'sensor.baro': { state: '1012.6', attributes: { unit_of_measurement: 'hPa' }, ...at },
     };
     const vane: BoatItem = { id: 'v', type: 'wind_vane', wind_apparent_speed: 'sensor.aws', wind_apparent_angle: 'sensor.awa' };
-    const settings = { wind_speed: 'sensor.tws', wind_dir: 'sensor.twd', pressure_entity: 'sensor.baro', sea_level: -1.3 };
+    const settings: Record<string, string | number> = { wind_speed: 'sensor.tws', wind_dir: 'sensor.twd', pressure_entity: 'sensor.baro', sea_level: -1.3 };
     const host = { hass: () => ({ states }), building: () => ({ settings, floors: [{ id: 'dk', furniture: [vane] }] }), language: () => 'de' };
     type Card = { live: string; status: { text: string }; main: { text: string; side?: { text: string } }; rows: { label: string; value: string }[]; hint?: { text: string } };
     const card = windCard(host, 'dk', vane, now) as Card;
@@ -96,6 +96,17 @@ test('wind card: true wind in knots on a boat, Beaufort, where from, apparent wi
     assert.equal(gale.status.text, 'Starkwind');
     assert.equal(gale.hint?.text, 'Starkwind: 7 Bft');
     assert.ok(boatWatched(host).includes('sensor.awa'));
+    // instruments off for two hours: the weather service's wind, no apparent wind
+    const old = { last_updated: new Date(now - 2 * 3600000).toISOString() };
+    for (const id of ['sensor.tws', 'sensor.twd', 'sensor.aws', 'sensor.awa']) {
+        states[id] = { ...states[id], ...old };
+    }
+    states['weather.home'] = { state: 'cloudy', attributes: { wind_speed: 15, wind_bearing: 160, wind_speed_unit: 'km/h' }, ...at };
+    settings.weather_entity = 'weather.home';
+    const off = windCard(host, 'dk', vane, now) as Card & { main: { sub: string } };
+    assert.equal(off.main.text, '8 kn');
+    assert.equal(off.main.sub, 'laut Wetterdienst');
+    assert.equal(off.rows.some(r => r.label === 'scheinbarer Wind'), false);
     // the form finds the apparent wind by its datapoint
     const fields = boatFields(host, { id: 'v', type: 'wind_vane' }) as { auto?: string | null }[];
     assert.deepEqual(fields.slice(1, 3).map(f => f.auto), ['sensor.aws', 'sensor.awa']);

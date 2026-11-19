@@ -69,6 +69,7 @@ const TEXTS: Record<string, Record<string, string>> = {
         black: 'Schwarzwasser',
         wind: 'Wind',
         wind_true: 'wahrer Wind',
+        wind_weather: 'laut Wetterdienst',
         wind_from: 'aus',
         bft: 'Windstärke',
         gusts: 'Böen',
@@ -105,6 +106,7 @@ const TEXTS: Record<string, Record<string, string>> = {
         black: 'Black water',
         wind: 'Wind',
         wind_true: 'true wind',
+        wind_weather: 'weather service',
         wind_from: 'from',
         bft: 'Force',
         gusts: 'Gusts',
@@ -141,6 +143,7 @@ const TEXTS: Record<string, Record<string, string>> = {
         black: 'Чёрные воды',
         wind: 'Ветер',
         wind_true: 'истинный ветер',
+        wind_weather: 'по прогнозу погоды',
         wind_from: 'с',
         bft: 'Сила ветра',
         gusts: 'Порывы',
@@ -340,7 +343,11 @@ export function windCard(
     }
     // the apparent wind: what the sails feel, its angle to the bow
     const aSt = linked(f.wind_apparent_speed) ? states[f.wind_apparent_speed] : undefined;
-    const aAngle = linked(f.wind_apparent_angle) ? num(hass, f.wind_apparent_angle) : null;
+    // (instruments switched off: their last values are old, they are left out as the true wind's are)
+    const aAngle =
+        linked(f.wind_apparent_angle) && fresh(states[f.wind_apparent_angle], now)
+            ? num(hass, f.wind_apparent_angle)
+            : null;
     const aSpeed =
         fresh(aSt, now) && Number.isFinite(Number(aSt.state))
             ? speedMs(Number(aSt.state), str(aSt.attributes.unit_of_measurement))
@@ -371,7 +378,11 @@ export function windCard(
         status: { icon: bft >= 6 ? '⚠' : '🌬', text: text(lang, word), color },
         main: {
             text: speed(wind.speed),
-            sub: text(lang, 'wind_true'),
+            // the own sensors while they report, else the weather service's wind
+            sub: text(
+                lang,
+                linked(set.wind_speed) && fresh(states[set.wind_speed], now) ? 'wind_true' : 'wind_weather',
+            ),
             ...(from ? { side: { text: from, sub: text(lang, 'wind_from'), color } } : {}),
         },
         rows,
