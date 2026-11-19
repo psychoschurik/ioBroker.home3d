@@ -199,6 +199,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Recorder: Ist ein Recorder installiert, liest der Verlauf automatisch aus ihm, für die Datenpunkte, die er
   aufzeichnet (auch Verlaufskurve und Energie-Ansicht). Die Zeitreise holt sie mit einem Schnappschuss und den
   Ereignissen des Zeitraums auf einmal statt mit zwei Anfragen je Datenpunkt
+- (bluefox) Markise, Kühlschranktüren, motorisierte Vorhänge und Leinwände lassen sich in 3D antippen (bisher nur über
+  ihr Symbol), ebenso Autos, Mähroboter mit Ladestation, Sprenger, Kaffeemaschine und Regenwassertank
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler

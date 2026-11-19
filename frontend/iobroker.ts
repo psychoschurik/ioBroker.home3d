@@ -157,23 +157,31 @@ export class IoBroker implements IoAccess, FileAccess {
     private recorded = new Map<string, { at: number; ids: Promise<Set<string> | null> }>();
     /**
      * The datapoints a history instance records (`getEnabledDPs`; the recorder answers with all it selected itself),
-     * null without an answer within 5 s. Kept for a minute: the time travel asks for every window.
+     * null without an answer within 15 s. A list is kept for five minutes (the time travel asks for every window); a
+     * late answer still fills it, a missing one is asked for again next time.
      */
     recordedIds(instance: string): Promise<Set<string> | null> {
         const hit = this.recorded.get(instance);
-        if (hit && Date.now() - hit.at < 60_000) {
-            return hit.ids;
+        let ids = hit && Date.now() - hit.at < 300_000 ? hit.ids : null;
+        if (!ids) {
+            const at = Date.now();
+            ids = this.conn
+                .sendTo<Record<string, unknown> | null>(instance, 'getEnabledDPs', {})
+                .then(r => (r && typeof r === 'object' && !('error' in r) ? new Set(Object.keys(r)) : null))
+                .catch(() => null)
+                .then(set => {
+                    if (!set && this.recorded.get(instance)?.at === at) {
+                        this.recorded.delete(instance);
+                    }
+                    return set;
+                });
+            this.recorded.set(instance, { at, ids });
         }
         let timer: ReturnType<typeof setTimeout> | undefined;
-        const ids = Promise.race([
-            this.conn.sendTo<Record<string, unknown> | null>(instance, 'getEnabledDPs', {}),
-            new Promise<null>(resolve => (timer = setTimeout(() => resolve(null), 5000))),
-        ])
-            .then(r => (r && typeof r === 'object' && !('error' in r) ? new Set(Object.keys(r)) : null))
-            .catch(() => null)
-            .finally(() => clearTimeout(timer));
-        this.recorded.set(instance, { at: Date.now(), ids });
-        return ids;
+        return Promise.race([
+            ids,
+            new Promise<null>(resolve => (timer = setTimeout(() => resolve(null), 15_000))),
+        ]).finally(() => clearTimeout(timer));
     }
     /** Values of a datapoint from a history adapter. */
     getHistory(id: string, options: ioBroker.GetHistoryOptions): Promise<ioBroker.GetHistoryResult> {

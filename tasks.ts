@@ -3010,6 +3010,108 @@ function treesMore(name: string, code: string): string {
 }
 
 /**
+ * Taps on furniture that is drawn apart from the others: the moving parts (doors of a smart fridge, an awning, a
+ * motorised curtain or screen) lie in their own mesh, so each keeps its triangles and a tap opens the item's entity;
+ * cars, coffee machines and rainwater tanks of the home looks (home-fx.ts) are found by their furniture id.
+ */
+function tapMore(name: string, code: string): string {
+    if (name === 'viewer/viewer3d.ts') {
+        code = replaceRequired(
+            code,
+            '  gateTris: { id: string; start: number; end: number }[];\n',
+            [
+                '  gateTris: { id: string; start: number; end: number }[];',
+                '  /** The moving parts by the id of their furniture (a tap opens its entity). */',
+                '  fp3dMoveTris?: { id: string; start: number; end: number }[];',
+                '',
+            ].join('\n'),
+            'tap: moving parts field',
+        );
+        code = replaceRequired(
+            code,
+            '      pushFridgeDoors(buf, f, mountBase(fv.floor, f), st?.l ?? 0, st?.r ?? 0);\n',
+            [
+                '      const fp3dStart = buf.count;',
+                '      pushFridgeDoors(buf, f, mountBase(fv.floor, f), st?.l ?? 0, st?.r ?? 0);',
+                '      fp3dMoves.push({ id: f.id, start: fp3dStart, end: buf.count });',
+                '',
+            ].join('\n'),
+            'tap: fridge doors',
+        );
+        code = replaceRequired(
+            code,
+            '    const buf = new GeoBuffer();\n    for (const f of fv.floor.furniture) {\n      if (f.type !== "fridge_smart") continue;\n',
+            '    const buf = new GeoBuffer();\n    const fp3dMoves: { id: string; start: number; end: number }[] = [];\n    for (const f of fv.floor.furniture) {\n      if (f.type !== "fridge_smart") continue;\n',
+            'tap: moving parts list',
+        );
+        code = replaceRequired(
+            code,
+            '    for (const f of fv.floor.furniture) if (f.type === "awning") pushAwning(buf, f, mountBase(fv.floor, f), this.awnings.get(f.id)?.cur ?? 0);\n',
+            [
+                '    for (const f of fv.floor.furniture) {',
+                '      if (f.type !== "awning") continue;',
+                '      const fp3dStart = buf.count;',
+                '      pushAwning(buf, f, mountBase(fv.floor, f), this.awnings.get(f.id)?.cur ?? 0);',
+                '      fp3dMoves.push({ id: f.id, start: fp3dStart, end: buf.count });',
+                '    }',
+                '',
+            ].join('\n'),
+            'tap: awnings',
+        );
+        code = replaceRequired(
+            code,
+            '      if (kind && item) pushPackMotion(buf, item, kind, f, mountBase(fv.floor, f), this.awnings.get(f.id)?.cur ?? 0);\n',
+            [
+                '      if (!kind || !item) continue;',
+                '      const fp3dStart = buf.count;',
+                '      pushPackMotion(buf, item, kind, f, mountBase(fv.floor, f), this.awnings.get(f.id)?.cur ?? 0);',
+                '      fp3dMoves.push({ id: f.id, start: fp3dStart, end: buf.count });',
+                '',
+            ].join('\n'),
+            'tap: curtains and screens',
+        );
+        code = replaceRequired(
+            code,
+            '    fv.fridgeMesh.geometry.dispose();\n    fv.fridgeMesh.geometry = buf.geometry();\n',
+            '    fv.fp3dMoveTris = fp3dMoves;\n    fv.fridgeMesh.geometry.dispose();\n    fv.fridgeMesh.geometry = buf.geometry();\n',
+            'tap: keep the moving parts',
+        );
+        code = replaceRequired(
+            code,
+            '        const id = inRange(fv.gateTris, tri);\n        if (id && devices) return { entity: id };\n',
+            [
+                '        const id = inRange(fv.gateTris, tri);',
+                '        if (id && devices) return { entity: id };',
+                '        const fp3dItem = inRange(fv.fp3dMoveTris ?? [], tri);',
+                '        const fp3dEntity = fp3dItem ? this.pickFurniture.get(fp3dItem) : undefined;',
+                '        if (fp3dEntity && devices) return { entity: fp3dEntity };',
+                '',
+            ].join('\n'),
+            'tap: on a moving part',
+        );
+        code = replaceRequired(
+            code,
+            '    // the gear of a boat lies apart (a tank is seen through berths and floors): a tap on it opens its sensor\n',
+            [
+                '    // a car, a coffee machine, a rainwater tank of the home looks: its entity, unless something tappable is nearer',
+                '    const fp3dOwn = devices && !this.furnish ? this.fp3dHome.furnitureAt(ray) : null;',
+                '    const fp3dOwnEntity = fp3dOwn ? this.pickFurniture.get(fp3dOwn.id) : undefined;',
+                '    if (fp3dOwn && fp3dOwnEntity) {',
+                '      const nearer = ray',
+                '        .intersectObjects(this.activeFloors().flatMap((f) => [f.lampMesh, f.fridgeMesh].filter((m) => m.visible)), false)',
+                '        .some((h) => h.distance < fp3dOwn.distance);',
+                '      if (!nearer) return { entity: fp3dOwnEntity };',
+                '    }',
+                '    // the gear of a boat lies apart (a tank is seen through berths and floors): a tap on it opens its sensor',
+                '',
+            ].join('\n'),
+            'tap: own furniture of the home looks',
+        );
+    }
+    return code;
+}
+
+/**
  * Rainwater tank (rain-tank.ts, home-view.ts, home-fx.ts): a rain barrel or a cistern in the garden, filled to the level
  * of its sensor, with the litres over it; while it rains, water runs in from above.
  */
@@ -4524,6 +4626,7 @@ const patches: Plugin = {
         code = treesMore(name, code);
         code = kitchenMore(name, code);
         code = rainTankMore(name, code);
+        code = tapMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

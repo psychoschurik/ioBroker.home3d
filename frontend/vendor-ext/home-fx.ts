@@ -523,6 +523,25 @@ export class HomeFx {
         this.light = light;
     }
 
+    /**
+     * The piece of furniture drawn here (a car, a mower and its dock, a sprinkler, a coffee machine, a rainwater tank) under a ray: its id and how far
+     * away it is; null: none, or only hidden ones.
+     */
+    furnitureAt(ray: Raycaster): { id: string; distance: number } | null {
+        for (const hit of ray.intersectObject(this.group, true)) {
+            let id: unknown;
+            let shown = true;
+            for (let o: Object3D | null = hit.object; o; o = o.parent) {
+                shown &&= o.visible;
+                id ??= o.userData.fp3dFurniture;
+            }
+            if (shown && typeof id === 'string') {
+                return { id, distance: hit.distance };
+            }
+        }
+        return null;
+    }
+
     /** The tip of the badge at a point of the view (-1 … 1 both ways), null: none there. */
     tipAt(x: number, y: number, camera: Camera): string | null {
         const shown = this.tips.filter(s => {
@@ -646,6 +665,7 @@ export class HomeFx {
         }
         for (const r of s.rainTanks ?? []) {
             const m = buildRainTank(r.kind, r.w, r.d, r.h, r.fill, this.light);
+            m.userData.fp3dFurniture = r.id;
             m.position.set(r.x, r.y, r.z);
             m.rotation.y = -r.angle;
             if (r.label) {
@@ -657,6 +677,7 @@ export class HomeFx {
         }
         for (const c of s.coffees ?? []) {
             const m = buildCoffeeMachine(c.w, c.d, c.h, this.light);
+            m.userData.fp3dFurniture = c.id;
             m.position.set(c.x, c.y, c.z);
             m.rotation.y = -c.angle;
             this.floorGroup(c.floor).add(m);
@@ -687,6 +708,7 @@ export class HomeFx {
                 0x2f4a2f,
             );
             head.userData.fp3dStatic = true;
+            head.userData.fp3dFurniture = sp.id;
             const p = particles(170, 0.07, 2.5);
             g.add(p.points);
             this.sprays.set(sp.id, p);
@@ -815,8 +837,10 @@ export class HomeFx {
             const dock = buildDock(mo.size);
             dock.position.set(mo.dock[0], mo.y, mo.dock[1]);
             dock.rotation.y = -mo.dockAngle;
+            dock.userData.fp3dFurniture = mo.id;
             g.add(dock);
             const mesh = buildMower(mo.size);
+            mesh.userData.fp3dFurniture = mo.id;
             if (mo.label) {
                 const l = labelSprite(mo.label, this.light, 'alarm', 0.022);
                 l.position.set(0, 0.6, 0);
@@ -828,6 +852,7 @@ export class HomeFx {
         for (const c of s.cars) {
             const g = this.floorGroup(c.floor);
             const car = buildCar(c.kind, c.w, c.d, c.h, c.color, c.plate);
+            car.userData.fp3dFurniture = c.id;
             g.add(car);
             let bay: Group | null = null;
             if (c.sensed) {
