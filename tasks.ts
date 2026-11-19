@@ -576,9 +576,10 @@ function solarText(name: string, code: string): string {
  * time travel (`home3d/timetravel/history` from the history adapters, frontend/history.ts), the energy view
  * (`recorder/statistics_during_period` from the history adapters) and the household (appliances with their time left
  * and "finished", plants, fridge doors; the waste calendar needs `callApi`, which ioBroker has not, and stays empty).
- * Energy and household are called just "Energie" and "Haushalt", without "Pro".
+ * Energy and household are called just "Energie" and "Haushalt", without "Pro". The pool's module is built in
+ * (pool-module.ts, poolMore).
  */
-const SERVED = ['weather', 'time_travel', 'energy_pro', 'household'];
+const SERVED = ['weather', 'time_travel', 'energy_pro', 'household', 'pool'];
 
 /** The served add-ons count as unlocked without a pack. */
 function unlockServed(name: string, code: string): string {
@@ -3165,6 +3166,34 @@ function tapMore(name: string, code: string): string {
         );
     }
     return code;
+}
+
+/**
+ * Pool (pool-module.ts): the module that gives the pools their life is built into this page instead of coming from a
+ * pack – registered in every bundle's copy of modules.ts and kept when the packs are synced. With it the pool tool
+ * draws pipes, a pool's form has its datapoints, the water shows the pump, the heating, the light and the cover.
+ */
+function poolMore(name: string, code: string): string {
+    if (name !== 'modules.ts') {
+        return code;
+    }
+    code = `import { poolModule as fp3dPoolModule } from "${root}/frontend/vendor-ext/pool-module.ts";\n${code}`;
+    code = replaceRequired(
+        code,
+        'const loaded = new Map<string, Loaded>();',
+        [
+            '/** Modules built into this page (no pack): never dropped when the packs are synced. */',
+            'const builtin = new Set<string>(["home3d.pool"]);',
+            'const loaded = new Map<string, Loaded>([["home3d.pool", { id: "home3d.pool", release: 1, module: fp3dPoolModule as unknown as NeonModule }]]);',
+        ].join('\n'),
+        'pool: built-in module',
+    );
+    return replaceRequired(
+        code,
+        'for (const id of [...loaded.keys()]) if (!wanted.has(id)) loaded.delete(id);',
+        'for (const id of [...loaded.keys()]) if (!wanted.has(id) && !builtin.has(id)) loaded.delete(id);',
+        'pool: built-in module kept',
+    );
 }
 
 /**
@@ -5801,6 +5830,7 @@ const patches: Plugin = {
         code = ebikeMore(name, code);
         code = heatStoreMore(name, code);
         code = airVentMore(name, code);
+        code = poolMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

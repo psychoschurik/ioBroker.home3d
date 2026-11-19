@@ -298,6 +298,13 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Neues Möbel „Lüftungsauslass“ (Schalter & Technik): ein Tellerventil an der Decke oder ein Gitter an der
   Wand, als Zu- oder Abluft; solange sein Lüfter läuft, strömt hellblaue frische Luft heraus bzw. wird graue Luft
   angesaugt – dichter, schneller und weiter mit der Stufe (Lüfter mit Prozent, Stufe, Leistung, m³/h, Drehzahl, Modus)
+- (bluefox) Pool freigeschaltet, mit eigenem eingebautem Modul: im Pool-Formular die Datenpunkte (Wassertemperatur,
+  Heizung, Filterpumpe, Licht, pH, Chlor/Redox, Salz, Abdeckung; leer gelassen per Name gefunden). Das Wasser leuchtet
+  in der Farbe der Poolbeleuchtung, sonst klar blau und grünlich bei schlechtem pH oder Chlor, bewegt sich bei
+  laufender Pumpe, flimmert warm beim Heizen, die Abdeckung schließt nach ihrer Stellung; darüber Temperatur, pH und
+  Redox, Warnungen bei pH oder Chlor außerhalb des Bereichs. Technikraum und Rohre lassen sich zeichnen: das Wasser
+  fließt vom Skimmer über Pumpe, Filter (nach Stellung des 6-Wege-Ventils) und Wärmepumpe oder Bypass zu den
+  Einlässen, beim Rückspülen braun zum Abwasser
 
 ### 0.4.0 (2026-11-15)
 
