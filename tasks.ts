@@ -508,7 +508,7 @@ function solarText(name: string, code: string): string {
             '    this.solarWatts = watts;',
             '    for (const g of [...this.solarTexts]) {',
             '      let p = g.parent;',
-            '      while (p && p !== this.root) p = p.parent;',
+            '      while (p && p !== this.root && p !== this.scene) p = p.parent;',
             '      if (!p) this.solarTexts.delete(g);',
             '      else writeSolarText(g, watts);',
             '    }',
@@ -3112,6 +3112,86 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * Lying snow without the fun pack (pv-snow.ts): snow lies on roof and lawn whenever the weather reports snow and stays
+ * while it freezes (up to three days, as the pack's `snowLevel` works it out); it lies on the roof's solar modules too
+ * and goes from a field as soon as it produces. The pack's fairy lights and firework stay its own.
+ */
+function snowMore(name: string, code: string): string {
+    if (name === 'winter.ts') {
+        code = replaceRequired(
+            code,
+            '  if (!hasFeature("fun_winter") || winterOf(b).snow === false || !weatherId) return 0;',
+            '  if (winterOf(b).snow === false || !weatherId) return 0;',
+            'snow: without the fun pack',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '    const snow = winter ? snowLevel(hass, b, weatherEntity(hass, this.weatherEntityId ?? b.settings.weather_entity)) : 0;',
+            '    const snow = this.replay ? 0 : snowLevel(hass, b, weatherEntity(hass, this.weatherEntityId ?? b.settings.weather_entity));',
+            'snow: lies with the weather',
+        );
+        // once a minute: the snow melts in a thaw
+        code = replaceRequired(
+            code,
+            '    this.watchWinter(winter);\n',
+            '    this.watchWinter(winter || snow > 0);\n',
+            'snow: melts by the minute',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { buildPvSnow as fp3dBuildPvSnow, writePvSnow as fp3dWritePvSnow } from "${root}/frontend/vendor-ext/pv-snow.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  private solarTexts = new Set<Group>();',
+            '  private solarTexts = new Set<Group>();\n  private fp3dPvSnows = new Set<Group>();',
+            'snow: on the modules field',
+        );
+        code = replaceRequired(
+            code,
+            '      else writeSolarText(g, watts);\n    }\n',
+            [
+                '      else writeSolarText(g, watts);',
+                '    }',
+                '    for (const g of [...this.fp3dPvSnows]) {',
+                '      let p = g.parent;',
+                '      while (p && p !== this.root && p !== this.scene) p = p.parent;',
+                '      if (!p) this.fp3dPvSnows.delete(g);',
+                '      else fp3dWritePvSnow(g, watts);',
+                '    }',
+                '',
+            ].join('\n'),
+            'snow: cleared by the power',
+        );
+        code = replaceRequired(
+            code,
+            '          mesh.renderOrder = 8;\n          part.add(mesh);\n        }\n      }\n',
+            [
+                '          mesh.renderOrder = 8;',
+                '          part.add(mesh);',
+                '        }',
+                '        // on the solar modules too, gone from a field as soon as it produces',
+                '        const fp3dPvSnow = fp3dBuildPvSnow(',
+                '          entries.map(({ face, field }) => ({ id: field.id, corners: fp3dFieldModules(face, field).map((m) => m.corners), n: face.n })),',
+                '          geo.floor.elevation + geo.base,',
+                '          this.roofSnow,',
+                '        );',
+                '        if (fp3dPvSnow) {',
+                '          this.fp3dPvSnows.add(fp3dPvSnow);',
+                '          fp3dWritePvSnow(fp3dPvSnow, this.solarWatts);',
+                '          part.add(fp3dPvSnow);',
+                '        }',
+                '      }',
+                '',
+            ].join('\n'),
+            'snow: on the modules',
+        );
+    }
+    return code;
+}
+
+/**
  * MJPEG camera streams (camera-url.ts): a camera's `entity_picture` that is a stream (e.g. the web extension of
  * ioBroker.frigate, `../frigate.0/<camera>/stream.mjpeg`) keeps its URL in every <img>, so the stream runs on instead of
  * being closed and opened again by the refresh counter `fp3d=` every few seconds. Stills and data URLs as before.
@@ -4877,6 +4957,7 @@ const patches: Plugin = {
         code = tapMore(name, code);
         code = passThroughMore(name, code);
         code = mjpegStreams(name, code);
+        code = snowMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

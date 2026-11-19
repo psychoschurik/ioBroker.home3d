@@ -210,6 +210,10 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   verbinden; Standbilder werden weiter aufgefrischt
 - (bluefox) Dicke Luft: ab 1000 ppm CO₂ liegt ein leichter Dunst im Raum, ab 1400 ppm ein deutlicher mit dem Schild
   „CO₂ … ppm · Lüften“ (aus mit der Luft an offenen Fenstern; im Raum mit Rauch nur der Rauch)
+- (bluefox) Schnee bleibt liegen, auch ohne das Paket „Winter“: meldet das Wetter Schnee, werden Dach und Rasen weiß und
+  bleiben es bei Frost bis zu drei Tage (bei Tauwetter schmilzt er in sechs Stunden); auch die PV-Module liegen unter
+  Schnee, ein Feld wird frei, sobald es Leistung liefert. Die Leistung auf den Modulen der Dachfelder wird wieder
+  aktualisiert
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler
