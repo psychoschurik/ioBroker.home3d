@@ -195,6 +195,10 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Kaffee in die Tasse und Dampf steigt auf
 - (bluefox) Regenwassertank (Garten): Regentonne oder Zisterne im Boden, gefüllt nach dem Füllstandssensor (%, l, m³,
   cm oder m), darüber Liter und Prozent, unter 10 % in der Warnfarbe; solange es regnet, läuft Wasser hinein
+- (bluefox) Alle Looks auch im Menü „Anzeige“ (bisher dort nur fünf, die übrigen hinter ⚙)
+- (bluefox) Recorder: Ist ein Recorder installiert, liest der Verlauf automatisch aus ihm, für die Datenpunkte, die er
+  aufzeichnet (auch Verlaufskurve und Energie-Ansicht). Die Zeitreise holt sie mit einem Schnappschuss und den
+  Ereignissen des Zeitraums auf einmal statt mit zwei Anfragen je Datenpunkt
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler

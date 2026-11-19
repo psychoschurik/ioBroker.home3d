@@ -36,8 +36,10 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 
 - `data.json`: `{ version: 2, plans, images: {id → file}, mappings, locate_plan, position_id?, timetravel_instance?, health_stale_min? }` — written on every change;
   `position_id`: a datapoint with the position (GPS on a boat) for `sun.sun` instead of the system settings;
-  `timetravel_instance`: the history instance (e.g. `recorder.0`) the time travel prefers for the datapoints it records
-  (`getEnabledDPs`), else per datapoint the instance of its `common.custom`, else the default history;
+  `timetravel_instance`: the history instance (e.g. `recorder.0`) preferred for the datapoints it records
+  (`getEnabledDPs`), missing: the first enabled recorder instance; else per datapoint the instance of its
+  `common.custom`, else the default history (time travel, detail dialog, energy). From a recorder the time travel reads
+  all its datapoints with one `getSnapshot` and paged `getEvents` (`recorderRows`), high-frequency ones by `getHistory`;
   `health_stale_min`: a device is "unreachable" after that many minutes without an update instead of as it reports
 - `history/<plan>.json`: snapshots (max 30)
 - `images/<id>.<ext>`: binary images

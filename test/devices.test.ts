@@ -2,7 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { entities, execute, validateMappings, wmoCondition } from '../frontend/entities';
 import { mappedIds } from '../frontend/store';
-import { historyDuringPeriod, loggedBy, statisticsDuringPeriod, timeTravelHistory, type HistoryAccess } from '../frontend/history';
+import {
+    historyDuringPeriod,
+    historyEnabled,
+    isRecorder,
+    loggedBy,
+    statisticsDuringPeriod,
+    timeTravelHistory,
+    type HistoryAccess,
+} from '../frontend/history';
 import { ICON_PICKS, markerInk, sensorIcon, sensorShow, sensorText } from '../frontend/vendor-ext/sensor-look';
 import * as mdi from '@mdi/js';
 import type { IoAccess, Mapping, StateObject } from '../frontend/model';
@@ -215,6 +223,84 @@ test('the time travel reads the datapoints the chosen instance records from it, 
     asked.length = 0;
     await timeTravelHistory(io, mappings, msg, null);
     assert.deepEqual([...new Set(asked)].sort(), ['a.open@history.0', 'b.open@influxdb.0', 'c.open@history.0']);
+});
+
+test('from a recorder the time travel reads all its datapoints with a snapshot and the changes of the window', async () => {
+    const start = 1_700_000_000;
+    const ms = start * 1000;
+    const calls: string[] = [];
+    const io: HistoryAccess = {
+        getObjects: async ids =>
+            Object.fromEntries(ids.map(id => [id, object(id === 'p.power' ? 'number' : 'boolean')])),
+        defaultHistory: async () => 'history.0',
+        recordedIds: async instance => (instance === 'recorder.0' ? new Set(['a.open', 'b.open', 'p.power']) : null),
+        getHistory: async (id, options) => {
+            calls.push(`getHistory ${id}@${options.instance}`);
+            return [{ val: 1200, ts: ms + 60_000 }] as ioBroker.GetHistoryResult;
+        },
+        recorderWalk: async <T>(instance: string, command: string, message: Record<string, unknown>): Promise<T | null> => {
+            calls.push(`${command}@${instance} ${String(message.start ?? message.ts)}`);
+            if (command === 'getSnapshot') {
+                return {
+                    states: [
+                        { id: 'a.open', val: false },
+                        { id: 'p.power', val: 800, aggregated: true },
+                    ],
+                } as T;
+            }
+            // two pages: the second starts at the last time of the first, with its change once more
+            return (
+                message.start === ms
+                    ? {
+                          events: [
+                              { ts: ms + 10_000, id: 'a.open', val: true },
+                              { ts: ms + 20_000, id: 'b.open', val: true },
+                          ],
+                          more: true,
+                      }
+                    : {
+                          events: [
+                              { ts: ms + 20_000, id: 'b.open', val: true },
+                              { ts: ms + 30_000, id: 'a.open', val: false },
+                          ],
+                          more: false,
+                      }
+            ) as T;
+        },
+    };
+    const mappings: Mapping[] = [
+        { entity_id: 'binary_sensor.a', state: 'a.open' },
+        { entity_id: 'binary_sensor.b', state: 'b.open' },
+        { entity_id: 'sensor.p', state: 'p.power' },
+    ];
+    const msg = { start_time: start, end_time: start + 900, entity_ids: ['binary_sensor.a', 'binary_sensor.b', 'sensor.p'] };
+    const day = await timeTravelHistory(io, mappings, msg, null, 'recorder.0');
+    assert.deepEqual(calls, [
+        `getSnapshot@recorder.0 ${ms}`,
+        `getEvents@recorder.0 ${ms}`,
+        `getEvents@recorder.0 ${ms + 20_000}`,
+        // high-frequency: only its five-minute aggregates, read by getHistory
+        'getHistory p.power@recorder.0',
+        'getHistory p.power@recorder.0',
+    ]);
+    const a = day.entities['binary_sensor.a'];
+    assert.deepEqual(a.t, [0, 10, 30]);
+    assert.deepEqual(
+        a.v.map(k => a.tab[k]),
+        ['off', 'on', 'off'],
+    );
+    // no value before the window, one change in it (not twice)
+    assert.deepEqual(day.entities['binary_sensor.b'].t, [20]);
+    assert.ok(day.entities['sensor.p']);
+    // a recorder that does not answer: getHistory for every datapoint
+    calls.length = 0;
+    await timeTravelHistory({ ...io, recorderWalk: async () => null }, mappings, msg, null, 'recorder.0');
+    assert.equal(calls.filter(c => c.startsWith('getHistory')).length, 6);
+    // the devices with a history: also those the recorder records
+    assert.deepEqual(await historyEnabled(io, mappings, { entity_ids: ['binary_sensor.a'] }, 'recorder.0'), ['binary_sensor.a']);
+    assert.deepEqual(await historyEnabled(io, mappings, { entity_ids: ['binary_sensor.a'] }), []);
+    assert.equal(isRecorder('recorder.1'), true);
+    assert.equal(isRecorder('history.0'), false);
 });
 
 test('statistics: five-minute means of the solar power and the hourly change of a counter', async () => {

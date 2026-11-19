@@ -122,6 +122,38 @@ export class IoBroker implements IoAccess, FileAccess {
             return [];
         }
     }
+    /** The first enabled instance of the recorder; null without one. */
+    async recorderInstance(): Promise<string | null> {
+        try {
+            const view = await this.conn.getObjectViewSystem(
+                'instance',
+                'system.adapter.recorder.',
+                'system.adapter.recorder.香',
+            );
+            const ids = Object.values(view)
+                .filter(o => (o.common as { enabled?: boolean } | undefined)?.enabled)
+                .map(o => o._id.replace(/^system\.adapter\./, ''))
+                .filter(id => /^recorder\.\d+$/.test(id))
+                .sort((a, b) => Number(a.split('.')[1]) - Number(b.split('.')[1]));
+            return ids[0] ?? null;
+        } catch {
+            return null;
+        }
+    }
+    /** Asks a recorder (`getSnapshot`, `getEvents`); null without an answer within 30 s. */
+    recorderWalk<T>(
+        instance: string,
+        command: 'getSnapshot' | 'getEvents',
+        message: Record<string, unknown>,
+    ): Promise<T | null> {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        return Promise.race([
+            this.conn.sendTo<T>(instance, command, message),
+            new Promise<null>(resolve => (timer = setTimeout(() => resolve(null), 30_000))),
+        ])
+            .catch(() => null)
+            .finally(() => clearTimeout(timer));
+    }
     private recorded = new Map<string, { at: number; ids: Promise<Set<string> | null> }>();
     /**
      * The datapoints a history instance records (`getEnabledDPs`; the recorder answers with all it selected itself),

@@ -1,7 +1,9 @@
 // The past of the devices from the history adapters of ioBroker (history, influxdb, sql): `history/history_during_period`
 // (the detail dialog) and `home3d/timetravel/history` (the time travel). The instance is the one that logs the datapoint
-// (its `common.custom`), else the default history of the system; the time travel may prefer one instance (e.g. the recorder,
-// which selects its datapoints itself) for the datapoints it records. Values become device states like the live ones.
+// (its `common.custom`), else the default history of the system; one instance may be preferred (the one chosen for the
+// time travel, else a recorder: it selects its datapoints itself) for the datapoints it records. From a recorder the time
+// travel reads all its datapoints at once (`getSnapshot` at the start, `getEvents` of the window) instead of two
+// `getHistory` per datapoint. Values become device states like the live ones.
 import { transformed } from './entities.js';
 import type { Mapping, StateObject } from './model.js';
 import { moonAttributes } from './moon.js';
@@ -20,6 +22,17 @@ export interface HistoryAccess {
     getHistory(id: string, options: ioBroker.GetHistoryOptions): Promise<ioBroker.GetHistoryResult>;
     /** The datapoints an instance records (its `getEnabledDPs`); null if it does not answer. */
     recordedIds?(instance: string): Promise<Set<string> | null>;
+    /** Asks a recorder instance (`getSnapshot`, `getEvents`); null without an answer. */
+    recorderWalk?<T>(
+        instance: string,
+        command: 'getSnapshot' | 'getEvents',
+        message: Record<string, unknown>,
+    ): Promise<T | null>;
+}
+
+/** An instance of the recorder: it answers `getSnapshot` and `getEvents` for many datapoints at once. */
+export function isRecorder(instance: string | null | undefined): boolean {
+    return !!instance && /^recorder\.\d+$/.test(instance);
 }
 
 /** At most this many points per device and period; longer periods are reduced by the adapter (min/max per step). */
@@ -69,6 +82,7 @@ export async function historyEnabled(
     io: HistoryAccess,
     mappings: Mapping[],
     msg: { entity_ids?: unknown },
+    preferred: string | null = null,
 ): Promise<string[]> {
     const wanted = idList(msg.entity_ids)
         .map(id => mappings.find(m => m.entity_id === id))
@@ -76,8 +90,11 @@ export async function historyEnabled(
     if (!wanted.length) {
         return [];
     }
-    const objects = await io.getObjects(wanted.map(m => m.state));
-    return wanted.filter(m => loggedBy(objects[m.state], null)).map(m => m.entity_id);
+    const [objects, recorded] = await Promise.all([
+        io.getObjects(wanted.map(m => m.state)),
+        preferred && io.recordedIds ? io.recordedIds(preferred) : null,
+    ]);
+    return wanted.filter(m => loggedBy(objects[m.state], null) || recorded?.has(m.state)).map(m => m.entity_id);
 }
 
 /** The mappings of the wanted devices with the history instance that logs them (devices without one are left out). */
@@ -158,12 +175,13 @@ export async function historyDuringPeriod(
     io: HistoryAccess,
     mappings: Mapping[],
     msg: { start_time?: unknown; end_time?: unknown; entity_ids?: unknown; type?: string },
+    preferred: string | null = null,
 ): Promise<Record<string, HistoryRow[]>> {
     const end = time(msg.end_time, Date.now());
     const start = Math.min(time(msg.start_time, end - 24 * 3600 * 1000), end);
     const out: Record<string, HistoryRow[]> = {};
     await Promise.all(
-        (await sources(io, mappings, idList(msg.entity_ids))).map(async src => {
+        (await sources(io, mappings, idList(msg.entity_ids), preferred)).map(async src => {
             try {
                 out[src.m.entity_id] = await rowsOf(io, src, start, end, false);
             } catch (e) {
@@ -172,6 +190,101 @@ export async function historyDuringPeriod(
         }),
     );
     return out;
+}
+
+/** At most this many changes per `getEvents` of a recorder, and this many pages per window. */
+const EVENT_PAGE = 10_000;
+const EVENT_PAGES = 20;
+
+interface WalkSnapshot {
+    states?: { id: string; val: ioBroker.StateValue; aggregated?: true }[];
+    error?: string;
+}
+interface WalkEvents {
+    events?: { ts: number; id: string; val: ioBroker.StateValue }[];
+    more?: boolean;
+    error?: string;
+}
+
+/**
+ * The rows of the devices a recorder records, from start to end (ms), with a snapshot at the start and the changes of
+ * the window (pages of 10000) instead of two `getHistory` per device. Left to `getHistory` (`rest`): high-frequency
+ * datapoints (the recorder keeps only their five-minute aggregates) and all, if the instance does not answer.
+ */
+export async function recorderRows(
+    io: HistoryAccess,
+    instance: string,
+    srcs: Source[],
+    start: number,
+    end: number,
+): Promise<{ rows: Map<Source, HistoryRow[]>; rest: Source[] }> {
+    const none = { rows: new Map<Source, HistoryRow[]>(), rest: srcs };
+    if (!io.recorderWalk || !srcs.length) {
+        return none;
+    }
+    const ids = [...new Set(srcs.map(s => s.m.state))];
+    const snap = await io.recorderWalk<WalkSnapshot>(instance, 'getSnapshot', { ts: start, ids });
+    if (!snap || snap.error || !Array.isArray(snap.states)) {
+        return none;
+    }
+    const at = new Map(snap.states.map(s => [s.id, s]));
+    const changes = new Map<string, { ts: number; val: ioBroker.StateValue }[]>();
+    let from = start;
+    // the changes at the last time of a page come again at the start of the next one
+    let edge = new Set<string>();
+    for (let page = 0; page < EVENT_PAGES; page++) {
+        const ev = await io.recorderWalk<WalkEvents>(instance, 'getEvents', {
+            start: from,
+            end,
+            ids,
+            limit: EVENT_PAGE,
+        });
+        if (!ev || ev.error || !Array.isArray(ev.events)) {
+            return none;
+        }
+        const last = ev.events.at(-1)?.ts ?? from;
+        const next = new Set<string>();
+        for (const e of ev.events) {
+            const key = `${e.ts}|${e.id}|${JSON.stringify(e.val)}`;
+            if (e.ts === from && edge.has(key)) {
+                continue;
+            }
+            if (e.ts === last) {
+                next.add(key);
+            }
+            const list = changes.get(e.id) ?? [];
+            list.push({ ts: e.ts, val: e.val });
+            changes.set(e.id, list);
+        }
+        if (!ev.more || last <= from) {
+            break;
+        }
+        from = last;
+        edge = next;
+    }
+    const rows = new Map<Source, HistoryRow[]>();
+    const rest: Source[] = [];
+    for (const src of srcs) {
+        const first = at.get(src.m.state);
+        if (first?.aggregated) {
+            rest.push(src);
+            continue;
+        }
+        const list: HistoryRow[] = [];
+        if (first && first.val !== null && first.val !== undefined) {
+            list.push({ s: stateOf(first.val, src.m, src.type), lu: start / 1000 });
+        }
+        for (const c of changes.get(src.m.state) ?? []) {
+            if (c.val !== null && c.val !== undefined) {
+                list.push({
+                    s: stateOf(c.val, src.m, src.type),
+                    lu: Math.max(start, Math.min(end, Number(c.ts))) / 1000,
+                });
+            }
+        }
+        rows.set(src, list);
+    }
+    return { rows, rest };
 }
 
 /** A value of the time travel: a state, or a state with the attributes kept for it. */
@@ -295,20 +408,44 @@ export async function timeTravelHistory(
         sources(io, mappings, entityIds, preferred),
         sources(io, mappings, statIds, preferred),
     ]);
+    const put = (src: Source, rows: HistoryRow[]): void => {
+        if (rows.length) {
+            day.entities[src.m.entity_id] = wire(
+                rows.map(r => ({ t: r.lu, value: r.s })),
+                start,
+            );
+        }
+    };
+    const single = async (src: Source): Promise<void> => {
+        try {
+            put(src, await rowsOf(io, src, start * 1000, end * 1000, true));
+        } catch (e) {
+            console.warn(`[home3d] time travel of ${src.m.state} (${src.instance})`, e);
+        }
+    };
+    // the datapoints of a recorder at once, per instance; the others one by one
+    const byRecorder = new Map<string, Source[]>();
+    const others: Source[] = [];
+    for (const src of states) {
+        if (isRecorder(src.instance) && io.recorderWalk) {
+            byRecorder.set(src.instance, [...(byRecorder.get(src.instance) ?? []), src]);
+        } else {
+            others.push(src);
+        }
+    }
     await Promise.all([
-        ...states.map(async src => {
+        ...[...byRecorder].map(async ([instance, srcs]) => {
+            let rest = srcs;
             try {
-                const rows = await rowsOf(io, src, start * 1000, end * 1000, true);
-                if (rows.length) {
-                    day.entities[src.m.entity_id] = wire(
-                        rows.map(r => ({ t: r.lu, value: r.s })),
-                        start,
-                    );
-                }
+                const got = await recorderRows(io, instance, srcs, start * 1000, end * 1000);
+                got.rows.forEach((rows, src) => put(src, rows));
+                rest = got.rest;
             } catch (e) {
-                console.warn(`[home3d] time travel of ${src.m.state} (${src.instance})`, e);
+                console.warn(`[home3d] time travel from ${instance}`, e);
             }
+            await Promise.all(rest.map(single));
         }),
+        ...others.map(single),
         ...stats.map(async src => {
             try {
                 const stat = await means(io, src, start, end);
@@ -349,6 +486,7 @@ export async function statisticsDuringPeriod(
         types?: unknown;
         type?: string;
     },
+    preferred: string | null = null,
 ): Promise<Record<string, StatisticRow[]>> {
     const now = Date.now();
     const end = Math.min(time(msg.end_time, now), now);
@@ -357,7 +495,7 @@ export async function statisticsDuringPeriod(
     const types = Array.isArray(msg.types) ? msg.types : ['mean'];
     const out: Record<string, StatisticRow[]> = {};
     await Promise.all(
-        (await sources(io, mappings, idList(msg.statistic_ids))).map(async src => {
+        (await sources(io, mappings, idList(msg.statistic_ids), preferred)).map(async src => {
             try {
                 out[src.m.entity_id] = await statisticRows(io, src, start, end, step, types.includes('change'));
             } catch (e) {

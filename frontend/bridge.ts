@@ -39,6 +39,8 @@ let objects: Record<string, StateObject> = {},
     readOnly = false,
     systemPosition: { lat: number; lon: number } | null = null,
     historyInstances: string[] = [],
+    // the first running recorder: preferred for its datapoints unless an instance is chosen in the editor
+    recorderInstance: string | null = null,
     hass: Hass | undefined,
     timer: ReturnType<typeof setTimeout> | undefined,
     element:
@@ -75,23 +77,30 @@ io.conn.registerConnectionHandler(connected => {
         void store.sync().catch(() => {});
     }
 });
+/**
+ * The history instance preferred for the datapoints it records: the one chosen in the editor, else the first running
+ * recorder (it selects its datapoints itself); null: each datapoint from the instance that logs it.
+ */
+function preferredHistory(): string | null {
+    return store.data.timetravel_instance ?? recorderInstance;
+}
 // The history is read beside the store: Store.call() serializes, a long query would hold up saving.
 const callWS: CallWS = msg => {
     if (msg?.type === 'history/history_during_period') {
-        return historyDuringPeriod(io, store.data.mappings, msg);
+        return historyDuringPeriod(io, store.data.mappings, msg, preferredHistory());
     }
     if (msg?.type === 'home3d/iobroker/history_enabled') {
-        return historyEnabled(io, store.data.mappings, msg as { entity_ids?: unknown });
+        return historyEnabled(io, store.data.mappings, msg as { entity_ids?: unknown }, preferredHistory());
     }
     if (msg?.type === 'recorder/statistics_during_period') {
-        return statisticsDuringPeriod(io, store.data.mappings, msg);
+        return statisticsDuringPeriod(io, store.data.mappings, msg, preferredHistory());
     }
     if (msg?.type === 'energy/get_prefs') {
         // ioBroker has no energy dashboard: the editor's proposals find nothing, the sensors are chosen by hand
         return Promise.resolve({ energy_sources: [] });
     }
     if (msg?.type === 'home3d/timetravel/history') {
-        return timeTravelHistory(io, store.data.mappings, msg, place(), store.data.timetravel_instance ?? null);
+        return timeTravelHistory(io, store.data.mappings, msg, place(), preferredHistory());
     }
     return store.call(msg);
 };
@@ -292,6 +301,7 @@ async function start(): Promise<void> {
     }
     systemPosition = await io.location();
     historyInstances = await io.historyInstances();
+    recorderInstance = await io.recorderInstance();
     await store.load();
     areas = await store.areas();
     await follow();

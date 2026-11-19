@@ -900,13 +900,13 @@ function timeTravelSource(name: string, code: string): string {
         code = replaceRequired(
             code,
             '  sea_on: "Meer um das Boot",',
-            '  sea_on: "Meer um das Boot",\n  timetravel_source: "Zeitreise liest aus",\n  timetravel_auto: "Automatisch (der Verlauf, der den Datenpunkt aufzeichnet)",\n  timetravel_source_hint: "Z. B. recorder.0: Er zeichnet alle wichtigen Datenpunkte auf, ohne Einstellung je Datenpunkt. Datenpunkte, die die gewählte Instanz nicht aufzeichnet, kommen weiter aus dem Verlauf, der sie aufzeichnet. Gilt für alle Grundrisse.",',
+            '  sea_on: "Meer um das Boot",\n  timetravel_source: "Verlauf liest aus",\n  timetravel_auto: "Automatisch (der Recorder, falls installiert, sonst der Verlauf, der den Datenpunkt aufzeichnet)",\n  timetravel_source_hint: "Z. B. recorder.0: Er zeichnet alle wichtigen Datenpunkte auf, ohne Einstellung je Datenpunkt, und liefert der Zeitreise alle auf einmal. Automatisch wird ein laufender Recorder genommen. Datenpunkte, die die gewählte Instanz nicht aufzeichnet, kommen weiter aus dem Verlauf, der sie aufzeichnet. Gilt für die Zeitreise, die Verlaufskurve der Geräte und die Energie-Ansicht aller Grundrisse.",',
             'time travel source de',
         );
         code = replaceRequired(
             code,
             '  sea_on: "Sea around the boat",',
-            '  sea_on: "Sea around the boat",\n  timetravel_source: "Time travel reads from",\n  timetravel_auto: "Automatic (the history that logs the datapoint)",\n  timetravel_source_hint: "E.g. recorder.0: it records all relevant datapoints without a setting per datapoint. Datapoints the chosen instance does not record still come from the history that logs them. Counts for all floor plans.",',
+            '  sea_on: "Sea around the boat",\n  timetravel_source: "History reads from",\n  timetravel_auto: "Automatic (the recorder if installed, else the history that logs the datapoint)",\n  timetravel_source_hint: "E.g. recorder.0: it records all relevant datapoints without a setting per datapoint and gives them to the time travel all at once. Automatically a running recorder is taken. Datapoints the chosen instance does not record still come from the history that logs them. Counts for the time travel, the history curve of the devices and the energy view of all floor plans.",',
             'time travel source en',
         );
     }
@@ -4382,20 +4382,32 @@ export interface FoldMasks {
         );
     }
     if (name === 'panel.ts') {
-        // the looks right in the menu "Anzeige", not only behind ⚙
+        // every look right in the menu "Anzeige" (the same choice as behind ⚙), not only behind ⚙
         code = replaceRequired(
             code,
             '          <div class="fp3d-seg" title=${this.t("plain_hint")}>',
             `          <div class="fp3d-seg" role="group" aria-label=\${this.t("style")}>
-            \${["neon", "cozy", "dollhouse", "comic", "gouache"].map(
-              (id) => html\`<button aria-pressed=\${this._theme === id} @click=\${() => {
-                this._theme = id;
-                prefs.set("theme", id);
-              }}>\${this.t(\`style_\${id}\` as I18nKey)}</button>\`,
-            )}
+            <label class="fp3d-style-pick fp3d-menu-style" title=\${this.t("style")}>
+              <span aria-hidden="true">🎨</span>
+              <select
+                aria-label=\${this.t("style")}
+                @change=\${(e: Event) => {
+                  this._theme = (e.target as HTMLSelectElement).value;
+                  prefs.set("theme", this._theme);
+                }}
+              >
+                \${styleOptions((k) => this.t(k), this._theme, { auto: true, house: true })}
+              </select>
+            </label>
           </div>
           <div class="fp3d-seg" title=\${this.t("plain_hint")}>`,
             'looks in the menu',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-opts-btn {\n',
+            '      .fp3d-menu-style {\n        flex: 1;\n      }\n      .fp3d-menu-style select {\n        width: 100%;\n        max-width: none;\n      }\n      .fp3d-opts-btn {\n',
+            'looks in the menu: width',
         );
     }
     return code;
