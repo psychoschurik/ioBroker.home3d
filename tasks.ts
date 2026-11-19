@@ -3171,6 +3171,31 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * Robot vacuums (device-cards.ts): the robot drives by the state of an ioBroker datapoint too (the codes of
+ * Xiaomi/Roborock, plain words), and finds its datapoint by name when none is linked.
+ */
+function robotMore(name: string, code: string): string {
+    if (name !== 'components/view3d.ts') {
+        return code;
+    }
+    code = `import { mainEntity as fp3dDeviceMain, robotState as fp3dRobotState } from "${root}/frontend/vendor-ext/device-cards.ts";\n${code}`;
+    return replaceRequired(
+        code,
+        [
+            '        if (!isRobotVacuum(f.type)) continue;',
+            '        const entity = this.furnitureLinks.get(f.id)?.entity ?? null;',
+            '        const state = entity ? hass.states[entity]?.state : undefined;',
+        ].join('\n'),
+        [
+            '        if (!isRobotVacuum(f.type)) continue;',
+            '        const entity = this.furnitureLinks.get(f.id)?.entity ?? fp3dDeviceMain(hass, f);',
+            '        const state = fp3dRobotState(entity ? hass.states[entity]?.state : undefined);',
+        ].join('\n'),
+        'robot: ioBroker states',
+    );
+}
+
+/**
  * Pool (pool-module.ts): the module that gives the pools their life is built into this page instead of coming from a
  * pack – registered in every bundle's copy of modules.ts and kept when the packs are synced. With it the pool tool
  * draws pipes, a pool's form has its datapoints, the water shows the pump, the heating, the light and the cover.
@@ -3179,14 +3204,17 @@ function poolMore(name: string, code: string): string {
     if (name !== 'modules.ts') {
         return code;
     }
-    code = `import { poolModule as fp3dPoolModule } from "${root}/frontend/vendor-ext/pool-module.ts";\n${code}`;
+    code = `import { poolModule as fp3dPoolModule } from "${root}/frontend/vendor-ext/pool-module.ts";\nimport { deviceModule as fp3dDeviceModule } from "${root}/frontend/vendor-ext/device-cards.ts";\n${code}`;
     code = replaceRequired(
         code,
         'const loaded = new Map<string, Loaded>();',
         [
             '/** Modules built into this page (no pack): never dropped when the packs are synced. */',
-            'const builtin = new Set<string>(["home3d.pool"]);',
-            'const loaded = new Map<string, Loaded>([["home3d.pool", { id: "home3d.pool", release: 1, module: fp3dPoolModule as unknown as NeonModule }]]);',
+            'const builtin = new Set<string>(["home3d.pool", "home3d.devices"]);',
+            'const loaded = new Map<string, Loaded>([',
+            '  ["home3d.pool", { id: "home3d.pool", release: 1, module: fp3dPoolModule as unknown as NeonModule }],',
+            '  ["home3d.devices", { id: "home3d.devices", release: 1, module: fp3dDeviceModule as unknown as NeonModule }],',
+            ']);',
         ].join('\n'),
         'pool: built-in module',
     );
@@ -5914,6 +5942,7 @@ const patches: Plugin = {
         code = heatStoreMore(name, code);
         code = airVentMore(name, code);
         code = poolMore(name, code);
+        code = robotMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

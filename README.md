@@ -311,6 +311,11 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) „Klang & Kino“ und „Bildschirme live“ freigeschaltet: über jedem spielenden Lautsprecher oder Player eine
   Glaskarte mit Cover, Titel, Interpret, Zurück/Play/Pause/Vor und Lautstärke, Schallringe um ihn, Linien zwischen
   gruppierten Playern; ein Fernseher zeigt das Cover bzw. die Farbe seiner App
+- (bluefox) Glaskarten mit Steuerung für Saugroboter, Mähroboter und Kaffeemaschine (eingebautes Modul): Zustand
+  (saugt, mäht, fährt zur Station, Störung …) seit wann, Akku als Balken, Knöpfe Start/Pause/Zur Station; bei der
+  Kaffeemaschine Ein/Aus, Getränke als Chips, Bezüge, Leistung, Wassertank, Bohnen und Entkalken mit Hinweis. Die
+  Datenpunkte werden am Gerät im Editor gewählt oder unter demselben ioBroker-Gerät bzw. nach dem Namen gefunden. Der
+  Saugroboter fährt jetzt auch mit den Zustandscodes von Xiaomi/Roborock los
 
 ### 0.4.0 (2026-11-15)
 
