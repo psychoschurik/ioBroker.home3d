@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { boatCards, boatFields, boatWatched, type BoatItem } from '../frontend/vendor-ext/boat-cards';
+import { boatCards, boatFields, boatWatched, windCard, type BoatItem } from '../frontend/vendor-ext/boat-cards';
 
 type St = { state: string; attributes: Record<string, unknown> };
 const st = (state: string, unit = ''): St => ({ state, attributes: unit ? { unit_of_measurement: unit } : {} });
@@ -64,4 +64,39 @@ test('boat cards: the anchor (distance against the radius, chain, depth, scope, 
     assert.equal(check.label, 'Anker: Glaskarte zeigen');
     check.set(false);
     assert.equal((boatCards(host) as Card[]).filter(c => c.id === 'boat:a').length, 0);
+});
+
+test('wind card: true wind in knots on a boat, Beaufort, where from, apparent wind, pressure, gale warning', () => {
+    const now = Date.parse('2026-11-19T12:00:00Z');
+    const at = { last_updated: new Date(now - 60000).toISOString() };
+    const states: Record<string, St & { last_updated?: string }> = {
+        'sensor.tws': { state: '18.19', attributes: { unit_of_measurement: 'kn' }, ...at },
+        'sensor.twd': { state: '178.8', attributes: { unit_of_measurement: '°' }, ...at },
+        'sensor.aws': { state: '22', attributes: { unit_of_measurement: 'kn', iobroker_id: 'nmea.0.windData.windSpeedApparent' }, ...at },
+        'sensor.awa': { state: '-99.6', attributes: { unit_of_measurement: '°', iobroker_id: 'nmea.0.windData.windAngleApparent' }, ...at },
+        'sensor.baro': { state: '1012.6', attributes: { unit_of_measurement: 'hPa' }, ...at },
+    };
+    const vane: BoatItem = { id: 'v', type: 'wind_vane', wind_apparent_speed: 'sensor.aws', wind_apparent_angle: 'sensor.awa' };
+    const settings = { wind_speed: 'sensor.tws', wind_dir: 'sensor.twd', pressure_entity: 'sensor.baro', sea_level: -1.3 };
+    const host = { hass: () => ({ states }), building: () => ({ settings, floors: [{ id: 'dk', furniture: [vane] }] }), language: () => 'de' };
+    type Card = { live: string; status: { text: string }; main: { text: string; side?: { text: string } }; rows: { label: string; value: string }[]; hint?: { text: string } };
+    const card = windCard(host, 'dk', vane, now) as Card;
+    assert.equal(card.main.text, '18 kn');
+    assert.equal(card.main.side?.text, 'S 179°');
+    assert.equal(card.live, '18 kn · S 179°');
+    assert.equal(card.status.text, 'Brise');
+    assert.deepEqual(card.rows.map(r => [r.label, r.value]), [
+        ['Windstärke', '5 Bft'],
+        ['scheinbarer Wind', '22 kn · 100° Bb'],
+        ['Luftdruck', '1.013 hPa'],
+    ]);
+    assert.equal(card.hint, undefined);
+    states['sensor.tws'] = { ...states['sensor.tws'], state: '30' };
+    const gale = windCard(host, 'dk', vane, now) as Card;
+    assert.equal(gale.status.text, 'Starkwind');
+    assert.equal(gale.hint?.text, 'Starkwind: 7 Bft');
+    assert.ok(boatWatched(host).includes('sensor.awa'));
+    // the form finds the apparent wind by its datapoint
+    const fields = boatFields(host, { id: 'v', type: 'wind_vane' }) as { auto?: string | null }[];
+    assert.deepEqual(fields.slice(1, 3).map(f => f.auto), ['sensor.aws', 'sensor.awa']);
 });

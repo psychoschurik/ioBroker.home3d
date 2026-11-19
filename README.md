@@ -335,6 +335,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Warnung bei fast leeren Vorräten oder fast vollem Fäkalientank); je Anker/Tank im Editor abschaltbar
 - (bluefox) Heizung/Klima: auch eine elektrische Heizung an einer geschalteten Steckdose (Ein/Aus über die Steckdose,
   „heizt“ nach ihrer Leistung, die Raumtemperatur aus demselben Raum)
+- (bluefox) Wind: Glaskarte über der Windanzeige (Windex, Windsack, Fahne) mit dem wahren Wind (auf einem Boot in
+  Knoten), Windstärke in Beaufort, woher er kommt, Böen, scheinbarem Wind mit Winkel zum Bug (Bb/Stb) und Luftdruck;
+  Warnung ab 6 Bft, „Sturm“ ab 8 Bft. Der scheinbare Wind wird z. B. bei nmea von selbst gefunden
 
 ### 0.4.0 (2026-11-15)
 
