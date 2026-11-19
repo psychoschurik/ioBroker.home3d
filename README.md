@@ -308,6 +308,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Neuer Stil „Hygge (Diorama)“ unter „Wohnlich“: Wände mit senkrechter Holzvertäfelung und Sockelleiste,
   Holzdielen auch aus der Ferne, weiche Verschattung in Ecken und unter Möbeln, warme gedämpfte Farben vor olivgrünem
   Hintergrund
+- (bluefox) „Klang & Kino“ und „Bildschirme live“ freigeschaltet: über jedem spielenden Lautsprecher oder Player eine
+  Glaskarte mit Cover, Titel, Interpret, Zurück/Play/Pause/Vor und Lautstärke, Schallringe um ihn, Linien zwischen
+  gruppierten Playern; ein Fernseher zeigt das Cover bzw. die Farbe seiner App
 
 ### 0.4.0 (2026-11-15)
 

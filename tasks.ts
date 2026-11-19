@@ -577,9 +577,11 @@ function solarText(name: string, code: string): string {
  * (`recorder/statistics_during_period` from the history adapters) and the household (appliances with their time left
  * and "finished", plants, fridge doors; the waste calendar needs `callApi`, which ioBroker has not, and stays empty).
  * Energy and household are called just "Energie" and "Haushalt", without "Pro". The pool's module is built in
- * (pool-module.ts, poolMore).
+ * (pool-module.ts, poolMore). Sound (a now-playing card over every playing speaker or player with its cover, title,
+ * buttons and volume, rings around it, lines between grouped players) and screens (a TV shows its app's colour and
+ * its cover) need nothing but the states and the players' actions.
  */
-const SERVED = ['weather', 'time_travel', 'energy_pro', 'household', 'pool'];
+const SERVED = ['weather', 'time_travel', 'energy_pro', 'household', 'pool', 'sound', 'screens'];
 
 /** The served add-ons count as unlocked without a pack. */
 function unlockServed(name: string, code: string): string {

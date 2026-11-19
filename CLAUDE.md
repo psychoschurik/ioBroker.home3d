@@ -70,7 +70,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
   `Store.readOnly` refuses every change in `MUTATING` and writes nothing, not even on the first start.
 - `crypto.randomUUID`/`crypto.subtle` are not available on plain http; use `uuid()` / the FNV hash in `entities.ts`.
 - All page links are relative (web serves the page under `/home3d/`, possibly behind a proxy).
-- Pro add-ons: only those whose backend this page brings are unlocked (`SERVED` in `tasks.ts`: weather, time travel, energy, household, pool — shown as "Energie" and "Haushalt", without "Pro"; the pool's module is built in, `frontend/vendor-ext/pool-module.ts`);
+- Pro add-ons: only those whose backend this page brings are unlocked (`SERVED` in `tasks.ts`: weather, time travel, energy, household, pool, sound (now-playing cards, sound rings), screens (cover and app colour on TVs) — shown as "Energie" and "Haushalt", without "Pro"; the pool's module is built in, `frontend/vendor-ext/pool-module.ts`);
   buttons of the others are removed (`proButtons`).
 - Do not mention the former upstream project name anywhere; keep the MIT copyright in LICENSE/NOTICE.
 - Texts of the frame only through `t()` of `frontend/lang.ts` (de, en and ru for every key); texts of the 3D view as
