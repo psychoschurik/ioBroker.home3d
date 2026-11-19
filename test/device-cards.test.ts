@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
     autoRole,
     autoRoomCleaner,
+    coolLevel,
     roomCleaners,
     deviceCards,
     deviceFields,
@@ -394,4 +395,44 @@ test('an electric heater on a switched socket: on/off, its power, the room tempe
     [card] = deviceCards(host) as Card[];
     assert.equal(card.live, 'aus');
     assert.equal(card.cells, undefined);
+});
+
+test('fridge: fridge and freezer found by name, warnings when too warm, a door open', () => {
+    const fs: Record<string, St> = {
+        'sensor.fr': st('4.2', io('alias.0.Kueche.Kühlschrank.ACTUAL', 'Kühlschrank', 'value.temperature', { unit_of_measurement: '°C' })),
+        'sensor.fz': st('-19.5', io('alias.0.Kueche.Tiefkühlschrank.ACTUAL', 'Tiefkühlschrank', 'value.temperature', { unit_of_measurement: '°C' })),
+        'sensor.frh': st('61', io('alias.0.Kueche.Kühlschrank.SECOND', 'Kühlschrank Feuchte', 'value.humidity', { unit_of_measurement: '%' })),
+        'sensor.out': st('21', io('alias.0.Weather.Temperatur.ACTUAL', 'Außentemperatur', 'value.temperature', { unit_of_measurement: '°C' })),
+        'binary_sensor.door': st('off', io('zigbee.0.door.opened', 'Kühlschranktür', 'sensor.door')),
+    };
+    const fHass = { states: fs };
+    const fridge: DeviceItem & { door_right: string } = { id: 'k', type: 'fridge', name: 'Kühlschrank', door_right: 'binary_sensor.door' };
+    assert.equal(deviceKind('fridge'), 'fridge');
+    assert.equal(autoRole(fHass, fridge, 'actual'), 'sensor.fr');
+    assert.equal(autoRole(fHass, fridge, 'freezer'), 'sensor.fz');
+    assert.equal(autoRole(fHass, fridge, 'humidity'), 'sensor.frh');
+    assert.equal(coolLevel('fridge', 8), 'warm');
+    assert.equal(coolLevel('freezer', -10), 'hot');
+    const host: DeviceHost = { hass: () => fHass, building: () => ({ floors: [{ id: 'ud', furniture: [fridge] }] }), language: () => 'de' };
+    type Card = { live: string; status: { text: string }; main: { text: string; side?: { text: string } }; rows: { label: string; value: string }[]; hint?: { text: string } };
+    let [card] = deviceCards(host) as Card[];
+    assert.equal(card.status.text, 'kühlt');
+    assert.equal(card.main.text, '4,2 °C');
+    assert.equal(card.main.side?.text, '-19,5 °C');
+    assert.deepEqual(card.rows.map(r => [r.label, r.value]), [
+        ['Kühlfach', '4,2 °C'],
+        ['Tiefkühlen', '-19,5 °C'],
+        ['Luftfeuchte', '61 %'],
+    ]);
+    assert.equal(card.hint, undefined);
+    fs['sensor.fz'] = st('-10', fs['sensor.fz'].attributes);
+    [card] = deviceCards(host) as Card[];
+    assert.equal(card.status.text, 'viel zu warm');
+    assert.match(card.hint!.text, /Lebensmittel/);
+    fs['binary_sensor.door'] = st('on', fs['binary_sensor.door'].attributes);
+    [card] = deviceCards(host) as Card[];
+    assert.equal(card.status.text, 'Tür offen');
+    // nothing found: no card
+    const bare: DeviceItem = { id: 'x', type: 'fridge', device_links: { actual: 'none', freezer: 'none' } };
+    assert.equal(deviceCards({ ...host, building: () => ({ floors: [{ id: 'ud', furniture: [bare] }] }) }).length, 0);
 });

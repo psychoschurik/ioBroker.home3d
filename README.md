@@ -338,6 +338,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Wind: Glaskarte über der Windanzeige (Windex, Windsack, Fahne) mit dem wahren Wind (auf einem Boot in
   Knoten), Windstärke in Beaufort, woher er kommt, Böen, scheinbarem Wind mit Winkel zum Bug (Bb/Stb) und Luftdruck;
   Warnung ab 6 Bft, „Sturm“ ab 8 Bft. Der scheinbare Wind wird z. B. bei nmea von selbst gefunden
+- (bluefox) Kühlschrank/Tiefkühler: Glaskarte mit der Temperatur von Kühlfach und Tiefkühler (auch zwei getrennte
+  Thermometer, nach ihren Namen gefunden), Luftfeuchte, Leistung und offener Tür; Warnung über 7 °C bzw. −16 °C,
+  „viel zu warm“ über 9 °C bzw. −12 °C
 
 ### 0.4.0 (2026-11-15)
 

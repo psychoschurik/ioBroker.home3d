@@ -48,7 +48,7 @@ export interface DeviceHost {
     callService?(domain: string, service: string, data?: Record<string, unknown>): Promise<unknown>;
 }
 
-export type DeviceKind = 'vacuum' | 'mower' | 'coffee' | 'wallbox' | 'climate';
+export type DeviceKind = 'vacuum' | 'mower' | 'coffee' | 'wallbox' | 'climate' | 'fridge';
 export type DeviceRole =
     | 'battery'
     | 'start'
@@ -75,7 +75,8 @@ export type DeviceRole =
     | 'valve'
     | 'boost'
     | 'window'
-    | 'onoff';
+    | 'onoff'
+    | 'freezer';
 
 export const DEVICE_ROLES: Record<DeviceKind, DeviceRole[]> = {
     vacuum: ['battery', 'start', 'pause', 'home'],
@@ -83,6 +84,7 @@ export const DEVICE_ROLES: Record<DeviceKind, DeviceRole[]> = {
     coffee: ['power', 'water', 'beans', 'descale', 'cups', 'drink1', 'drink2', 'drink3'],
     wallbox: ['power', 'charge', 'current', 'mode', 'soc', 'target', 'range', 'energy'],
     climate: ['setpoint', 'actual', 'humidity', 'valve', 'mode', 'boost', 'window', 'onoff', 'power'],
+    fridge: ['actual', 'freezer', 'humidity', 'power'],
 };
 
 /** Which card a piece of furniture gets. */
@@ -101,6 +103,9 @@ export function deviceKind(type: string): DeviceKind | null {
     }
     if (type === 'radiator' || type === 'ac_unit' || /radiator|ac_unit|thermostat/.test(type)) {
         return 'climate';
+    }
+    if (/^(fridge|fridge_smart|freezer)$|fridge|freezer|refrigerator/.test(type)) {
+        return 'fridge';
     }
     return null;
 }
@@ -150,6 +155,17 @@ const TEXTS: Record<string, Record<string, string>> = {
         rooms_hint:
             'Raum saugen: je Raum der Knopf, der genau diesen Raum saugen lässt (z. B. rooms.<Raum>.roomClean bei mihome-vacuum, cleanSpotArea bei ecovacs-deebot). Leer gelassen wird ein Knopf unter dem Roboter gesucht, der den Raum im Namen trägt.',
         climate: 'Heizung / Klima',
+        fridge: 'Kühlschrank',
+        fridge_part: 'Kühlfach',
+        freezer: 'Tiefkühlen',
+        watts: 'Leistung',
+        door_open: 'Tür offen',
+        cool_ok: 'kühlt',
+        cool_cold: 'zu kalt',
+        cool_warm: 'zu warm',
+        cool_hot: 'viel zu warm',
+        cool_warm_hint: 'Etwas zu warm: Kühlschrank über 7 °C oder Tiefkühler über −16 °C.',
+        cool_hot_hint: 'Viel zu warm: Kühlschrank über 9 °C oder Tiefkühler über −12 °C. Lebensmittel prüfen!',
         climate_mode: 'Betriebsart',
         setpoint: 'Solltemperatur',
         actual: 'Raumtemperatur',
@@ -244,6 +260,17 @@ const TEXTS: Record<string, Record<string, string>> = {
         rooms_hint:
             'Clean a room: per room the button that cleans just that room (e.g. rooms.<room>.roomClean of mihome-vacuum, cleanSpotArea of ecovacs-deebot). Left empty, a button below the robot that names the room is used.',
         climate: 'Heating / AC',
+        fridge: 'Fridge',
+        fridge_part: 'Fridge',
+        freezer: 'Freezer',
+        watts: 'Power',
+        door_open: 'door open',
+        cool_ok: 'cooling',
+        cool_cold: 'too cold',
+        cool_warm: 'too warm',
+        cool_hot: 'far too warm',
+        cool_warm_hint: 'A bit too warm: fridge above 7 °C or freezer above −16 °C.',
+        cool_hot_hint: 'Far too warm: fridge above 9 °C or freezer above −12 °C. Check the food!',
         climate_mode: 'Mode',
         setpoint: 'Target temperature',
         actual: 'Room temperature',
@@ -338,6 +365,17 @@ const TEXTS: Record<string, Record<string, string>> = {
         rooms_hint:
             'Уборка комнаты: для каждой комнаты кнопка, запускающая уборку только этой комнаты (например rooms.<комната>.roomClean у mihome-vacuum, cleanSpotArea у ecovacs-deebot). Если поле пустое, ищется кнопка робота с названием комнаты.',
         climate: 'Отопление / климат',
+        fridge: 'Холодильник',
+        fridge_part: 'Холодильник',
+        freezer: 'Морозилка',
+        watts: 'Мощность',
+        door_open: 'дверь открыта',
+        cool_ok: 'охлаждает',
+        cool_cold: 'слишком холодно',
+        cool_warm: 'тепловато',
+        cool_hot: 'слишком тепло',
+        cool_warm_hint: 'Тепловато: холодильник выше 7 °C или морозилка выше −16 °C.',
+        cool_hot_hint: 'Слишком тепло: холодильник выше 9 °C или морозилка выше −12 °C. Проверьте продукты!',
         climate_mode: 'Режим работы',
         setpoint: 'Заданная температура',
         actual: 'Температура в комнате',
@@ -489,7 +527,11 @@ const KIND_WORD: Record<DeviceKind, RegExp> = {
         /wallbox|wall box|evcc|go-?e|keba|easee|wallbe|openwb|charger|ladestation|ladepunkt|loadpoint|ladesäule|зарядн/i,
     // a radiator's or air conditioner's datapoints only below its own linked datapoint (a name would fit every room)
     climate: /(?!)/,
+    fridge: /kühl|fridge|refrigerat|freez|gefrier|холодил|морозил/i,
 };
+
+/** A freezer (compartment) by its name: the fridge's own temperature and humidity are the other ones. */
+const FREEZER = /tiefkühl|gefrier|freez|морозил/i;
 
 /** Whether an entity may serve a role (its domain, then its ioBroker role or name). */
 function fits(role: DeviceRole, id: string, st: StateLike): boolean {
@@ -576,6 +618,13 @@ function fits(role: DeviceRole, id: string, st: StateLike): boolean {
             );
         case 'humidity':
             return d === 'sensor' && (/humidity/.test(r) || (unit === '%' && /humid|feucht|влажн/.test(n)));
+        case 'freezer':
+            return (
+                d === 'sensor' &&
+                st.attributes.iobroker_write !== true &&
+                (/^°[CF]$/.test(unit) || /value\.temperature/.test(r)) &&
+                FREEZER.test(`${nameOf(id, st)} ${str(st.attributes.iobroker_id)}`)
+            );
         case 'valve':
             return d === 'sensor' && unit === '%' && /valve|ventil|stellgr|клапан/.test(n);
         case 'boost':
@@ -635,7 +684,7 @@ export function mainEntity(hass: HassLike, f: DeviceItem): string | null {
         );
     }
     // a radiator or air conditioner only by its own link (an entity found by name would belong to any room)
-    if (kind === 'climate') {
+    if (kind === 'climate' || kind === 'fridge') {
         return null;
     }
     const own = kind === 'vacuum' ? 'vacuum' : 'lawn_mower';
@@ -671,7 +720,14 @@ export function autoRole(hass: HassLike, f: DeviceItem, role: DeviceRole): strin
     const mainSt = main ? hass.states[main] : undefined;
     const ids = Object.keys(hass.states)
         .sort()
-        .filter(id => id !== main && fits(role, id, hass.states[id]!));
+        .filter(id => id !== main && fits(role, id, hass.states[id]!))
+        .filter(
+            id =>
+                kind !== 'fridge' ||
+                role === 'freezer' ||
+                role === 'power' ||
+                !FREEZER.test(`${nameOf(id, hass.states[id])} ${str(hass.states[id]!.attributes.iobroker_id)}`),
+        );
     const drinkIndex = role === 'drink1' ? 0 : role === 'drink2' ? 1 : role === 'drink3' ? 2 : -1;
     const pick = (list: string[]): string | null => (drinkIndex >= 0 ? (list[drinkIndex] ?? null) : (list[0] ?? null));
     for (const levels of [4, 3, 2]) {
@@ -900,7 +956,9 @@ export function deviceCard(host: DeviceHost, floorId: string, f: DeviceItem): Re
                       ? f.type === 'ac_unit'
                           ? '❄️'
                           : '🌡️'
-                      : '☕',
+                      : kind === 'fridge'
+                        ? '🧊'
+                        : '☕',
         title: f.name || text(lang, kind),
     };
     if (kind === 'wallbox') {
@@ -908,6 +966,9 @@ export function deviceCard(host: DeviceHost, floorId: string, f: DeviceItem): Re
     }
     if (kind === 'climate') {
         return mainSt ? climateCard(host, f, base, main!, links) : null;
+    }
+    if (kind === 'fridge') {
+        return fridgeCard(host, f, base, links);
     }
     if (kind === 'coffee') {
         const watts = links.power ? num(hass.states[links.power]) : null;
@@ -1051,6 +1112,103 @@ export function deviceCard(host: DeviceHost, floorId: string, f: DeviceItem): Re
               }
             : {}),
         buttons,
+    };
+}
+
+/** How a compartment's temperature is: fine, too warm, far too warm (or too cold for a fridge). */
+export function coolLevel(kind: 'fridge' | 'freezer', t: number): 'ok' | 'cold' | 'warm' | 'hot' {
+    if (kind === 'freezer') {
+        return t > -12 ? 'hot' : t > -16 ? 'warm' : 'ok';
+    }
+    return t > 9 ? 'hot' : t > 7 ? 'warm' : t < 0.5 ? 'cold' : 'ok';
+}
+const COOL_COLOR = { ok: '#4cd97b', cold: '#37b6ff', warm: '#ffb347', hot: '#ff5d5d' };
+
+/** A fridge's card: its compartments' temperatures (fridge and freezer), the humidity, a door open, its power. */
+function fridgeCard(
+    host: DeviceHost,
+    f: DeviceItem & { door_left?: string | null; door_right?: string | null },
+    base: Record<string, unknown>,
+    links: Partial<Record<DeviceRole, string | null>>,
+): Record<string, unknown> | null {
+    const hass = host.hass();
+    const lang = host.language();
+    const fridgeSt = links.actual ? hass.states[links.actual] : undefined;
+    const freezerSt = links.freezer ? hass.states[links.freezer] : undefined;
+    const fridgeT = num(fridgeSt);
+    const freezerT = num(freezerSt);
+    if (fridgeT === null && freezerT === null) {
+        return null;
+    }
+    const levels = [
+        ...(fridgeT !== null ? [coolLevel('fridge', fridgeT)] : []),
+        ...(freezerT !== null ? [coolLevel('freezer', freezerT)] : []),
+    ];
+    const worst = (['hot', 'warm', 'cold', 'ok'] as const).find(l => levels.includes(l))!;
+    const doors = [f.door_left, f.door_right].filter((d): d is string => !!d && d !== 'none');
+    const open = doors.some(d => ON.test(str(hass.states[d]?.state)) || /open|offen/i.test(str(hass.states[d]?.state)));
+    const word = open ? 'door_open' : worst === 'ok' ? 'cool_ok' : `cool_${worst}`;
+    const color = open ? COOL_COLOR.warm : COOL_COLOR[worst];
+    const deg = (t: number): string =>
+        `${t.toLocaleString(lang, { maximumFractionDigits: 1, minimumFractionDigits: 1 })} °C`;
+    const rows: Record<string, unknown>[] = [];
+    // a bar per compartment: where the temperature lies between its good and its bad end
+    if (fridgeT !== null) {
+        rows.push({
+            label: text(lang, 'fridge_part'),
+            value: deg(fridgeT),
+            at: Math.max(0, Math.min(100, (fridgeT / 12) * 100)),
+            fill: true,
+            color: COOL_COLOR[coolLevel('fridge', fridgeT)],
+        });
+    }
+    if (freezerT !== null) {
+        rows.push({
+            label: text(lang, 'freezer'),
+            value: deg(freezerT),
+            at: Math.max(0, Math.min(100, ((freezerT + 24) / 16) * 100)),
+            fill: true,
+            color: COOL_COLOR[coolLevel('freezer', freezerT)],
+        });
+    }
+    const humidity = links.humidity ? num(hass.states[links.humidity]) : null;
+    if (humidity !== null) {
+        rows.push({ label: text(lang, 'humidity'), value: `${Math.round(humidity)} %`, minor: true });
+    }
+    const watts = links.power ? num(hass.states[links.power]) : null;
+    const main = fridgeT !== null ? fridgeT : freezerT!;
+    return {
+        ...base,
+        title: f.name || text(lang, 'fridge'),
+        live: [fridgeT, freezerT]
+            .filter((t): t is number => t !== null)
+            .map(t => deg(t))
+            .join(' · '),
+        liveColor: color,
+        status: {
+            icon: open ? '🚪' : worst === 'ok' ? '✓' : worst === 'cold' ? '❄' : '⚠',
+            text: text(lang, word),
+            since: since(lang, fridgeSt ?? freezerSt),
+            color,
+        },
+        main: {
+            text: deg(main),
+            sub: text(lang, fridgeT !== null ? 'fridge_part' : 'freezer'),
+            ...(fridgeT !== null && freezerT !== null
+                ? {
+                      side: {
+                          text: deg(freezerT),
+                          sub: text(lang, 'freezer'),
+                          color: COOL_COLOR[coolLevel('freezer', freezerT)],
+                      },
+                  }
+                : {}),
+        },
+        rows,
+        ...(watts !== null
+            ? { cells: [{ label: text(lang, 'watts'), value: `${Math.round(watts).toLocaleString(lang)} W` }] }
+            : {}),
+        ...(worst === 'hot' || worst === 'warm' ? { hint: { text: text(lang, `cool_${worst}_hint`), color } } : {}),
     };
 }
 
@@ -1503,6 +1661,7 @@ const ROLE_DOMAIN: Record<DeviceRole, RegExp> = {
     boost: WRITABLE,
     window: /^(sensor|binary_sensor)$/,
     onoff: WRITABLE,
+    freezer: /^sensor$/,
     charge: WRITABLE,
     current: /^(sensor|number)$/,
     mode: /^(sensor|select|input_select)$/,
@@ -1582,7 +1741,14 @@ export function deviceFields(host: DeviceHost, item: DeviceItem): unknown[] {
         },
         ...DEVICE_ROLES[kind].map(role => ({
             kind: 'entity',
-            label: text(lang, kind === 'climate' && role === 'mode' ? 'climate_mode' : role),
+            label: text(
+                lang,
+                kind === 'climate' && role === 'mode'
+                    ? 'climate_mode'
+                    : kind === 'fridge' && role === 'actual'
+                      ? 'fridge_part'
+                      : role,
+            ),
             value: item.device_links?.[role] ?? null,
             auto: autoRole(hass, item, role),
             filter: (id: string) => ROLE_DOMAIN[role].test(domain(id)),
