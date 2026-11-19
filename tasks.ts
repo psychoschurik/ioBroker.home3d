@@ -3112,6 +3112,193 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * Waste bins at the street (bin-spots.ts): a new piece "bin spot" (a paved pad at the street); a bin that is out (its
+ * "put out" entity is on, else from the evening before its pickup until the pickup's morning, as its tag glows) stands
+ * on the nearest spot of its floor, in a row, turned like it. The floors are built again only when a bin goes out or
+ * comes back, as with the cars in the parking spots.
+ */
+function binsMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "server",\n] as const;',
+            '  "server",\n  "bin_spot",\n] as const;',
+            'bins: furniture type',
+        );
+        code = replaceRequired(
+            code,
+            '  household: ["waste_bin", "mailbox"],',
+            '  household: ["waste_bin", "bin_spot", "mailbox"],',
+            'bins: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  server: [0.6, 0.8, 1.2],',
+            '  server: [0.6, 0.8, 1.2],\n  // a pad at the street for three or four bins\n  bin_spot: [2.4, 0.9, 0.02],',
+            'bins: size',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  waste_bin: ["household", ["garden", "garage", "utility"]],',
+            '  waste_bin: ["household", ["garden", "garage", "utility"]],\n  bin_spot: ["household", ["garden"]],',
+            'bins: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "server":',
+            [
+                '    case "bin_spot":',
+                '      // the pad and the edge of the street',
+                '      return [rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"), line(-w / 2, d / 2 - Math.min(0.1, d * 0.15), w / 2, d / 2 - Math.min(0.1, d * 0.15))];',
+                '    case "server":',
+            ].join('\n'),
+            'bins: symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "server":\n    case "rain_tank":\n',
+            [
+                '    case "bin_spot":',
+                '      // a paved pad at the street where the bins go out',
+                '      b.box(-w / 2, w / 2, 0, Math.max(0.01, h), -d / 2, d / 2, 0x9ea4aa, 0xb4bac0);',
+                '      return;',
+                '    case "server":',
+                '    case "rain_tank":',
+                '',
+            ].join('\n'),
+            'bins: the pad',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_bin_spot: 'Tonnenplatz (Straße)',
+            bin_spot_hint:
+                'Hierhin rollen die Mülltonnen, wenn sie draußen stehen: mit ihrem Datenpunkt „rausgestellt“, sonst vom Vorabend der Abholung bis zum Morgen (wie ihr Schild leuchtet). Sie stehen nebeneinander auf dem nächsten Tonnenplatz ihrer Etage, gedreht wie er; die Vorderseite zeigt zur Straße.',
+        };
+        const en: Record<string, string> = {
+            furn_bin_spot: 'Bin spot (street)',
+            bin_spot_hint:
+                'The waste bins roll here while they are out: by their "put out" datapoint, else from the evening before the pickup until its morning (as their tag glows). They stand side by side on the nearest bin spot of their floor, turned like it; the front faces the street.',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Mülltonne",',
+            `  furn_waste_bin: "Mülltonne",${lines(de)}`,
+            'bins de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Waste bin",',
+            `  furn_waste_bin: "Waste bin",${lines(en)}`,
+            'bins en',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '"coffee_machine", "rain_tank", "server"]);',
+            '"coffee_machine", "rain_tank", "server", "bin_spot"]);',
+            'bins: no state links',
+        );
+        code = replaceRequired(
+            code,
+            '    if (f.type === "server")\n',
+            [
+                '    if (f.type === "bin_spot")',
+                '      return html`<div class="fp3d-form fp3d-links"><p class="fp3d-sub fp3d-wide">${this.t("bin_spot_hint" as I18nKey)}</p></div>`;',
+                '    if (f.type === "server")',
+                '',
+            ].join('\n'),
+            'bins: form',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { binsSig as fp3dBinsSig, withBinsOut as fp3dWithBins, type BinPlace as Fp3dBinPlace } from "${root}/frontend/vendor-ext/bin-spots.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  /** Vehicles in the parking spots (spot id -> pack item type); a change rebuilds the floors. */\n',
+            [
+                '  private fp3dBins = new Map<string, Fp3dBinPlace>();',
+                '  private fp3dBinsKey = "";',
+                '  /** Waste bins that are out, standing at the street (bin id -> place); a change rebuilds the floors. */',
+                '  fp3dSetBinsOut(places: Map<string, Fp3dBinPlace>): void {',
+                '    const sig = fp3dBinsSig(places);',
+                '    if (sig === this.fp3dBinsKey) return;',
+                '    this.fp3dBinsKey = sig;',
+                '    this.fp3dBins = places;',
+                '    if (this.building) {',
+                '      this.rebuild();',
+                '      this.invalidate();',
+                '    }',
+                '  }',
+                '',
+                '  /** Vehicles in the parking spots (spot id -> pack item type); a change rebuilds the floors. */',
+                '',
+            ].join('\n'),
+            'bins: setter',
+        );
+        code = replaceRequired(
+            code,
+            'buildFloorGeometry(withVehicles(floor, this.parked),',
+            'buildFloorGeometry(fp3dWithBins(withVehicles(floor, this.parked), this.fp3dBins),',
+            'bins: built at the street',
+        );
+        // their contact shadows go with them
+        code = replaceRequired(
+            code,
+            '        const mesh = contactShadows(fv.floor);',
+            '        const mesh = contactShadows(fp3dWithBins(fv.floor, this.fp3dBins));',
+            'bins: shadows at the street',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = `import { binsOut as fp3dBinsOut, type BinPlace as Fp3dBinPlace } from "${root}/frontend/vendor-ext/bin-spots.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    v.setParked(parkedVehicles(hass, b));\n',
+            [
+                '    v.setParked(parkedVehicles(hass, b));',
+                '    // waste bins that are out stand at the street: by their own switch, else as their tag glows',
+                '    this.fp3dBinsAt = this.replay',
+                '      ? new Map()',
+                '      : fp3dBinsOut(b.floors, (f) =>',
+                '          typeof f.bin_out === "string" && f.bin_out !== "none"',
+                '            ? binOut(f, hass)',
+                '            : !!binDue(f, hass, this.pickups, new Date(), { from: b.settings.household?.bin_from, until: b.settings.household?.bin_until })?.glow,',
+                '        );',
+                '    v.fp3dSetBinsOut(this.fp3dBinsAt);',
+                '',
+            ].join('\n'),
+            'bins: out to the viewer',
+        );
+        code = replaceRequired(
+            code,
+            '  private householdState(',
+            '  /** Waste bins standing at the street now (bin id -> place). */\n  private fp3dBinsAt = new Map<string, Fp3dBinPlace>();\n\n  private householdState(',
+            'bins: field',
+        );
+        // the bin's tag goes with it
+        code = replaceRequired(
+            code,
+            'this.binHolos.push({ id: f.id, floorId: floor.id, x: f.x, z: f.z, y: mountBase(floor, f) + f.h, r: Math.max(f.w, f.d) / 2, name: label,',
+            'this.binHolos.push({ id: f.id, floorId: floor.id, x: this.fp3dBinsAt.get(f.id)?.x ?? f.x, z: this.fp3dBinsAt.get(f.id)?.z ?? f.z, y: mountBase(floor, f) + f.h, r: Math.max(f.w, f.d) / 2, name: label,',
+            'bins: the tag at the street',
+        );
+    }
+    return code;
+}
+
+/**
  * The flag of a mailbox (mail-flag.ts, home-view.ts, home-fx.ts): it swings up while post lies in the box and folds
  * back once it is taken out, on every shape; the fixed flag of the US mailbox on a post goes.
  */
@@ -4983,6 +5170,7 @@ const patches: Plugin = {
         code = mjpegStreams(name, code);
         code = snowMore(name, code);
         code = mailFlagMore(name, code);
+        code = binsMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

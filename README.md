@@ -216,6 +216,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   aktualisiert
 - (bluefox) Briefkasten: ein rotes Fähnchen an der Seite klappt hoch, solange Post darin liegt, und legt sich wieder an,
   wenn sie geholt ist – an jeder Form (bisher hatte nur der US-Briefkasten ein festes Fähnchen)
+- (bluefox) Mülltonnen an der Straße: neues Möbelstück „Tonnenplatz (Straße)“ unter Haushalt. Steht eine Tonne draußen
+  (ihr Datenpunkt „rausgestellt“, sonst vom Vorabend der Abholung bis zum Morgen), steht sie mit Schild und Schatten
+  nebeneinander mit den anderen auf dem nächsten Tonnenplatz und kommt danach wieder an ihren Platz
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler
