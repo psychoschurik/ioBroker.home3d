@@ -3,6 +3,7 @@
 // switch are datapoints linked at the device in the editor; a link left empty is looked for below the same ioBroker
 // device as the device's own datapoint, then by name. The buttons write only through the mappings' actions
 // (callService → execute()).
+import { boatCards, boatFields, boatWatched } from './boat-cards';
 import { mowerPhase } from './home-data';
 
 interface StateLike {
@@ -81,7 +82,7 @@ export const DEVICE_ROLES: Record<DeviceKind, DeviceRole[]> = {
     mower: ['battery', 'start', 'pause', 'home'],
     coffee: ['power', 'water', 'beans', 'descale', 'cups', 'drink1', 'drink2', 'drink3'],
     wallbox: ['power', 'charge', 'current', 'mode', 'soc', 'target', 'range', 'energy'],
-    climate: ['setpoint', 'actual', 'humidity', 'valve', 'mode', 'boost', 'window', 'onoff'],
+    climate: ['setpoint', 'actual', 'humidity', 'valve', 'mode', 'boost', 'window', 'onoff', 'power'],
 };
 
 /** Which card a piece of furniture gets. */
@@ -516,7 +517,13 @@ function fits(role: DeviceRole, id: string, st: StateLike): boolean {
                 (/home|dock|return/.test(r) || /home|dock|charge|return|heim|station|basis|zurück|park|баз/.test(n))
             );
         case 'power':
-            return d === 'sensor' && (/power/.test(r) || /^k?W$/.test(unit)) && !/kWh/.test(unit);
+            // the power now, not a meter of the energy used
+            return (
+                d === 'sensor' &&
+                (/power/.test(r) || /^k?W$/.test(unit)) &&
+                !/k?Wh/.test(unit) &&
+                !/consumption|energy|verbrauch|zähler/.test(`${r} ${n}`)
+            );
         case 'water':
             return (
                 /^(sensor|binary_sensor)$/.test(d) && /wasser|water|tank|вод/.test(n) && !/temp|härte|hardness/.test(n)
@@ -667,7 +674,7 @@ export function autoRole(hass: HassLike, f: DeviceItem, role: DeviceRole): strin
         .filter(id => id !== main && fits(role, id, hass.states[id]!));
     const drinkIndex = role === 'drink1' ? 0 : role === 'drink2' ? 1 : role === 'drink3' ? 2 : -1;
     const pick = (list: string[]): string | null => (drinkIndex >= 0 ? (list[drinkIndex] ?? null) : (list[0] ?? null));
-    for (const levels of [3, 2]) {
+    for (const levels of [4, 3, 2]) {
         const base = baseOf(mainSt, levels);
         if (!base) {
             continue;
@@ -1285,19 +1292,25 @@ function climateCard(
           ? num(hass.states[actualId])
           : null;
     const valve = links.valve ? num(hass.states[links.valve]) : null;
+    // an electric heater on a switched socket: its power tells whether it heats
+    const watts = links.power ? num(hass.states[links.power]) : null;
     const humidity = links.humidity
         ? num(hass.states[links.humidity])
         : typeof a.current_humidity === 'number'
           ? a.current_humidity
           : null;
-    const onoffId = links.onoff;
+    // a heater switched by its own datapoint (a socket): that switch is its on/off
+    const onoffId = links.onoff ?? (!own && WRITABLE.test(domain(main)) ? main : null);
     const switchedOff = onoffId ? !ON.test(str(hass.states[onoffId]?.state)) : own && mainSt.state === 'off';
     const ac = f.type === 'ac_unit';
     const action = str(a.hvac_action);
     const phase = switchedOff
         ? 'climate_off'
         : action === 'heating' ||
-            (valve !== null ? valve > 5 : !ac && !own && target !== null && actual !== null && target > actual + 0.3)
+            (watts !== null && watts > 20) ||
+            (watts === null && valve !== null
+                ? valve > 5
+                : !ac && !own && target !== null && actual !== null && target > actual + 0.3)
           ? 'heats'
           : action === 'cooling' || (ac && !own && target !== null && actual !== null && target < actual - 0.3)
             ? 'cools'
@@ -1317,6 +1330,16 @@ function climateCard(
             color: '#ff8a3d',
         });
     }
+    const cells =
+        watts !== null && !switchedOff
+            ? [
+                  {
+                      label: text(lang, 'power').replace(/\s*\(.*\)/, ''),
+                      value: `${Math.round(watts).toLocaleString(lang)} W`,
+                      color: watts > 20 ? '#ff8a3d' : undefined,
+                  },
+              ]
+            : [];
     if (humidity !== null) {
         rows.push({
             label: text(lang, 'humidity'),
@@ -1425,6 +1448,7 @@ function climateCard(
               }
             : {}),
         ...(rows.length ? { rows } : {}),
+        ...(cells.length ? { cells } : {}),
         ...(windowOpen ? { hint: { text: text(lang, 'window_open'), color: '#37b6ff' } } : {}),
         ...(chips.length ? { chips } : {}),
         buttons,
@@ -1607,7 +1631,9 @@ export function deviceFields(host: DeviceHost, item: DeviceItem): unknown[] {
 export const deviceModule = {
     api: 1,
     id: 'home3d.devices',
-    watched: deviceWatched,
-    cards: deviceCards,
-    furnitureFields: deviceFields,
+    watched: (host: DeviceHost): string[] => [...deviceWatched(host), ...boatWatched(host)],
+    // the boat's gear (anchor, tanks) has its cards here too
+    cards: (host: DeviceHost): unknown[] => [...deviceCards(host), ...boatCards(host)],
+    furnitureFields: (host: DeviceHost, item: DeviceItem): unknown[] =>
+        deviceKind(item.type) ? deviceFields(host, item) : boatFields(host, item),
 };

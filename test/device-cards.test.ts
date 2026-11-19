@@ -355,3 +355,43 @@ test('clean a room: a chip per room of the floor, found below the robot by the r
     bad?.set?.('switch.r_16');
     assert.equal((saved as typeof b).floors[0].furniture[0].device_rooms?.b, 'switch.r_16');
 });
+
+test('an electric heater on a switched socket: on/off, its power, the room temperature of its room', () => {
+    const hs: Record<string, St> = {
+        'switch.heat': st('on', io('alias.0.Salon.Heizung.SET', 'SET', 'switch')),
+        'sensor.heat_w': st('1480', io('alias.0.Salon.Heizung.ELECTRIC_POWER', 'Salon Heizung ELECTRIC POWER', 'value.power', { unit_of_measurement: 'W' })),
+        'sensor.heat_kwh': st('12.3', io('alias.0.Salon.Heizung.CONSUMPTION', 'Salon Heizung CONSUMPTION', 'value.power.consumption', { unit_of_measurement: 'Wh' })),
+        'sensor.salon_t': st('17.2', io('alias.0.Salon.Temperatur.ACTUAL', 'Salontemperatur', 'value.temperature', { unit_of_measurement: '°C' })),
+    };
+    const hHass = { states: hs };
+    const heater: DeviceItem = { id: 'h', type: 'radiator', entity: 'switch.heat' };
+    assert.equal(autoRole(hHass, heater, 'power'), 'sensor.heat_w');
+    assert.equal(autoRole(hHass, heater, 'actual'), 'sensor.salon_t');
+    const calls: string[] = [];
+    const host: DeviceHost = {
+        hass: () => hHass,
+        building: () => ({ floors: [{ id: 'ud', furniture: [heater] }] }),
+        language: () => 'de',
+        callService: (d, s, data) => {
+            calls.push(`${d}.${s}:${String(data?.entity_id)}`);
+            return Promise.resolve();
+        },
+    };
+    type Card = { live: string; main: { text: string }; cells?: { value: string }[]; buttons: { label: string; on?: boolean; onTap(): void }[] };
+    let [card] = deviceCards(host) as Card[];
+    assert.equal(card.live, 'heizt');
+    assert.equal(card.main.text, '17,2 °C');
+    assert.equal(card.cells?.[0].value, '1.480 W');
+    const power = card.buttons.find(b => b.label === '⏻')!;
+    assert.equal(power.on, true);
+    power.onTap();
+    assert.deepEqual(calls, ['switch.turn_off:switch.heat']);
+    // on, but its thermostat holds: no power drawn
+    hs['sensor.heat_w'] = st('0', hs['sensor.heat_w'].attributes);
+    [card] = deviceCards(host) as Card[];
+    assert.equal(card.live, 'hält');
+    hs['switch.heat'] = st('off', hs['switch.heat'].attributes);
+    [card] = deviceCards(host) as Card[];
+    assert.equal(card.live, 'aus');
+    assert.equal(card.cells, undefined);
+});

@@ -330,6 +330,11 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Saugroboter: Chips „Raum saugen“ auf seiner Glaskarte, einer je Raum seiner Etage; der Knopf wird unter
   dem Roboter nach dem Raumnamen gefunden (z. B. rooms.Küche.roomClean bei mihome-vacuum) oder im Editor je Raum gewählt,
   der Raum, den er gerade saugt, leuchtet
+- (bluefox) Boot: Glaskarten für den Anker (Abstand zum Anker gegen den Alarmradius, Kette, Tiefe, Verhältnis
+  Kette : Tiefe mit Warnung unter 3 : 1, Ankeralarm) und für die Tanks (ein Balken je Tank mit Füllstand und Litern,
+  Warnung bei fast leeren Vorräten oder fast vollem Fäkalientank); je Anker/Tank im Editor abschaltbar
+- (bluefox) Heizung/Klima: auch eine elektrische Heizung an einer geschalteten Steckdose (Ein/Aus über die Steckdose,
+  „heizt“ nach ihrer Leistung, die Raumtemperatur aus demselben Raum)
 
 ### 0.4.0 (2026-11-15)
 
