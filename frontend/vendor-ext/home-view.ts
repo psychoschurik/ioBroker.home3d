@@ -7,6 +7,7 @@ import { RAIN_LOW, rainTankCapacity, rainTankFill, rainTankKind } from './rain-t
 import { mailBase, mailShape } from './mail-flag';
 import { frontRank, parcelWaits, ringAt } from './parcel';
 import { heatPumpDefrost, heatPumpRun } from './heat-pump';
+import { ebikeCharging, ebikeLevel } from './ebike';
 import { serverKind, serverLoad } from './server';
 import type {
     AirState,
@@ -17,6 +18,7 @@ import type {
     MailFlagState,
     ParcelState,
     HeatPumpState,
+    EbikeState,
     SmokeState,
     HazeState,
     BadgeState,
@@ -119,6 +121,9 @@ export interface FurnitureLike {
     server_kind?: string | null;
     /** A heat pump: the datapoint that tells it defrosts. */
     heat_pump_defrost?: string | null;
+    /** An e-bike: its charger (power or switch) and whether it is home (a tracker, a sensor). */
+    ebike_charge?: string | null;
+    ebike_presence?: string | null;
     /** The model's variant (a mailbox's shape …). */
     variant?: string | null;
     /** A boat's gear: the sensor of a hatch, a tank … */
@@ -239,6 +244,11 @@ export function homeWatched(
             if (x.type === 'heat_pump') {
                 add(x.entity);
                 add(x.heat_pump_defrost);
+            }
+            if (x.type === 'ebike') {
+                add(x.entity);
+                add(x.ebike_charge);
+                add(x.ebike_presence);
             }
         }
         for (const r of f.rooms) {
@@ -434,6 +444,7 @@ export function homeScene(input: HomeInput): HomeOutput {
     const servers: ServerState[] = [];
     const mailFlags: MailFlagState[] = [];
     const heatPumps: HeatPumpState[] = [];
+    const ebikes: EbikeState[] = [];
     const sounds: SoundState[] = [];
     const streams: StreamState[] = [];
     const sprinklers: HomeScene['sprinklers'] = [];
@@ -736,6 +747,37 @@ export function homeScene(input: HomeInput): HomeOutput {
                     h: f.h,
                     up: !!input.mailPost?.(f),
                 });
+            } else if (f.type === 'ebike') {
+                // gone while it is out (by its presence datapoint); its charge on the battery, the charger while it charges
+                const linked = (id: string | null | undefined): StateLike | null =>
+                    id && id !== 'none' ? (hass.states[id] ?? null) : null;
+                const presence = linked(f.ebike_presence);
+                const away = !!f.ebike_presence && f.ebike_presence !== 'none' && !carPresent(presence ?? undefined);
+                const level = ebikeLevel(linked(f.entity));
+                const charging = ebikeCharging(linked(f.ebike_charge));
+                const inRoom = floor.rooms.some(r => r.points.length >= 3 && pointIn([f.x, f.z], r.points));
+                if (!away) {
+                    ebikes.push({
+                        id: f.id,
+                        floor: floor.id,
+                        x: f.x,
+                        z: f.z,
+                        y: inRoom ? (f.mount_y ?? 0) : groundAt(f.x, f.z),
+                        angle: rad(f.rotation ?? 0),
+                        w: f.w,
+                        d: f.d,
+                        h: f.h,
+                        level,
+                        charging,
+                        label:
+                            level === null
+                                ? charging
+                                    ? '🔌'
+                                    : ''
+                                : `${charging ? '🔌' : '🔋'} ${Math.round(level)} %`,
+                        low: level !== null && level <= 20 && !charging,
+                    });
+                }
             } else if (f.type === 'heat_pump') {
                 // on the ground; its fan from its power or switch, steam while it defrosts
                 const linked = (id: string | null | undefined): StateLike | null =>
@@ -994,6 +1036,7 @@ export function homeScene(input: HomeInput): HomeOutput {
             servers,
             mailFlags,
             heatPumps,
+            ebikes,
             parcels: parcelAtDoor(input, hass, b, now),
             glow,
         },

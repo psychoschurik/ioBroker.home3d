@@ -3114,6 +3114,137 @@ function tapMore(name: string, code: string): string {
 }
 
 /**
+ * E-bike (ebike.ts, home-view.ts, home-fx.ts): a new piece under vehicles, drawn by the home looks; the five LEDs on its
+ * battery show its charge, the charger stands beside it with its cable while it charges (the next LED blinks), and with
+ * a presence datapoint it is gone while it is out.
+ */
+function ebikeMore(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "heat_pump",\n] as const;',
+            '  "heat_pump",\n  "ebike",\n] as const;',
+            'e-bike: furniture type',
+        );
+        code = replaceRequired(
+            code,
+            '  vehicles: ["parking",',
+            '  vehicles: ["parking", "ebike",',
+            'e-bike: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  heat_pump: [1.0, 0.4, 0.85],',
+            '  heat_pump: [1.0, 0.4, 0.85],\n  // an e-bike: its length, the handlebar, its height\n  ebike: [1.8, 0.62, 1.1],',
+            'e-bike: size',
+        );
+        code = replaceRequired(
+            code,
+            '  heat_pump_defrost?: string | null;',
+            '  heat_pump_defrost?: string | null;\n  /** An e-bike: its charger (power or switch) and whether it is home (a tracker, a sensor). */\n  ebike_charge?: string | null;\n  ebike_presence?: string | null;',
+            'e-bike: fields',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  heat_pump: ["outdoor", ["garden", "utility"]],',
+            '  heat_pump: ["outdoor", ["garden", "utility"]],\n  ebike: ["vehicle", ["garage", "garden"]],',
+            'e-bike: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "heat_pump":',
+            [
+                '    case "ebike":',
+                '      // the two wheels and the frame between them, the handlebar across',
+                '      return [ellipse(-w * 0.31, 0, w * 0.18, Math.min(0.04, d * 0.1)), ellipse(w * 0.31, 0, w * 0.18, Math.min(0.04, d * 0.1)), line(-w * 0.31, 0, w * 0.31, 0), line(w * 0.22, -d * 0.45, w * 0.22, d * 0.45)];',
+                '    case "heat_pump":',
+            ].join('\n'),
+            'e-bike: symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "heat_pump":\n    case "server":\n',
+            '    case "ebike":\n    case "heat_pump":\n    case "server":\n',
+            'e-bike: drawn by the home looks',
+        );
+    }
+    if (name === 'viewer/preview.ts') {
+        code = `import { buildEbike as fp3dPrevEbike } from "${root}/frontend/vendor-ext/ebike.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '              ? fp3dPrevHeatPump(item.w, item.d, item.h)\n              : null;',
+            '              ? fp3dPrevHeatPump(item.w, item.d, item.h)\n              : item.type === "ebike"\n                ? fp3dPrevEbike(item.w, item.d, item.h)\n                : null;',
+            'e-bike: library picture',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_ebike: 'E-Bike',
+            ebike_entity: 'Akkustand (%)',
+            ebike_charge: 'Ladegerät (Leistung oder Schalter)',
+            ebike_presence: 'Anwesenheit (zuhause)',
+            ebike_hint:
+                'Die fünf LEDs am Akku zeigen den Ladestand (rot bis 20 %, gelb bis zur Hälfte, dann grün), über dem Rad stehen die Prozent. Zieht das Ladegerät Leistung (ab 5 W) oder ist sein Schalter an, steht es mit Kabel neben dem Rad und die nächste LED blinkt. Mit einem Datenpunkt für die Anwesenheit ist das Rad weg, solange es unterwegs ist.',
+        };
+        const en: Record<string, string> = {
+            furn_ebike: 'E-bike',
+            ebike_entity: 'Battery level (%)',
+            ebike_charge: 'Charger (power or switch)',
+            ebike_presence: 'Presence (home)',
+            ebike_hint:
+                'The five LEDs on the battery show its charge (red up to 20 %, amber up to half, then green), the percent stand over the bike. While the charger draws power (from 5 W) or its switch is on, it stands beside the bike with its cable and the next LED blinks. With a presence datapoint the bike is gone while it is out.',
+        };
+        const lines = (t: Record<string, string>): string =>
+            Object.entries(t)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Mülltonne",',
+            `  furn_waste_bin: "Mülltonne",${lines(de)}`,
+            'e-bike de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_waste_bin: "Waste bin",',
+            `  furn_waste_bin: "Waste bin",${lines(en)}`,
+            'e-bike en',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '"server", "bin_spot", "heat_pump"]);',
+            '"server", "bin_spot", "heat_pump", "ebike"]);',
+            'e-bike: no state links',
+        );
+        code = replaceRequired(
+            code,
+            '    if (f.type === "heat_pump")\n',
+            [
+                '    if (f.type === "ebike")',
+                '      return html`<div class="fp3d-form fp3d-links">',
+                '        ${this.entitySelect(this.t("ebike_entity" as I18nKey), f.entity ?? null, undefined, this.entityOptions((id) => /^(sensor|input_number|number)\\./.test(id)), (v) => set({ entity: pick(v) }))}',
+                '        ${this.entitySelect(this.t("ebike_charge" as I18nKey), f.ebike_charge ?? null, undefined, this.entityOptions((id) => /^(switch|sensor|binary_sensor|input_boolean)\\./.test(id)), (v) => set({ ebike_charge: pick(v) }))}',
+                '        ${this.entitySelect(this.t("ebike_presence" as I18nKey), f.ebike_presence ?? null, undefined, this.entityOptions((id) => /^(device_tracker|person|binary_sensor|sensor|input_boolean|switch)\\./.test(id)), (v) => set({ ebike_presence: pick(v) }))}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("ebike_hint" as I18nKey)}</p>',
+                '      </div>`;',
+                '    if (f.type === "heat_pump")',
+                '',
+            ].join('\n'),
+            'e-bike: form',
+        );
+    }
+    return code;
+}
+
+/**
  * Heat pump (heat-pump.ts, home-view.ts, home-fx.ts): the outdoor unit of a heat pump, drawn by the home looks; its fan
  * turns the faster the more power it draws (or steadily by its switch) and runs down when it stops; while its defrost
  * datapoint reports defrosting, the fan stands and steam rises from it. Also: the doorbells are watched, so the parcel
@@ -5318,6 +5449,7 @@ const patches: Plugin = {
         code = mailFlagMore(name, code);
         code = binsMore(name, code);
         code = heatPumpMore(name, code);
+        code = ebikeMore(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

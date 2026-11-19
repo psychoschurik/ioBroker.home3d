@@ -37,6 +37,7 @@ import { buildCoffeeMachine } from './kitchen';
 import { buildRainTank, type RainTankKind } from './rain-tank';
 import { buildParcel } from './parcel';
 import { buildHeatPump, type HeatPumpRun } from './heat-pump';
+import { buildEbike, ebikeColor, ebikeLit, EBIKE_LED_OFF } from './ebike';
 import { buildMailFlag, FLAG_DOWN, type MailShape } from './mail-flag';
 import { buildServer, LED_OFF, ledColor, ledLit, type ServerKind, type ServerLed, type ServerLoad } from './server';
 
@@ -245,6 +246,24 @@ export interface RainTankState {
     warn: boolean;
 }
 
+/** An e-bike while it is home: its battery's LEDs show the charge, the charger stands beside it while it charges. */
+export interface EbikeState {
+    id: string;
+    floor: string;
+    x: number;
+    z: number;
+    y: number;
+    /** Turn in the plan (rad, clockwise). */
+    angle: number;
+    w: number;
+    d: number;
+    h: number;
+    level: number | null;
+    charging: boolean;
+    label: string;
+    low: boolean;
+}
+
 /** The outdoor unit of a heat pump: its fan turns with its power, steam rises while it defrosts. */
 export interface HeatPumpState {
     id: string;
@@ -324,6 +343,7 @@ export interface HomeScene {
     mailFlags?: MailFlagState[];
     parcels?: ParcelState[];
     heatPumps?: HeatPumpState[];
+    ebikes?: EbikeState[];
     glow: GlowState | null;
 }
 
@@ -623,6 +643,8 @@ export class HomeFx {
     /** The LEDs of each server and the colour each shows now. */
     /** The arm of each mailbox's flag and how far up it stands (0 … 1); kept over a rebuild. */
     private mailFlags = new Map<string, { arm: Object3D; cur: number }>();
+    /** The battery LEDs and the charger of each e-bike, and the colour each LED shows now. */
+    private ebikes = new Map<string, { leds: Mesh[]; charger: Object3D; shown: number[] }>();
     /** The fans and the defrost steam of each heat pump. */
     private heatPumps = new Map<
         string,
@@ -654,7 +676,7 @@ export class HomeFx {
 
     /**
      * The piece of furniture drawn here (a car, a mower and its dock, a sprinkler, a coffee machine, a rainwater tank,
-     * a server, a mailbox's flag, a heat pump) under a ray: its id and how far
+     * a server, a mailbox's flag, a heat pump, an e-bike) under a ray: its id and how far
      * away it is; null: none, or only hidden ones.
      */
     furnitureAt(ray: Raycaster): { id: string; distance: number } | null {
@@ -733,6 +755,7 @@ export class HomeFx {
             (s.hazes ?? []).map(x => [x.id, x.floor, x.points, x.top, x.label]),
             (s.coffees ?? []).map(c => [c.id, c.floor, c.x, c.z, c.y, c.angle, c.w, c.d, c.h]),
             (s.servers ?? []).map(v => [v.id, v.floor, v.kind, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
+            (s.ebikes ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.w, v.d, v.h, v.label, v.low]),
             (s.heatPumps ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
             (s.parcels ?? []).map(v => [v.id, v.floor, v.x, v.z, v.y, v.angle, v.label]),
             (s.mailFlags ?? []).map(v => [v.id, v.floor, v.shape, v.x, v.z, v.y, v.angle, v.w, v.d, v.h]),
@@ -792,6 +815,23 @@ export class HomeFx {
                 m.add(label);
             }
             this.floorGroup(r.floor).add(m);
+        }
+        for (const v of s.ebikes ?? []) {
+            const m = buildEbike(v.w, v.d, v.h, this.light);
+            m.userData.fp3dFurniture = v.id;
+            m.position.set(v.x, v.y, v.z);
+            m.rotation.y = -v.angle;
+            if (v.label) {
+                const l = labelSprite(v.label, this.light, v.low ? 'warn' : null, 0.024);
+                l.position.set(0, v.h + 0.3, 0);
+                m.add(l);
+            }
+            this.floorGroup(v.floor).add(m);
+            this.ebikes.set(v.id, {
+                leds: m.userData.leds as Mesh[],
+                charger: m.userData.charger as Object3D,
+                shown: [],
+            });
         }
         for (const v of s.heatPumps ?? []) {
             const m = buildHeatPump(v.w, v.d, v.h, this.light);
@@ -1109,6 +1149,7 @@ export class HomeFx {
         this.steamParts.clear();
         this.serverLeds.clear();
         this.heatPumps.clear();
+        this.ebikes.clear();
         this.tips = [];
         if (all) {
             this.carIn.clear();
@@ -1236,6 +1277,28 @@ export class HomeFx {
             const k = e.cur * e.cur * (3 - 2 * e.cur);
             e.arm.rotation.x = FLAG_DOWN * (1 - k);
             moving ||= e.cur !== goal;
+        }
+        for (const v of s.ebikes ?? []) {
+            const e = this.ebikes.get(v.id);
+            if (!e) {
+                continue;
+            }
+            e.charger.visible = v.charging;
+            // the lit LEDs; while it charges the next one blinks (calm: lit)
+            const lit = ebikeLit(v.level);
+            const color = ebikeColor(v.level);
+            const next = v.charging && lit < e.leds.length ? lit : -1;
+            const on = calm || Math.floor(t * 1.5) % 2 === 0;
+            if (next >= 0 && !calm && shown(v.floor)) {
+                moving = true;
+            }
+            e.leds.forEach((led, k) => {
+                const c = k < lit ? color : k === next && on ? color : EBIKE_LED_OFF;
+                if (e.shown[k] !== c) {
+                    e.shown[k] = c;
+                    (led.material as MeshBasicMaterial).color.setHex(c);
+                }
+            });
         }
         for (const v of s.heatPumps ?? []) {
             const e = this.heatPumps.get(v.id);
