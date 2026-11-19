@@ -292,6 +292,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Die Details einer Kamera zeigen ihr Bild: ein Standbild wird jede Sekunde neu geholt, ein MJPEG-Stream läuft durch
 - (bluefox) Der Sichtbereich einer Kamera beginnt an ihrer Linse und fällt von dort auf den Boden, statt in einer anderen
   Höhe unter ihr auf dem Boden zu liegen
+- (bluefox) „Eigenes Symbol“ bietet jetzt gut 200 Symbole in Gruppen an (Licht, Haushaltsgeräte wie Spülmaschine und
+  Saugroboter, Klima, Wasser, Strom, Türen und Fenster, Sicherheit, Medien, Garten mit Bewässerung, Fahrzeuge mit
+  Fahrrad, Boot, Räume); alle erscheinen sofort, ohne den ganzen Symbolsatz nachzuladen
 
 ### 0.4.0 (2026-11-15)
 
