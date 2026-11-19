@@ -41,7 +41,11 @@ export function setupDeviceDialog({
         if (mode === 'single') {
             return;
         }
-        const ids = items.map(i => i.path).filter(id => !requested.has(id));
+        // a media player is no datapoint of its own: its value column shows its parts
+        const ids = items
+            .filter(i => !i.id.startsWith('media_player.'))
+            .map(i => i.path)
+            .filter(id => !requested.has(id));
         if (!ids.length) {
             return;
         }
@@ -95,11 +99,11 @@ export function setupDeviceDialog({
         const existing = new Set(mappings.map(m => m.entity_id));
         return candidates.map(c => ({
             id: c.entity_id,
-            path: c.state,
-            label: c.name || c.state,
+            path: c._meta?.path ?? c.state,
+            label: c._meta?.path ? `🎵 ${c.name || c.state}` : c.name || c.state,
             role: c._meta?.role,
             type: c._meta?.type,
-            value: values.get(c.state),
+            value: c._meta?.path ? c._meta.value : values.get(c.state),
             room: c.area_id,
             disabled: existing.has(c.entity_id),
         }));

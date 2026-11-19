@@ -18,6 +18,8 @@ export interface StateObject {
         min?: number;
         max?: number;
         unit?: string;
+        /** The texts of its values (e.g. 0: "pause", 1: "play"). */
+        states?: Record<string, string> | string | string[];
     };
 }
 export interface RoomObject {
@@ -85,6 +87,8 @@ export interface Mapping extends Binding {
         write: boolean;
         secret?: boolean;
         value: unknown;
+        /** Where the device tree shows it (a media player: below its device), missing: at its state. */
+        path?: string;
     };
 }
 /** ioBroker access of the browser. Everything is loaded on demand, never all states at once. */

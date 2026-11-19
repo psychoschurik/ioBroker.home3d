@@ -12,7 +12,8 @@ import type {
     ProtocolMessage,
     ProtocolRecord,
 } from './model.js';
-import { validateMappings, discover, execute, nameOf } from './entities.js';
+import { validateMappings, discover, execute, nameOf, hash } from './entities.js';
+import { mediaBases, mediaCandidates } from './media.js';
 import { freeEntityId, plainMapping, projectFile, readProject, renamed, usedBy } from './project.js';
 import { t } from './lang.js';
 
@@ -420,8 +421,17 @@ export class Store {
         switch (type) {
             case 'iobroker/mappings/get':
                 return this.data.mappings;
-            case 'iobroker/discover':
-                return discover(await this.io.stateObjects(), await this.io.rooms());
+            case 'iobroker/discover': {
+                const objects = await this.io.stateObjects();
+                const rooms = await this.io.rooms();
+                // media players first, as one device each with all their actions; their devices only for the names
+                const bases = mediaBases(objects).slice(0, 400);
+                const devices = bases.length ? await this.io.getObjects(bases) : {};
+                return [
+                    ...mediaCandidates(objects, rooms, devices, base => `media_player.${hash(base)}`, nameOf),
+                    ...discover(objects, rooms),
+                ];
+            }
             case 'iobroker/mappings/set': {
                 const ids = Array.isArray(m.mappings) ? mappedIds(m.mappings as Mapping[]) : [];
                 this.data.mappings = validateMappings(m.mappings, await this.io.getObjects(ids));

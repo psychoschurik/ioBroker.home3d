@@ -385,4 +385,4 @@ export function withDatapoint(m: Mapping, to: string, obj: StateObject | undefin
     return { ...next, attributes };
 }
 
-export { validateMappings, entities, discover, execute, nameOf };
+export { validateMappings, entities, discover, execute, nameOf, hash };

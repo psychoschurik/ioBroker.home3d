@@ -230,6 +230,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Speicher: neues Möbelstück „Speicher (Warmwasser / Puffer)“. Ein Fenster in der Hülle zeigt die Wasserschichten
   nach Temperatur (blau bis rot) aus den Fühlern oben, Mitte und unten, darüber „🌡 62° · 31°“; solange geheizt wird,
   brennt unten eine Flamme
+- (bluefox) Mediaplayer in „Geräte verbinden“: ein Gerät mit den Rollen eines Players (YouTube-Remote, Alexa, Spotify,
+  Cast, TV …) erscheint als ein Eintrag „🎵 Name“ unter seinem Gerät und wird mit allen Aktionen verbunden – Play/Pause,
+  vor/zurück, Lautstärke, Stumm, Ein/Aus, dazu Titel, Interpret und Cover
 - (bluefox) Nebel auch aus der Sichtweite oder daraus, wie nah die Temperatur am Taupunkt ist
 - (bluefox) Luftdruck (Sensor oder Wetter-Entität): fällt er in 3 Stunden um 3 hPa oder mehr, erscheint eine Warnung, ab
   6 hPa eine Sturmwarnung, und der Himmel wird dunkler
