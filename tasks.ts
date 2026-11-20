@@ -3108,6 +3108,1328 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
 }
 
 /**
+ * Furniture of the house the 3D frontend did not have (frontend/vendor-ext/house-items.ts): a spiral stair (it cuts a
+ * round opening into the floor above), a wood stove, a chimney and a sauna cabin. And a tank for heating oil: the
+ * boat's tank with the kind "oil", offered in the library's section "Heizung" (a library entry may preset fields of
+ * the item it places).
+ */
+function houseItems(name: string, code: string): string {
+    const items = `${root}/frontend/vendor-ext/house-items.ts`;
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  "water_heater",\n',
+            '  "water_heater",\n  "stairs_spiral",\n  "fireplace",\n  "chimney",\n  "sauna",\n  "railing",\n  "stairs_outdoor",\n  "light_well",\n',
+            'house items: types',
+        );
+        code = replaceRequired(
+            code,
+            '"stairs", "stairs_u", "robot_vacuum"]',
+            '"stairs", "stairs_u", "stairs_spiral", "railing", "fireplace", "chimney", "sauna", "robot_vacuum"]',
+            'house items: library group',
+        );
+        code = replaceRequired(
+            code,
+            '"sprinkler", "tree", "tree_conifer",',
+            '"sprinkler", "stairs_outdoor", "light_well", "tree", "tree_conifer",',
+            'house items: outdoor group',
+        );
+        code = replaceRequired(
+            code,
+            '  water_heater: [0.56, 0.56, 1.5],',
+            [
+                '  water_heater: [0.56, 0.56, 1.5],',
+                '  // a spiral stair (its height reaches the next floor when placed), a wood stove with its flue pipe, a chimney, a sauna cabin',
+                '  stairs_spiral: [1.6, 1.6, 2.75],',
+                '  fireplace: [0.6, 0.5, 2.4],',
+                '  chimney: [0.5, 0.5, 3],',
+                '  sauna: [2, 1.8, 2.05],',
+                '  // a railing (its length, thickness, height), steps of stone outside, a light well in front of a cellar window',
+                '  railing: [1.2, 0.05, 1],',
+                '  stairs_outdoor: [1.4, 1.6, 0.8],',
+                '  light_well: [1.2, 0.6, 1],',
+            ].join('\n'),
+            'house items: sizes',
+        );
+        code = replaceRequired(
+            code,
+            'export const STAIR_TYPES = new Set<string>(["stairs", "stairs_u"]);',
+            'export const STAIR_TYPES = new Set<string>(["stairs", "stairs_u", "stairs_spiral"]);',
+            'house items: spiral stair is a stair',
+        );
+    }
+    if (name === 'packs.ts') {
+        code = replaceRequired(
+            code,
+            '  if (f.mount_y != null) return f.mount_y;\n',
+            '  if (f.mount_y != null) return f.mount_y;\n  // a light well goes down from the ground to the floor in front of its window: it stands on the floor, not on the lawn\n  if (f.type === "light_well") return 0;\n',
+            'house items: light well on the floor',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '  stairs_u: ["stairs", ["hall", "living"]],',
+            '  stairs_u: ["stairs", ["hall", "living"]],\n  stairs_spiral: ["stairs", ["hall", "living"]],\n  railing: ["stairs", ["hall", "living", "garden"]],\n  stairs_outdoor: ["outdoor", ["garden"]],\n  light_well: ["outdoor", ["garden"]],',
+            'house items: spiral stair in the index',
+        );
+        code = replaceRequired(
+            code,
+            '  water_heater: ["heating", ["utility", "bath", "garage"]],',
+            [
+                '  water_heater: ["heating", ["utility", "bath", "garage"]],',
+                '  fireplace: ["heating", ["living"]],',
+                '  chimney: ["architecture", []],',
+                '  sauna: ["bath", ["bath", "hobby"]],',
+            ].join('\n'),
+            'house items: index',
+        );
+        code = replaceRequired(
+            code,
+            '  /** Placed mirrored (the twin of an item that comes left-handed only: the corner sofa for the other side). */\n  mirror?: boolean;',
+            "  /** Placed mirrored (the twin of an item that comes left-handed only: the corner sofa for the other side). */\n  mirror?: boolean;\n  /** Fields set on the placed item (the oil tank: the boat's tank holding heating oil, in its size). */\n  preset?: Record<string, unknown>;",
+            'house items: entry preset',
+        );
+        code = replaceRequired(
+            code,
+            '    if (!e.family) e.family = e.type;\n  }\n  return out;\n}',
+            [
+                '    if (!e.family) e.family = e.type;',
+                '  }',
+                "  // the boat's tank for heating oil, in the house's section of heating",
+                '  const tank = out.find((e) => e.type === "tank" && !e.mirror);',
+                '  if (tank) {',
+                '    const label = src.basicName("tank_oil");',
+                '    out.push({',
+                '      ...tank,',
+                '      key: "tank#oil",',
+                '      label,',
+                '      search: `${label} ${src.basicNameEn("tank_oil")} heizöl öltank tank ${src.kindName("heating")} ${KIND_WORDS.heating}`,',
+                '      kind: "heating",',
+                '      rooms: ["utility", "garage"],',
+                '      size: [0.72, 1.6, 1.55],',
+                '      preset: { gear_kind: "oil", w: 0.72, d: 1.6, h: 1.55 },',
+                '    });',
+                '  }',
+                '  return out;',
+                '}',
+            ].join('\n'),
+            'house items: oil tank entry',
+        );
+    }
+    if (name === 'components/library.ts') {
+        code = replaceRequired(
+            code,
+            'detail: { type: entry.type, mirror: !!entry.mirror }',
+            'detail: { type: entry.type, mirror: !!entry.mirror, preset: entry.preset ?? null }',
+            'house items: preset to the editor',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '@library-add=${(e: CustomEvent<{ type: string; mirror?: boolean }>) => this.addFurniture(e.detail.type, !!e.detail.mirror)}',
+            '@library-add=${(e: CustomEvent<{ type: string; mirror?: boolean; preset?: Partial<Furniture> | null }>) => this.addFurniture(e.detail.type, !!e.detail.mirror, e.detail.preset ?? null)}',
+            'house items: preset placed',
+        );
+        code = replaceRequired(
+            code,
+            '  private addFurniture(type: string, mirror = false): void {',
+            '  private addFurniture(type: string, mirror = false, preset: Partial<Furniture> | null = null): void {',
+            'house items: preset argument',
+        );
+        code = replaceRequired(
+            code,
+            '...(mirror ? { mirror: true } : {}) };\n    this.change((_, f) => f.furniture.push(item));',
+            '...(mirror ? { mirror: true } : {}), ...(preset ?? {}) };\n    this.change((_, f) => f.furniture.push(item));',
+            'house items: preset fields',
+        );
+        // the plan symbol of the outdoor steps counts its steps by the height
+        code = replaceRequired(
+            code,
+            '<g class="fp3d-furn-sym">${furnitureSymbol(f.type, f.w, f.d)}</g>',
+            '<g class="fp3d-furn-sym">${furnitureSymbol(f.type, f.w, f.d, f.h)}</g>',
+            'house items: symbol height',
+        );
+    }
+    if (name === 'viewer/outdoor.ts') {
+        code = `import { wellHoles as fp3dWellHoles } from "${items}";\nimport { furnitureFootprint as fp3dFootprint } from "../model.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '        const holes = outdoorHoles(areas, index);\n',
+            [
+                '        const holes = outdoorHoles(areas, index);',
+                '        // light wells in front of cellar windows cut their holes into the lawn or path around them (house-items.ts)',
+                '        if (!outdoorStanding(a.type)) holes.push(...fp3dWellHoles(floor.furniture, a.points, fp3dFootprint).map((h) => ccw(h)));',
+                '',
+            ].join('\n'),
+            'house items: light well holes',
+        );
+    }
+    if (name === 'viewer/build.ts') {
+        code = `import { spiralHole as fp3dSpiralHole } from "${items}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '      if (f.type === "stairs_u") return uStairHole(f);',
+            '      if (f.type === "stairs_u") return uStairHole(f);\n      if (f.type === "stairs_spiral") return [fp3dSpiralHole(f)];',
+            'house items: round stair opening',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = `import { chimney as fp3dChimney, HOUSE_NATURAL as FP3D_HOUSE_NATURAL, HOUSE_NEON as FP3D_HOUSE_NEON, lightWell as fp3dLightWell, outdoorSteps as fp3dOutdoorSteps, railing as fp3dRailing, sauna as fp3dSauna, spiralStairs as fp3dSpiralStairs, woodStove as fp3dWoodStove } from "${items}";\n${code}`;
+        code = replaceRequired(
+            code,
+            'const EDGE_GLOW = shade(0x37e0ff, 0.45);',
+            'const EDGE_GLOW = shade(0x37e0ff, 0.45);\n/** The house items (house-items.ts): their own colours and the furniture outlines. */\nconst FP3D_HC = palette(FP3D_HOUSE_NEON, FP3D_HOUSE_NATURAL);\nconst FP3D_EDGES = { furn: EDGE_FURN, faint: EDGE_FAINT, glow: EDGE_GLOW };',
+            'house items: colours',
+        );
+        code = replaceRequired(
+            code,
+            '  /** Vertical cylinder with `n` sides. */\n',
+            [
+                '  /** An upright prism over a polygon in local coordinates (the treads of a spiral stair). */',
+                '  prism(pts: Vec2[], y0: number, y1: number, side: number, top = side, edges: Color | null = null): void {',
+                '    if (y1 - y0 < 1e-4 || pts.length < 3) return;',
+                '    const poly = pts.map(([x, z]) => this.tf(x, z));',
+                '    pushPrism(this.buf, ccw(poly), y0, y1, side, top, { aoFrom: 0, bottom: y0 > 0.05 });',
+                '    if (edges) this.outline(poly, y0, y1, edges);',
+                '  }',
+                '',
+                '  /** Vertical cylinder with `n` sides. */',
+                '',
+            ].join('\n'),
+            'house items: prism',
+        );
+        code = replaceRequired(
+            code,
+            '    case "stairs_u":\n      stairsU(b, w, d, h);\n      break;',
+            [
+                '    case "stairs_u":',
+                '      stairsU(b, w, d, h);',
+                '      break;',
+                '    case "stairs_spiral":',
+                '      fp3dSpiralStairs(b, C, FP3D_EDGES, w, d, h);',
+                '      break;',
+                '    case "fireplace":',
+                '      fp3dWoodStove(b, C, FP3D_HC, FP3D_EDGES, w, d, h);',
+                '      break;',
+                '    case "chimney":',
+                '      fp3dChimney(b, FP3D_HC, FP3D_EDGES, w, d, h);',
+                '      break;',
+                '    case "sauna":',
+                '      fp3dSauna(b, C, FP3D_HC, FP3D_EDGES, w, d, h);',
+                '      break;',
+                '    case "railing":',
+                '      fp3dRailing(b, C, FP3D_EDGES, w, d, h);',
+                '      break;',
+                '    case "stairs_outdoor":',
+                '      fp3dOutdoorSteps(b, FP3D_HC, FP3D_EDGES, w, d, h);',
+                '      break;',
+                '    case "light_well":',
+                '      fp3dLightWell(b, C, FP3D_HC, FP3D_EDGES, w, d, h);',
+                '      break;',
+            ].join('\n'),
+            'house items: drawn',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            'export function furnitureSymbol(type: string, w: number, d: number): Part[] | typeof nothing {',
+            'export function furnitureSymbol(type: string, w: number, d: number, h = 0): Part[] | typeof nothing {',
+            'house items: symbol height argument',
+        );
+        code = `import { houseSymbol as fp3dHouseSymbol } from "${items}";
+${code}`;
+        code = replaceRequired(
+            code,
+            '    case "stairs_u": {\n',
+            [
+                '    case "stairs_spiral": {',
+                '      // the round stair: its outline, the pole, the treads as spokes and an arrow up along the walking line',
+                '      const r = Math.min(w, d) / 2;',
+                '      const n = 14;',
+                '      const step = (2 * Math.PI) / (n + 1);',
+                '      const at = (rr: number, a: number): [number, number] => [Math.sin(a) * rr, Math.cos(a) * rr];',
+                '      const out: Part[] = [circle(0, 0, r, "fp3d-sym-strong"), circle(0, 0, Math.min(0.06, r * 0.12), "fp3d-sym-fill")];',
+                '      for (let i = 0; i <= n; i++) out.push(line(0, 0, ...at(r, step * i)));',
+                '      const rw = r * 0.62;',
+                '      const end = step * (n - 0.5);',
+                '      for (let i = 0; i < 24; i++) out.push(line(...at(rw, step / 2 + ((end - step / 2) * i) / 24), ...at(rw, step / 2 + ((end - step / 2) * (i + 1)) / 24), "fp3d-sym-strong"));',
+                '      const [tx, tz] = at(rw, end);',
+                '      const [ux, uz] = [Math.cos(end), -Math.sin(end)];',
+                '      const [nx, nz] = [Math.sin(end), Math.cos(end)];',
+                '      out.push(line(tx - ux * 0.16 + nx * 0.1, tz - uz * 0.16 + nz * 0.1, tx, tz, "fp3d-sym-strong"), line(tx - ux * 0.16 - nx * 0.1, tz - uz * 0.16 - nz * 0.1, tx, tz, "fp3d-sym-strong"));',
+                '      return out;',
+                '    }',
+                '    case "fireplace":',
+                '      // a wood stove: its body, the glass door at the front and the flue pipe',
+                '      return [rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"), line(-w * 0.36, d / 2 - 0.03, w * 0.36, d / 2 - 0.03, "fp3d-sym-strong"), circle(0, -d * 0.1, Math.min(0.075, w * 0.15))];',
+                '    case "chimney":',
+                '      // a chimney: the stack and its flue',
+                '      return [rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"), rect(-w * 0.2, -d * 0.2, w * 0.2, d * 0.2, "fp3d-sym-fill")];',
+                '    case "sauna": {',
+                '      // a sauna: its walls, the benches along the back, the stove in the front right corner, the door on the left',
+                '      const t = 0.06;',
+                '      const zu = Math.min(-d / 2 + t + 0.6, d / 2 - t - 0.3);',
+                '      const zl = Math.max(zu, Math.min(-d / 2 + t + 1.1, d / 2 - t - 0.55));',
+                '      const doorW = Math.max(0.4, Math.min(0.7, w - 0.5));',
+                '      const dx0 = -w / 2 + Math.min(0.2, (w - doorW) / 3);',
+                '      return [',
+                '        rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"),',
+                '        rect(-w / 2 + t, -d / 2 + t, w / 2 - t, d / 2 - t),',
+                '        line(-w / 2 + t, zu, w / 2 - t, zu),',
+                '        line(-w / 2 + t, zl, w / 2 - t, zl),',
+                '        rect(w / 2 - t - 0.45, d / 2 - t - 0.42, w / 2 - t - 0.05, d / 2 - t - 0.06, "fp3d-sym-fill"),',
+                '        line(dx0, d / 2, dx0 + doorW, d / 2, "fp3d-sym-fill"),',
+                '      ];',
+                '    }',
+                '    case "railing":',
+                '    case "stairs_outdoor":',
+                '    case "light_well":',
+                '      return fp3dHouseSymbol(type, w, d, h, { rect, line }) ?? nothing;',
+                '    case "stairs_u": {',
+                '',
+            ].join('\n'),
+            'house items: symbols',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  furn_stairs_u: "U-Treppe mit Podest",',
+            [
+                '  furn_stairs_u: "U-Treppe mit Podest",',
+                '  furn_stairs_spiral: "Wendeltreppe",',
+                '  furn_fireplace: "Kaminofen",',
+                '  furn_chimney: "Schornstein",',
+                '  furn_sauna: "Sauna",',
+                '  furn_tank_oil: "Öltank",',
+                '  gear_tank_oil: "Heizöl",',
+                '  furn_railing: "Geländer",',
+                '  furn_stairs_outdoor: "Außentreppe",',
+                '  furn_light_well: "Lichtschacht",',
+            ].join('\n'),
+            'house items: de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_stairs_u: "U-stair with landing",',
+            [
+                '  furn_stairs_u: "U-stair with landing",',
+                '  furn_stairs_spiral: "Spiral staircase",',
+                '  furn_fireplace: "Wood stove",',
+                '  furn_chimney: "Chimney",',
+                '  furn_sauna: "Sauna",',
+                '  furn_tank_oil: "Oil tank",',
+                '  gear_tank_oil: "Heating oil",',
+                '  furn_railing: "Railing",',
+                '  furn_stairs_outdoor: "Outdoor steps",',
+                '  furn_light_well: "Light well",',
+            ].join('\n'),
+            'house items: en',
+        );
+    }
+    return code;
+}
+
+/**
+ * An area outside that lies above the ground (a raised terrace, a plateau on a hill, a raised bed) is filled down to
+ * the ground instead of floating as a slab: its block reaches from the ground (or from its lowest point, if that lies
+ * deeper) to its top. On a hill, a flat plateau beside a sloping bank then reads as earth, not as a shelf.
+ */
+function groundFill(name: string, code: string): string {
+    if (name === 'viewer/outdoor.ts') {
+        code = replaceRequired(
+            code,
+            'import { areaGround, bounds, centroid, gateSpans, groundDrop, isAxisRect,',
+            'import { areaGround, bounds, centroid, gateSpans, groundDrop, groundLevel, isAxisRect,',
+            'fill: import',
+        );
+        code = replaceRequired(
+            code,
+            [
+                '        const holes = outdoorHoles(areas, index);',
+                '        pushPrism(buf, poly, lowest, a.slope ? topAt : g + look.top, look.side, look.color, { aoFrom: lowest, holes });',
+            ].join('\n'),
+            [
+                '        const holes = outdoorHoles(areas, index);',
+                '        // above the ground it is filled down to it (a raised terrace, a plateau on a hill), not a floating slab',
+                '        const base = Math.min(lowest, groundLevel(floor));',
+                '        pushPrism(buf, poly, base, a.slope ? topAt : g + look.top, look.side, look.color, { aoFrom: base, holes });',
+            ].join('\n'),
+            'fill: down to the ground',
+        );
+    }
+    return code;
+}
+
+/**
+ * A balcony's railing only where the deck would drop (rail-spans.ts): not where a garden on the hill reaches up to it
+ * (an area of a lower floor at the deck's level), nor where a terrace, another balcony or a room continues it.
+ */
+function balconyRails(name: string, code: string): string {
+    const rails = `${root}/frontend/vendor-ext/rail-spans.ts`;
+    if (name === 'viewer/outdoor.ts') {
+        code = [
+            `import { railSpans as fp3dRailSpans } from "${rails}";`,
+            'import { outdoorTopAt as fp3dOutdoorTopAt } from "../model.ts";',
+            code,
+        ].join('\n');
+        code = replaceRequired(
+            code,
+            'const GATE_SIDE = 0x31467d;',
+            [
+                '/** The model behind the railing check: the top of an area, and which areas stand (hedge, fence). */',
+                'const FP3D_RAIL_MODEL = {',
+                '  topAt: (fl: unknown, o: unknown, x: number, z: number) => fp3dOutdoorTopAt(fl as Floor, o as OutdoorArea, x, z),',
+                '  standing: (type: string) => outdoorStanding(type as OutdoorType),',
+                '};',
+                '',
+                'const GATE_SIDE = 0x31467d;',
+            ].join('\n'),
+            'rails: model',
+        );
+        code = replaceRequired(
+            code,
+            [
+                '          if (againstWall(floor, p, q)) continue;',
+                '          const len = Math.hypot(q[0] - p[0], q[1] - p[1]);',
+                '          const y0 = g + look.top;',
+                '          lines.seg([p[0], y0 + rail, p[1]], [q[0], y0 + rail, q[1]], top, ALWAYS);',
+                '          lines.seg([p[0], y0 + 0.1, p[1]], [q[0], y0 + 0.1, q[1]], bar, ALWAYS);',
+                '          // bars every 12 cm, posts at the ends',
+                '          const n = Math.max(1, Math.round(len / 0.12));',
+                '          for (let k = 0; k <= n; k++) {',
+                '            const t = k / n;',
+                '            const x = p[0] + (q[0] - p[0]) * t;',
+                '            const z = p[1] + (q[1] - p[1]) * t;',
+                '            lines.seg([x, y0, z], [x, y0 + rail, z], k === 0 || k === n ? top : bar, ALWAYS);',
+                '          }',
+                '        }',
+            ].join('\n'),
+            [
+                '          if (againstWall(floor, p, q)) continue;',
+                '          const y0 = g + look.top;',
+                '          // only the parts where the deck would drop: none where a garden on the hill reaches up to it',
+                '          for (const [t0, t1] of fp3dRailSpans(floor, a, p, q, y0, FP3D_RAIL_MODEL)) {',
+                '            const pa: Vec2 = [p[0] + (q[0] - p[0]) * t0, p[1] + (q[1] - p[1]) * t0];',
+                '            const qa: Vec2 = [p[0] + (q[0] - p[0]) * t1, p[1] + (q[1] - p[1]) * t1];',
+                '            const len = Math.hypot(qa[0] - pa[0], qa[1] - pa[1]);',
+                '            lines.seg([pa[0], y0 + rail, pa[1]], [qa[0], y0 + rail, qa[1]], top, ALWAYS);',
+                '            lines.seg([pa[0], y0 + 0.1, pa[1]], [qa[0], y0 + 0.1, qa[1]], bar, ALWAYS);',
+                '            // bars every 12 cm, posts at the ends',
+                '            const n = Math.max(1, Math.round(len / 0.12));',
+                '            for (let k = 0; k <= n; k++) {',
+                '              const t = k / n;',
+                '              const x = pa[0] + (qa[0] - pa[0]) * t;',
+                '              const z = pa[1] + (qa[1] - pa[1]) * t;',
+                '              lines.seg([x, y0, z], [x, y0 + rail, z], k === 0 || k === n ? top : bar, ALWAYS);',
+                '            }',
+                '          }',
+                '        }',
+            ].join('\n'),
+            'rails: only where it drops',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { setRailFloors as fp3dSetRailFloors } from "${rails}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '      const geo = buildFloorGeometry(withVehicles(floor, this.parked),',
+            '      fp3dSetRailFloors(b.floors);\n      const geo = buildFloorGeometry(withVehicles(floor, this.parked),',
+            'rails: floors',
+        );
+    }
+    return code;
+}
+
+/**
+ * A window or door glazed up under the roof (gable-glass.ts, "Bis unters Dach verglast"): in a wall under the roof a
+ * transom over the opening and fixed glass above it up to the slope, the wall left out there – the gable window that
+ * follows the roof.
+ */
+function gableGlass(name: string, code: string): string {
+    const glass = `${root}/frontend/vendor-ext/gable-glass.ts`;
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  top_hung?: boolean;\n',
+            '  top_hung?: boolean;\n  /** Glazed up under the roof: a transom over it, fixed glass up to the slope (a wall under the roof only). */\n  to_roof?: boolean;\n',
+            'gable glass: model',
+        );
+    }
+    if (name === 'viewer/build.ts') {
+        code = `import { glazedTops as fp3dGlazedTops, roofTops as fp3dRoofTops } from "${glass}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  hingeAtStart: boolean;\n  exterior: boolean;\n}',
+            "  hingeAtStart: boolean;\n  exterior: boolean;\n  /** Glazed up under the roof: the roof's height (less a gap) at evenly spaced points from its start to its end. */\n  roof_tops?: number[] | null;\n}",
+            'gable glass: info',
+        );
+        code = replaceRequired(
+            code,
+            '    const sill = Math.max(0, Math.min(o.sill + fp3dLift, top - 0.1));\n',
+            [
+                '    const sill = Math.max(0, Math.min(o.sill + fp3dLift, top - 0.1));',
+                '    // glazed up under the roof: the roof over the opening, where it leaves room for glass above it',
+                '    const fp3dTops =',
+                '      o.to_roof && (o.type === "window" || o.type === "door") && (roofUnder || wall.slope)',
+                '        ? fp3dGlazedTops(fp3dRoofTops(width, (k) => topAt(wall.a[0] + ax[0] * (s0 + k), wall.a[1] + ax[1] * (s0 + k), wallHeight(wall, floor.height), wall) - 0.02), top)',
+                '        : null;',
+                '',
+            ].join('\n'),
+            'gable glass: tops',
+        );
+        code = replaceRequired(
+            code,
+            '      exterior: wall.exterior || freeLeft !== undefined,\n',
+            '      exterior: wall.exterior || freeLeft !== undefined,\n      roof_tops: fp3dTops,\n',
+            'gable glass: info tops',
+        );
+        code = replaceRequired(
+            code,
+            '    list.push({ s0, s1: s0 + width, sill, top, info });',
+            '    // glazed up to the roof: no wall over the opening\n    list.push({ s0, s1: s0 + width, sill, top: fp3dTops ? Math.max(...fp3dTops) + 0.05 : top, info });',
+            'gable glass: span',
+        );
+        code = replaceRequired(
+            code,
+            '  const bottom = Math.max(sp.sill, 0.004);\n',
+            [
+                '  const bottom = Math.max(sp.sill, 0.004);',
+                '  // glazed up under the roof: the jambs reach the slope, the top edge follows it',
+                '  const fp3dTops = info.roof_tops;',
+                '  if (fp3dTops) {',
+                '    const n = fp3dTops.length - 1;',
+                '    const sAt = (i: number) => sp.s0 + ((sp.s1 - sp.s0) * i) / n;',
+                '    for (const nn of [info.faceRoom, -info.faceOut]) {',
+                '      lines.segSplit(at(sp.s0, nn, bottom), at(sp.s0, nn, fp3dTops[0]), EDGE_SOFT, cut, b);',
+                '      lines.segSplit(at(sp.s1, nn, bottom), at(sp.s1, nn, fp3dTops[n]), EDGE_SOFT, cut, b);',
+                '      for (let i = 0; i < n; i++) lines.seg(at(sAt(i), nn, fp3dTops[i]), at(sAt(i + 1), nn, fp3dTops[i + 1]), EDGE_SOFT, foldAt(Math.min(fp3dTops[i], fp3dTops[i + 1])));',
+                '      if (sp.sill > 0.01) lines.seg(at(sp.s0, nn, sp.sill), at(sp.s1, nn, sp.sill), EDGE_SOFT, foldAt(sp.sill));',
+                '    }',
+                '    for (const [s, y] of [[sp.s0, fp3dTops[0]], [sp.s1, fp3dTops[n]]]) {',
+                '      lines.seg(at(s, info.faceRoom, y), at(s, -info.faceOut, y), EDGE_SOFT, foldAt(y));',
+                '      if (sp.sill > 0.01) lines.seg(at(s, info.faceRoom, sp.sill), at(s, -info.faceOut, sp.sill), EDGE_SOFT, foldAt(sp.sill));',
+                '      if (sp.sill < cut && y > cut) lines.seg(at(s, info.faceRoom, cut), at(s, -info.faceOut, cut), EDGE_CUT, CUT_OFFSET + b);',
+                '    }',
+                '    return;',
+                '  }',
+                '',
+            ].join('\n'),
+            'gable glass: lines',
+        );
+    }
+    if (name === 'viewer/openings.ts') {
+        code = `import { glassStrips as fp3dGlassStrips, topAtX as fp3dTopAtX } from "${glass}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    frameTris.push({ id: info.opening.id, start: fStart, end: frames.count });\n',
+            [
+                '    // glazed up under the roof: a transom over the opening, fixed glass up to the slope, a frame along it',
+                '    const fp3dTops = info.roof_tops;',
+                '    if (fp3dTops && info.opening.type !== "garage") {',
+                '      const fw = 0.06;',
+                '      const fd = 0.035;',
+                '      const y0 = T + fw;',
+                '      const fold = (y: number) => (y >= cut - 1e-6 ? bucket : ALWAYS);',
+                '      // a quad seen from both sides',
+                '      const quad = (buf: GeoBuffer, a: number[], b: number[], c: number[], d: number[], col: Color, f: number, uv?: number[]) => {',
+                '        buf.tri(a, b, c, col, col, col, uv, f);',
+                '        buf.tri(a, c, d, col, col, col, uv, f);',
+                '        buf.tri(a, c, b, col, col, col, uv, f);',
+                '        buf.tri(a, d, c, col, col, col, uv, f);',
+                '      };',
+                '      splitBox(frames, tf, 0, W, mid - fd, mid + fd, T, y0, frameC, frameTop, cut, bucket);',
+                '      const left = fp3dTopAtX(fp3dTops, W, 0);',
+                '      const right = fp3dTopAtX(fp3dTops, W, W);',
+                '      if (left > y0 + 0.01) splitBox(frames, tf, 0, fw, mid - fd, mid + fd, y0, left, frameC, frameTop, cut, bucket);',
+                '      if (right > y0 + 0.01) splitBox(frames, tf, W - fw, W, mid - fd, mid + fd, y0, right, frameC, frameTop, cut, bucket);',
+                '      const n = fp3dTops.length - 1;',
+                '      const under = shade(frameC.getHex(), 0.8);',
+                '      for (let i = 0; i < n; i++) {',
+                '        const xa = (W * i) / n;',
+                '        const xb = (W * (i + 1)) / n;',
+                '        const ya = Math.max(y0, fp3dTops[i]);',
+                '        const yb = Math.max(y0, fp3dTops[i + 1]);',
+                '        const ba = Math.max(y0, ya - fw);',
+                '        const bb = Math.max(y0, yb - fw);',
+                '        if (ya - y0 < 1e-3 && yb - y0 < 1e-3) continue;',
+                '        const f = fold(Math.min(ba, bb));',
+                '        for (const nn of [mid - fd, mid + fd]) quad(frames, tf(xa, nn, ba), tf(xb, nn, bb), tf(xb, nn, yb), tf(xa, nn, ya), frameC, f);',
+                '        quad(frames, tf(xa, mid - fd, ya), tf(xb, mid - fd, yb), tf(xb, mid + fd, yb), tf(xa, mid + fd, ya), frameTop, f);',
+                '        quad(frames, tf(xa, mid - fd, ba), tf(xb, mid - fd, bb), tf(xb, mid + fd, bb), tf(xa, mid + fd, ba), under, f);',
+                '      }',
+                '      const glassC = OP.GLASS as Color;',
+                '      for (const g of fp3dGlassStrips(fp3dTops, W, y0, fw)) {',
+                '        quad(glass, tf(g.x0, mid, g.y0), tf(g.x1, mid, g.y0), tf(g.x1, mid, g.yb), tf(g.x0, mid, g.ya), glassC, fold(g.y0), [0, 0.5, 1, 0.5, 1, 0.5]);',
+                '      }',
+                '    }',
+                '    frameTris.push({ id: info.opening.id, start: fStart, end: frames.count });',
+                '',
+            ].join('\n'),
+            'gable glass: glazing',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '        ${this.len(this.t("opening_height"), o.height, (v) => this.updateOpening({ height: Math.max(0.3, v) }), 0.01, 0.3)}\n',
+            [
+                '        ${o.type === "window" || o.type === "door"',
+                '          ? html`<label class="fp3d-check fp3d-wide" title=${this.t("opening_to_roof_hint")}',
+                '              ><input type="checkbox" .checked=${!!o.to_roof} ?disabled=${!admin} @change=${(ev: Event) => this.updateOpening({ to_roof: (ev.target as HTMLInputElement).checked || undefined })} />',
+                '              ${this.t("opening_to_roof")}</label',
+                '            >`',
+                '          : nothing}',
+                '        ${this.len(this.t("opening_height"), o.height, (v) => this.updateOpening({ height: Math.max(0.3, v) }), 0.01, 0.3)}',
+                '',
+            ].join('\n'),
+            'gable glass: switch',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  top_hung: "Klappfenster (oben angeschlagen, öffnet nach oben)",',
+            [
+                '  top_hung: "Klappfenster (oben angeschlagen, öffnet nach oben)",',
+                '  opening_to_roof: "Bis unters Dach verglast",',
+                '  opening_to_roof_hint: "In einer Wand unter dem Dach: über dem Fenster oder der Tür ein Kämpfer, darüber feste Verglasung bis unter die Dachschräge – das Giebelfenster, das der Dachneigung folgt.",',
+            ].join('\n'),
+            'gable glass: de',
+        );
+        code = replaceRequired(
+            code,
+            '  top_hung: "Top-hung (opens upwards)",',
+            [
+                '  top_hung: "Top-hung (opens upwards)",',
+                '  opening_to_roof: "Glazed up to the roof",',
+                '  opening_to_roof_hint: "In a wall under the roof: a transom over the window or door, fixed glass above it up to the slope – the gable window that follows the roof.",',
+            ].join('\n'),
+            'gable glass: en',
+        );
+    }
+    return code;
+}
+
+/**
+ * A balcony cut into the roof (roof-cut.ts, "Dacheinschnitt"): switched on at a balcony of an attic floor, the
+ * roof's slope opens over it, and along its edges that do not lie at a room's wall a wall stands from the deck up
+ * under the roof – the cheeks at the sides, the parapet in front; where that wall is a railing high, the railing goes.
+ */
+function roofCuts(name: string, code: string): string {
+    const cut = `${root}/frontend/vendor-ext/roof-cut.ts`;
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  slope_dir?: SlopeDir;\n',
+            '  slope_dir?: SlopeDir;\n  /** A balcony cut into the roof (Dacheinschnitt): the roof opens over it, walls stand up to it along its edges. */\n  roof_cut?: boolean;\n',
+            'roof cut: model',
+        );
+    }
+    if (name === 'viewer/roof.ts') {
+        code = `import { cutHole as fp3dCutHole } from "${cut}";\nimport { onSection as fp3dOnSection } from "../roof-sections.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            "    // a dormer's rear runs into the slope: no gable there, only at its front (the lower end of the slope)\n",
+            [
+                '    // a balcony cut into the roof (Dacheinschnitt): the slope opens over it',
+                '    for (const fl of b.floors) {',
+                '      for (const a of fl.outdoor ?? []) {',
+                '        if (a.type !== "balcony" || !a.roof_cut || a.points.length < 3) continue;',
+                '        const cx = a.points.reduce((t, q) => t + q[0], 0) / a.points.length;',
+                '        const cz = a.points.reduce((t, q) => t + q[1], 0) / a.points.length;',
+                '        if (sec.open || !fp3dOnSection(sec, cx, cz)) continue;',
+                '        holes.push(fp3dCutHole(a.points.map((q) => sectionUV(sec, q[0], q[1]))));',
+                '      }',
+                '    }',
+                "    // a dormer's rear runs into the slope: no gable there, only at its front (the lower end of the slope)",
+                '',
+            ].join('\n'),
+            'roof cut: hole',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { setRoofUnder as fp3dSetRoofUnder } from "${cut}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '      fp3dSetRailFloors(b.floors);\n',
+            '      fp3dSetRailFloors(b.floors);\n      // the roof over this floor, for the walls of a balcony cut into it\n      fp3dSetRoofUnder(roofUnder ?? null);\n',
+            'roof cut: roof',
+        );
+    }
+    if (name === 'viewer/outdoor.ts') {
+        code = `import { cheekFoot as fp3dCheekFoot, cheekHigh as fp3dCheekHigh, cheekPieces as fp3dCheekPieces, roofAt as fp3dRoofAt } from "${cut}";\n${code}`;
+        code = replaceRequired(
+            code,
+            'const GATE_SIDE = 0x31467d;',
+            [
+                "/** The walls of a balcony cut into the roof: like the house's walls. */",
+                'const FP3D_CHEEK = palette({ side: 0x131d31, top: 0x14303f }, { side: 0xf0ede8, top: 0xf7f5f1 });',
+                '',
+                'const GATE_SIDE = 0x31467d;',
+            ].join('\n'),
+            'roof cut: colours',
+        );
+        code = replaceRequired(
+            code,
+            '          if (againstWall(floor, p, q)) continue;\n          const y0 = g + look.top;\n',
+            [
+                '          if (againstWall(floor, p, q)) continue;',
+                '          // cut into the roof: a wall from under the deck up to the roof along this edge, no railing where it is high enough',
+                '          if (a.roof_cut) {',
+                '            const fp3dPieces = fp3dCheekPieces(p, q, g + look.top);',
+                '            for (const c of fp3dPieces) {',
+                '              pushPrism(buf, ccw(fp3dCheekFoot(c.a, c.b, 0.2)), g - slab, (x, z) => fp3dRoofAt(x, z) ?? g + look.top + rail, FP3D_CHEEK.side, FP3D_CHEEK.top, { aoFrom: g });',
+                '            }',
+                '            if (fp3dCheekHigh(fp3dPieces, g + look.top, rail, Math.hypot(q[0] - p[0], q[1] - p[1]))) continue;',
+                '          }',
+                '          const y0 = g + look.top;',
+                '',
+            ].join('\n'),
+            'roof cut: walls',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '        <label class="fp3d-check fp3d-wide" title=${this.t("outdoor_cut_hint")}',
+            [
+                '        ${a.type === "balcony"',
+                '          ? html`<label class="fp3d-check fp3d-wide" title=${this.t("balcony_roof_cut_hint")}',
+                '              ><input type="checkbox" .checked=${!!a.roof_cut} ?disabled=${!admin} @change=${(ev: Event) => this.updateOutdoor({ roof_cut: (ev.target as HTMLInputElement).checked || undefined })} />',
+                '              ${this.t("balcony_roof_cut")}</label',
+                '            >`',
+                '          : nothing}',
+                '        <label class="fp3d-check fp3d-wide" title=${this.t("outdoor_cut_hint")}',
+            ].join('\n'),
+            'roof cut: switch',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  balcony_rail: "Geländerhöhe",',
+            [
+                '  balcony_rail: "Geländerhöhe",',
+                '  balcony_roof_cut: "Dacheinschnitt",',
+                '  balcony_roof_cut_hint: "Der Balkon liegt im Dach: Darüber ist das Dach offen, an seinen freien Rändern stehen Wände vom Boden bis unters Dach – seitlich die Wangen, vorn die Brüstung. Wo eine Wand geländerhoch ist, entfällt das Geländer.",',
+            ].join('\n'),
+            'roof cut: de',
+        );
+        code = replaceRequired(
+            code,
+            '  balcony_rail: "Railing height",',
+            [
+                '  balcony_rail: "Railing height",',
+                '  balcony_roof_cut: "Cut into the roof",',
+                '  balcony_roof_cut_hint: "The balcony lies in the roof: the roof is open above it, and along its free edges walls stand from the deck up under the roof – the cheeks at the sides, the parapet in front. Where a wall is as high as a railing, the railing goes.",',
+            ].join('\n'),
+            'roof cut: en',
+        );
+    }
+    return code;
+}
+
+/**
+ * A wall outside (outdoor type "wall"): a garden wall, a retaining wall where the hill goes up – a stone block of its
+ * own height standing on the ground, drawn like a hedge but of stone.
+ */
+function gardenWalls(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '"hedge", "fence", "pergola", "balcony"] as const;',
+            '"hedge", "fence", "wall", "pergola", "balcony"] as const;',
+            'garden wall: type',
+        );
+        code = replaceRequired(code, '  fence: 1.0,\n', '  fence: 1.0,\n  wall: 1.0,\n', 'garden wall: height');
+        code = replaceRequired(
+            code,
+            '  return type === "hedge" || type === "fence" || type === "pergola";',
+            '  return type === "hedge" || type === "fence" || type === "wall" || type === "pergola";',
+            'garden wall: standing',
+        );
+    }
+    if (name === 'viewer/outdoor.ts') {
+        code = replaceRequired(
+            code,
+            '  fence: { color: 0x1d2946, side: 0x1d2946, edge: 0x5b7cff, edgeAlpha: 0.45 },\n',
+            '  fence: { color: 0x1d2946, side: 0x1d2946, edge: 0x5b7cff, edgeAlpha: 0.45 },\n  wall: { color: 0x2b3042, side: 0x222737, edge: 0x5b7cff, edgeAlpha: 0.4 },\n',
+            'garden wall: look',
+        );
+        code = replaceRequired(
+            code,
+            'fence: { color: 0xd8d3cb, side: 0xc8c2b9, edge: 0x5b7cff, edgeAlpha: 0.2 }, pergola:',
+            'fence: { color: 0xd8d3cb, side: 0xc8c2b9, edge: 0x5b7cff, edgeAlpha: 0.2 }, wall: { color: 0xb3ab9e, side: 0x9d9588, edge: 0x5b7cff, edgeAlpha: 0.15 }, pergola:',
+            'garden wall: light look',
+        );
+        code = replaceRequired(
+            code,
+            '        if (a.type === "hedge") outline((x, z) => groundAt(x, z) + 0.004);',
+            '        if (a.type === "hedge" || a.type === "wall") outline((x, z) => groundAt(x, z) + 0.004);',
+            'garden wall: foot',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '      .fp3d-out-pool polygon {',
+            '      .fp3d-out-wall polygon {\n        fill: rgba(170, 176, 200, 0.28);\n        stroke: rgba(200, 206, 230, 0.7);\n      }\n      .fp3d-out-pool polygon {',
+            'garden wall: plan',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  out_fence: "Zaun",',
+            '  out_fence: "Zaun",\n  out_wall: "Mauer",',
+            'garden wall: de',
+        );
+        code = replaceRequired(
+            code,
+            '  out_fence: "Fence",',
+            '  out_fence: "Fence",\n  out_wall: "Wall",',
+            'garden wall: en',
+        );
+    }
+    return code;
+}
+
+/**
+ * A room whose floor lies higher than its floor (room-level.ts): split level without a floor of its own, the dining
+ * area three steps above the living room. Its floor and the step face are drawn at that height, everything standing
+ * in it stands on it (furniture, wall cabinets and wall lights with it), its windows and doors count from it, the
+ * light falls on it and the walk goes up with it; its ceiling stays, unless it has a ceiling height of its own.
+ */
+function roomLevels(name: string, code: string): string {
+    const lv = `${root}/frontend/vendor-ext/room-level.ts`;
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            '  ceiling_height?: number | null;\n',
+            "  ceiling_height?: number | null;\n  /** How far the room's floor lies above its floor's level (m, 0 … 3; null = 0): split level within one floor. */\n  floor_level?: number | null;\n",
+            'room level: model',
+        );
+    }
+    if (name === 'packs.ts') {
+        code = `import { levelAt as fp3dLevelAt } from "${lv}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  if (!rooms.length || rooms.some((r) => pointInPolygon([f.x, f.z], r.points))) return 0;',
+            '  if (!rooms.length) return 0;\n  // a raised room: on its floor\n  if (rooms.some((r) => pointInPolygon([f.x, f.z], r.points))) return fp3dLevelAt(rooms, f.x, f.z);',
+            'room level: ground',
+        );
+        code = replaceRequired(
+            code,
+            '  if (f.type === "lamp_wall") return WALL_LAMP_Y;',
+            '  if (f.type === "lamp_wall") return WALL_LAMP_Y + fp3dLevelAt(floor.rooms, f.x, f.z);',
+            'room level: wall lamp',
+        );
+        code = replaceRequired(
+            code,
+            '      return item.wall_y ?? 1;',
+            '      return (item.wall_y ?? 1) + fp3dLevelAt(floor.rooms, f.x, f.z);',
+            'room level: wall item',
+        );
+        code = replaceRequired(
+            code,
+            '      return builtinBase(f) || groundUnder(floor, f);',
+            '      return builtinBase(f) ? builtinBase(f) + fp3dLevelAt(floor.rooms, f.x, f.z) : groundUnder(floor, f);',
+            'room level: built-in',
+        );
+    }
+    if (name === 'viewer/build.ts') {
+        code = `import { roomLevel as fp3dRoomLevel } from "${lv}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    const look = FLOOR_LOOK[room.floor_material] ?? FLOOR_LOOK.wood;\n    const top = new Color(look.color);\n',
+            "    const look = FLOOR_LOOK[room.floor_material] ?? FLOOR_LOOK.wood;\n    const top = new Color(look.color);\n    // a raised room: its floor higher, the slab's side the step up to it\n    const fp3dLv = fp3dRoomLevel(room);\n",
+            'room level: floor',
+        );
+        code = replaceRequired(
+            code,
+            '      floorBuf.tri([a[0], 0, a[1]], [c[0], 0, c[1]], [b[0], 0, b[1]], top, top, top, [a[0], a[1], c[0], c[1], b[0], b[1]], ALWAYS, look.tile);',
+            '      floorBuf.tri([a[0], fp3dLv, a[1]], [c[0], fp3dLv, c[1]], [b[0], fp3dLv, b[1]], top, top, top, [a[0], a[1], c[0], c[1], b[0], b[1]], ALWAYS, look.tile);',
+            'room level: top',
+        );
+        code = replaceRequired(
+            code,
+            [
+                '        floorBuf.tri([a[0], -SLAB, a[1]], [a[0], 0, a[1]], [b[0], 0, b[1]], slab);',
+                '        floorBuf.tri([a[0], -SLAB, a[1]], [b[0], 0, b[1]], [b[0], -SLAB, b[1]], slab);',
+            ].join('\n'),
+            [
+                '        floorBuf.tri([a[0], -SLAB, a[1]], [a[0], fp3dLv, a[1]], [b[0], fp3dLv, b[1]], slab);',
+                '        floorBuf.tri([a[0], -SLAB, a[1]], [b[0], fp3dLv, b[1]], [b[0], -SLAB, b[1]], slab);',
+            ].join('\n'),
+            'room level: step',
+        );
+        code = replaceRequired(
+            code,
+            '        holeLines.seg([a[0], 0.006, a[1]], [b[0], 0.006, b[1]], EDGE_TOP);',
+            '        holeLines.seg([a[0], fp3dLv + 0.006, a[1]], [b[0], fp3dLv + 0.006, b[1]], EDGE_TOP);',
+            'room level: hole rim',
+        );
+        // a window or a door of the raised room counts from its floor
+        code = replaceRequired(
+            code,
+            [
+                '    const top = Math.min(lowestTop(wall.a, ax, s0, s0 + width, wallHeight(wall, floor.height), wall) - 0.02, o.sill + o.height);',
+                '    const sill = Math.max(0, Math.min(o.sill, top - 0.1));',
+            ].join('\n'),
+            [
+                '    const fp3dLift = fp3dRoomLevel(floor.rooms.find((r) => r.id === o.room_id));',
+                '    const top = Math.min(lowestTop(wall.a, ax, s0, s0 + width, wallHeight(wall, floor.height), wall) - 0.02, o.sill + fp3dLift + o.height);',
+                '    const sill = Math.max(0, Math.min(o.sill + fp3dLift, top - 0.1));',
+            ].join('\n'),
+            'room level: openings',
+        );
+    }
+    if (name === 'viewer/lighting.ts') {
+        code = `import { roomLevel as fp3dRoomLevel } from "${lv}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  floor.rooms.forEach((r, ri) => {\n    if (r.points.length < 3) return;\n',
+            '  floor.rooms.forEach((r, ri) => {\n    if (r.points.length < 3) return;\n    // a raised room: the light lies on its floor\n    const fp3dY = LIFT + fp3dRoomLevel(r);\n',
+            'room level: light',
+        );
+        code = replaceRequired(
+            code,
+            '          quad([a, LIFT, b], [a, LIFT, b1], [a1, LIFT, b1], [a1, LIFT, b], [0, 1, 0], ri, -1);',
+            '          quad([a, fp3dY, b], [a, fp3dY, b1], [a1, fp3dY, b1], [a1, fp3dY, b], [0, 1, 0], ri, -1);',
+            'room level: light cells',
+        );
+        code = replaceRequired(
+            code,
+            '          quad([p0[0], LIFT, p0[1]], [p1[0], LIFT, p1[1]], [p2[0], LIFT, p2[1]], [p2[0], LIFT, p2[1]], [0, 1, 0], ri, -1);',
+            '          quad([p0[0], fp3dY, p0[1]], [p1[0], fp3dY, p1[1]], [p2[0], fp3dY, p2[1]], [p2[0], fp3dY, p2[1]], [0, 1, 0], ri, -1);',
+            'room level: light parts',
+        );
+    }
+    if (name === 'viewer/walk.ts') {
+        code = `import { levelAt as fp3dLevelAt } from "${lv}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    return (fv ? fv.floor.elevation + fv.y : this.map.floor.elevation) + EYE;',
+            '    // up with a raised room\n    return (fv ? fv.floor.elevation + fv.y : this.map.floor.elevation) + EYE + fp3dLevelAt(this.map.floor.rooms, this.state.x, this.state.z);',
+            'room level: walk',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = `import { levelValue as fp3dLevelValue, MAX_ROOM_LEVEL as FP3D_MAX_ROOM_LEVEL } from "${lv}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '        <p class="fp3d-sub fp3d-wide">${this.t("room_ceiling_hint")}</p>\n',
+            [
+                '        <p class="fp3d-sub fp3d-wide">${this.t("room_ceiling_hint")}</p>',
+                '        ${this.len(this.t("room_floor_level"), room.floor_level ?? 0, (v) => this.updateRoom({ floor_level: fp3dLevelValue(v) }), 0.05, 0)}',
+                '        <p class="fp3d-sub fp3d-wide">${this.t("room_floor_level_hint", { max: FP3D_MAX_ROOM_LEVEL })}</p>',
+                '',
+            ].join('\n'),
+            'room level: field',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  room_ceiling: "Deckenhöhe (m)",',
+            [
+                '  room_ceiling: "Deckenhöhe (m)",',
+                '  room_floor_level: "Boden höher (m)",',
+                '  room_floor_level_hint: "Split-Level ohne eigene Etage: Der Boden des Raums liegt so viel höher (bis {max} m), z. B. der Essplatz drei Stufen über dem Wohnzimmer. Möbel, Fenster und Türen des Raums zählen ab seinem Boden; die Decke bleibt – für dieselbe Raumhöhe die Deckenhöhe um den Versatz erhöhen. Die Stufen hinauf sind eine Treppe im tieferen Raum.",',
+            ].join('\n'),
+            'room level: de',
+        );
+        code = replaceRequired(
+            code,
+            '  room_ceiling: "Ceiling height (m)",',
+            [
+                '  room_ceiling: "Ceiling height (m)",',
+                '  room_floor_level: "Floor raised (m)",',
+                '  room_floor_level_hint: "Split level without a floor of its own: the room\'s floor lies this much higher (up to {max} m), e.g. the dining area three steps above the living room. The room\'s furniture, windows and doors count from its floor; the ceiling stays – for the same room height raise the ceiling height by the same amount. The steps up are a stair in the lower room.",',
+            ].join('\n'),
+            'room level: en',
+        );
+    }
+    return code;
+}
+
+/**
+ * A floor's outline from its outer walls closes over a wall left open in part (outline-gaps.ts): a passage of height 0
+ * to a stair room broke the loop, and the floor lost its outline – no earth around it, no roof from it.
+ */
+function outlineGaps(name: string, code: string): string {
+    if (name === 'roof-sections.ts') {
+        code = `import { gapSegments as fp3dGapSegments } from "${root}/frontend/vendor-ext/outline-gaps.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  const segs: Seg[] = walls.map((w) => ({ a: w.a, b: w.b }));\n',
+            [
+                '  const segs: Seg[] = walls.map((w) => ({ a: w.a, b: w.b }));',
+                '  // a wall open in part leaves a gap in the loop: its open ends are joined straight',
+                '  for (const [a, b] of fp3dGapSegments(segs.map((w) => [w.a, w.b] as [Vec2, Vec2]))) segs.push({ a, b });',
+                '',
+            ].join('\n'),
+            'outline gaps',
+        );
+    }
+    return code;
+}
+
+/**
+ * Heights at the corners of an area outside (area-heights.ts): a lawn up a hill, a bank beside the drive. The surface
+ * runs between the corners (mean value coordinates: straight along the edges, smooth inside), drawn with points of
+ * its own inside; everything that stands on it or looks at it (lamps, furniture, snow, light, light wells) follows
+ * through `groundDrop`. The earth at the house follows such an area lying higher beside its walls.
+ */
+function areaHeights(name: string, code: string): string {
+    const heights = `${root}/frontend/vendor-ext/area-heights.ts`;
+    if (name === 'model.ts') {
+        code = `import { cornerRise as fp3dCornerRise } from "${heights}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  slope_dir?: SlopeDir;\n',
+            "  slope_dir?: SlopeDir;\n  /** Height of each corner over the area's level (m, null = 0): the surface runs between them (a hillside). */\n  heights?: (number | null)[] | null;\n",
+            'area heights: model',
+        );
+        code = replaceRequired(
+            code,
+            '  return a.type === "pool" ? 0 : outdoorDrop(a, x, z);',
+            '  return a.type === "pool" ? 0 : outdoorDrop(a, x, z) - fp3dCornerRise(a.points, a.heights, x, z);',
+            'area heights: drop',
+        );
+    }
+    if (name === 'viewer/outdoor.ts') {
+        code = `import { hasHeights as fp3dHasHeights, heightRange as fp3dHeightRange, innerPoints as fp3dInnerPoints } from "${heights}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    const lowest = g - (a.type === "pool" ? 0 : (a.slope ?? 0));',
+            '    const lowest = g - (a.type === "pool" ? 0 : (a.slope ?? 0) - fp3dHeightRange(a.heights)[0]);',
+            'area heights: lowest',
+        );
+        code = replaceRequired(
+            code,
+            '        pushPrism(buf, poly, base, a.slope ? topAt : g + look.top, look.side, look.color, { aoFrom: base, holes });',
+            [
+                '        // corners at heights of their own: points inside let the surface bend between them',
+                '        const fp3dRaised = a.type !== "pool" && fp3dHasHeights(a.heights);',
+                '        const fp3dInner = fp3dRaised ? fp3dInnerPoints(poly, holes).map((q) => [q]) : [];',
+                '        pushPrism(buf, poly, base, a.slope || fp3dRaised ? topAt : g + look.top, look.side, look.color, { aoFrom: base, holes: [...holes, ...fp3dInner] });',
+            ].join('\n'),
+            'area heights: surface',
+        );
+    }
+    if (name === 'geometry/wells.ts') {
+        code = `import { raisedAround as fp3dRaisedAround } from "${heights}";\n${code}`;
+        // a floor stands in the ground too where a garden lies clearly higher beside it (up a hill)
+        code = replaceRequired(
+            code,
+            '  return !!outline && outline.some(([x, z]) => terrainAt(x, z) - floor.elevation > -0.15);',
+            [
+                '  if (!outline) return false;',
+                '  if (outline.some(([x, z]) => terrainAt(x, z) - floor.elevation > -0.15)) return true;',
+                '  return fp3dRaisedAround(outline, (p) => coverAt(b, floor, p), (p) => terrainAt(p[0], p[1]) - floor.elevation);',
+            ].join('\n'),
+            'area heights: in the ground',
+        );
+    }
+    if (name === 'viewer/earth.ts') {
+        code = replaceRequired(
+            code,
+            'import { earthOutline, inGround, WELL_DEPTH, wellBelowGround } from "../geometry/wells.ts";',
+            'import { coverAt as fp3dCoverAt, earthOutline, inGround, WELL_DEPTH, wellBelowGround } from "../geometry/wells.ts";',
+            'area heights: earth import',
+        );
+        code = replaceRequired(
+            code,
+            '      const g0 = ground(p0[0], p0[1]);\n      const g1 = ground(p1[0], p1[1]);\n',
+            [
+                '      // the earth reaches up to an area outside lying higher beside the wall (a garden up a hill)',
+                '      const fp3dUp = (s: number) => fp3dCoverAt(b, floor, at(s, 0.3)) ?? -Infinity;',
+                '      const g0 = Math.min(H, Math.max(ground(p0[0], p0[1]), fp3dUp(s0)));',
+                '      const g1 = Math.min(H, Math.max(ground(p1[0], p1[1]), fp3dUp(s1)));',
+                '',
+            ].join('\n'),
+            'area heights: earth',
+        );
+    }
+    if (name === 'winter.ts') {
+        code = `import { hasHeights as fp3dHasHeights } from "${heights}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '...(a.slope ? { follow: { areaId: a.id, lift: 0.025 } } : {})',
+            '...(a.slope || fp3dHasHeights(a.heights) ? { follow: { areaId: a.id, lift: 0.025 } } : {})',
+            'area heights: snow',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { hasHeights as fp3dHasHeights, innerPoints as fp3dInnerPoints } from "${heights}";\n${code}`;
+        code = replaceRequired(
+            code,
+            [
+                '        for (const tri of triangulate(t.points)) {',
+                '          for (const i of tri) {',
+                '            const [px, pz] = t.points[i];',
+            ].join('\n'),
+            [
+                '        // on an area with heights at its corners the snow bends with it',
+                '        const fp3dIn = area && fp3dHasHeights(area.heights) ? fp3dInnerPoints(t.points) : [];',
+                '        const fp3dAll = [...t.points, ...fp3dIn];',
+                '        for (const tri of triangulate(t.points, fp3dIn.map((q) => [q]))) {',
+                '          for (const i of tri) {',
+                '            const [px, pz] = fp3dAll[i];',
+            ].join('\n'),
+            'area heights: snow patches',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = `import { hasHeights as fp3dHasHeights, heightsInsert as fp3dHeightsInsert, heightsRemove as fp3dHeightsRemove, heightsSet as fp3dHeightsSet } from "${heights}";\n${code}`;
+        // a corner put in halfway along an edge takes the height halfway
+        code = replaceRequired(
+            code,
+            '        a.points.splice(i + 1, 0, [round((p[0] + q[0]) / 2), round((p[1] + q[1]) / 2)]);\n',
+            [
+                '        const fp3dH = fp3dHeightsInsert(a.heights, a.points.length, i);',
+                '        a.points.splice(i + 1, 0, [round((p[0] + q[0]) / 2), round((p[1] + q[1]) / 2)]);',
+                '        if (fp3dH) a.heights = fp3dH;',
+                '',
+            ].join('\n'),
+            'area heights: corner in',
+        );
+        code = replaceRequired(
+            code,
+            '      this.updateOutdoor({ points: a.points.filter((_, k) => k !== i).map((p) => [...p] as Vec2), ...(a.gates ? { gates: gates?.length ? gates : undefined } : {}) });',
+            '      this.updateOutdoor({ points: a.points.filter((_, k) => k !== i).map((p) => [...p] as Vec2), ...(a.gates ? { gates: gates?.length ? gates : undefined } : {}), ...(a.heights ? { heights: fp3dHeightsRemove(a.heights, n, i) } : {}) });',
+            'area heights: corner out',
+        );
+        // every corner's height beside its x and z
+        code = replaceRequired(
+            code,
+            [
+                '        (p, i) => html`<div class="fp3d-point">',
+                '          <span class="fp3d-muted">${i + 1}</span>',
+                '          ${this.len(this.t("x"), p[0], (v) => setPoint(i, 0, v))} ${this.len(this.t("z"), p[1], (v) => setPoint(i, 1, v))}',
+            ].join('\n'),
+            [
+                '        (p, i) => html`<div class=${a.type !== "pool" && a.points.length >= 3 ? "fp3d-point fp3d-point-h" : "fp3d-point"}>',
+                '          <span class="fp3d-muted">${i + 1}</span>',
+                '          ${this.len(this.t("x"), p[0], (v) => setPoint(i, 0, v))} ${this.len(this.t("z"), p[1], (v) => setPoint(i, 1, v))}',
+                '          ${a.type !== "pool" && a.points.length >= 3 ? this.len(this.t("corner_height"), a.heights?.[i] ?? 0, (v) => Number.isFinite(v) && this.updateOutdoor({ heights: fp3dHeightsSet(a.heights, a.points.length, i, v) }), 0.05) : nothing}',
+            ].join('\n'),
+            'area heights: field',
+        );
+        code = replaceRequired(
+            code,
+            '      )}\n    </details>`;\n  }\n\n  private deleteOutdoor(): void {',
+            '      )}\n      ${a.type !== "pool" && a.points.length >= 3 ? html`<p class="fp3d-sub">${this.t("corner_height_hint")}</p>` : nothing}\n    </details>`;\n  }\n\n  private deleteOutdoor(): void {',
+            'area heights: hint',
+        );
+        // in the plan the corner's number carries its height
+        code = replaceRequired(
+            code,
+            [
+                '      return svg`<g class="fp3d-vertex" data-out-vertex=${`${a.id}:${i}`}><circle cx=${x} cy=${y} r="16" class="fp3d-hit" /><circle cx=${x} cy=${y} r="6" /></g>',
+                '        <text class="fp3d-vertex-no" x=${x + 9} y=${y - 9}>${i + 1}</text>`;',
+            ].join('\n'),
+            [
+                '      const fp3dH = fp3dHasHeights(a.heights) ? (a.heights?.[i] ?? 0) : null;',
+                '      return svg`<g class="fp3d-vertex" data-out-vertex=${`${a.id}:${i}`}><circle cx=${x} cy=${y} r="16" class="fp3d-hit" /><circle cx=${x} cy=${y} r="6" /></g>',
+                '        <text class="fp3d-vertex-no" x=${x + 9} y=${y - 9}>${i + 1}${fp3dH !== null ? ` · ${fp3dH > 0 ? "+" : ""}${this.m(fp3dH, 2)}` : ""}</text>`;',
+            ].join('\n'),
+            'area heights: plan',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-point-sel .fp3d-muted {',
+            '      .fp3d-point-h {\n        grid-template-columns: 18px 1fr 1fr 1fr auto;\n      }\n      .fp3d-point-sel .fp3d-muted {',
+            'area heights: css',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  outdoor_slope: "Gefälle (m)",',
+            [
+                '  outdoor_slope: "Gefälle (m)",',
+                '  corner_height: "Höhe (m)",',
+                '  corner_height_hint: "Höhe: wie weit die Ecke über der Fläche liegt (über ihrem Höhenversatz). Die Fläche verläuft zwischen den Ecken – ein Hang, eine Böschung; das Erdreich am Haus folgt ihr.",',
+            ].join('\n'),
+            'area heights: de',
+        );
+        code = replaceRequired(
+            code,
+            '  outdoor_slope: "Slope (m)",',
+            [
+                '  outdoor_slope: "Slope (m)",',
+                '  corner_height: "Height (m)",',
+                '  corner_height_hint: "Height: how far the corner lies above the area (above its height offset). The surface runs between the corners – a hillside, a bank; the earth at the house follows it.",',
+            ].join('\n'),
+            'area heights: en',
+        );
+    }
+    return code;
+}
+
+/**
+ * The background picture can be stretched in one direction (`stretch`: its depth against its width): a scan or a
+ * photo of a plan is often a few percent longer one way. The ruler can scale it only along the measured stretch
+ * (width or depth), and the form has the stretch in percent.
+ */
+function bgStretch(name: string, code: string): string {
+    if (name === 'model.ts') {
+        code = replaceRequired(
+            code,
+            "  /** Turn about the picture's middle (degrees, clockwise in the plan). */\n  rotation?: number;\n}",
+            "  /** Turn about the picture's middle (degrees, clockwise in the plan). */\n  rotation?: number;\n  /** Its depth against its width, stretched (1 = as the picture is; 0.975 = 2.5 % shorter in depth). */\n  stretch?: number | null;\n}",
+            'background stretch: model',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '    _bgRulerLen: { state: true },\n',
+            '    _bgRulerLen: { state: true },\n    _bgRulerAxis: { state: true },\n',
+            'background stretch: state',
+        );
+        code = replaceRequired(
+            code,
+            '  private declare _bgRulerLen: number;\n',
+            "  private declare _bgRulerLen: number;\n  /** The ruler scales only along the measured stretch: the picture's width or its depth, whichever is nearer. */\n  private declare _bgRulerAxis: boolean;\n",
+            'background stretch: declare',
+        );
+        code = replaceRequired(
+            code,
+            '    this._bgRuler = null;\n    this._bgRulerLen = 0;\n    this._bgLevel = null;\n',
+            '    this._bgRuler = null;\n    this._bgRulerLen = 0;\n    this._bgRulerAxis = false;\n    this._bgLevel = null;\n',
+            'background stretch: init',
+        );
+        // every height of the picture: its width by the picture's own aspect and the stretch
+        code = replaceEvery(
+            code,
+            'const h = bg.width * img.aspect;',
+            'const h = bg.width * img.aspect * (bg.stretch ?? 1);',
+            'background stretch: heights',
+            3,
+        );
+        code = replaceRequired(
+            code,
+            'const h = bg.width * (img?.aspect ?? 1);',
+            'const h = bg.width * (img?.aspect ?? 1) * (bg.stretch ?? 1);',
+            'background stretch: turn handle',
+        );
+        code = replaceRequired(
+            code,
+            '    const h = w * img.aspect;\n    const rot = bg.rotation ?? 0;',
+            '    const h = w * img.aspect * (bg.stretch ?? 1);\n    const rot = bg.rotation ?? 0;',
+            'background stretch: drawn',
+        );
+        code = replaceRequired(
+            code,
+            '  private bgLocal(bg: Background, world: Vec2, aspect: number): Vec2 {\n    const h = bg.width * aspect;',
+            '  private bgLocal(bg: Background, world: Vec2, aspect: number): Vec2 {\n    const h = bg.width * aspect * (bg.stretch ?? 1);',
+            'background stretch: local',
+        );
+        // the ruler: along one direction only, the picture is scaled along its own axis nearest the measured line
+        code = replaceRequired(
+            code,
+            [
+                '    const k = real / measured;',
+                '    // scaling about p keeps the turn: the centre moves to p + k (c − p), the size grows by k',
+                '    const h = bg.width * img.aspect * (bg.stretch ?? 1);',
+                '    const c: Vec2 = [bg.x + bg.width / 2, bg.z + h / 2];',
+                '    const p = pts[0];',
+            ].join('\n'),
+            [
+                '    const k = real / measured;',
+                '    // scaling about p keeps the turn: the centre moves to p + k (c − p), the size grows by k',
+                '    const h = bg.width * img.aspect * (bg.stretch ?? 1);',
+                '    const c: Vec2 = [bg.x + bg.width / 2, bg.z + h / 2];',
+                '    const p = pts[0];',
+                '    if (this._bgRulerAxis) {',
+                "      // only along the picture's width or its depth (its own axes, turned with it), whichever the line follows",
+                '      const a = ((bg.rotation ?? 0) * Math.PI) / 180;',
+                '      const ux: Vec2 = [Math.cos(a), Math.sin(a)];',
+                '      const dx = pts[1][0] - pts[0][0];',
+                '      const dz = pts[1][1] - pts[0][1];',
+                '      const along = Math.abs(dx * ux[0] + dz * ux[1]) >= Math.abs(-dx * ux[1] + dz * ux[0]);',
+                '      const u: Vec2 = along ? ux : [-ux[1], ux[0]];',
+                '      const t = (c[0] - p[0]) * u[0] + (c[1] - p[1]) * u[1];',
+                '      const c3: Vec2 = [c[0] + (k - 1) * t * u[0], c[1] + (k - 1) * t * u[1]];',
+                '      const w3 = along ? bg.width * k : bg.width;',
+                '      const h3 = along ? h : h * k;',
+                '      const stretch = Math.round((h3 / (w3 * img.aspect)) * 10000) / 10000;',
+                '      this.updateFloor({ background: { ...bg, width: round(w3), stretch: Math.abs(stretch - 1) < 1e-4 ? null : stretch, x: round(c3[0] - w3 / 2), z: round(c3[1] - h3 / 2) } });',
+                '      this._bgRuler = null;',
+                '      this._bgRulerLen = 0;',
+                '      return;',
+                '    }',
+            ].join('\n'),
+            'background stretch: ruler',
+        );
+        code = replaceRequired(
+            code,
+            '                          <button class="fp3d-btn fp3d-primary" ?disabled=${!(this._bgRulerLen > 0)} @click=${() => this.applyBgRuler(this._bgRulerLen)}>${this.t("bg_ruler_apply")}</button>`',
+            [
+                '                          <label class="fp3d-check fp3d-wide"',
+                '                            ><input type="checkbox" .checked=${this._bgRulerAxis} @change=${(e: Event) => (this._bgRulerAxis = (e.target as HTMLInputElement).checked)} />',
+                '                            ${this.t("bg_ruler_axis")}</label',
+                '                          >',
+                '                          <button class="fp3d-btn fp3d-primary" ?disabled=${!(this._bgRulerLen > 0)} @click=${() => this.applyBgRuler(this._bgRulerLen)}>${this.t("bg_ruler_apply")}</button>`',
+            ].join('\n'),
+            'background stretch: ruler option',
+        );
+        // the form: the stretch in percent beside the width (the depth then follows from the picture)
+        code = replaceRequired(
+            code,
+            '              ${this.num(this.t("background_rotation"), bg.rotation ?? 0,',
+            '              ${this.num(this.t("background_stretch"), Math.round((bg.stretch ?? 1) * 10000) / 100, (v) => this.updateFloor({ background: { ...bg, stretch: v > 0 && Math.abs(v - 100) > 1e-3 ? Math.round(v * 100) / 10000 : null } }), 0.1)}\n              ${this.num(this.t("background_rotation"), bg.rotation ?? 0,',
+            'background stretch: form',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  background_width: "Breite im Plan (m)",',
+            '  background_width: "Breite im Plan (m)",\n  background_stretch: "Tiefe gestreckt (%)",\n  bg_ruler_axis: "Nur in dieser Richtung (Breite oder Tiefe des Bildes)",',
+            'background stretch: de',
+        );
+        code = replaceRequired(
+            code,
+            '  background_width: "Width in plan (m)",',
+            '  background_width: "Width in plan (m)",\n  background_stretch: "Depth stretched (%)",\n  bg_ruler_axis: "Only in this direction (the picture\'s width or depth)",',
+            'background stretch: en',
+        );
+    }
+    return code;
+}
+
+/**
+ * A straight stair is a flight of slabs, open below (like the U-stair's second flight), not a solid wedge: in a
+ * split-level house the flights lie above each other (hall → half floor above the garage → flat below → garage), each
+ * on the floor it starts from, and the one below passes under the one above.
+ */
+function stairFlights(name: string, code: string): string {
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    b.box(-w / 2, w / 2, 0, y1, z0, z1, C.wood, C.woodTop);',
+            '    b.box(-w / 2, w / 2, Math.max(0, y1 - rise - 0.2), y1, z0, z1, C.wood, C.woodTop);',
+            'stairs: open below',
+        );
+        code = replaceRequired(
+            code,
+            '/** Straight stair rising towards -z (the back), with a handrail on the +x side. */',
+            '/** Straight stair rising towards -z (the back), a flight of slabs open below, with a handrail on the +x side. */',
+            'stairs: doc',
+        );
+    }
+    return code;
+}
+
+/**
  * Trees and bushes (trees.ts): furniture outside, dressed for the season from the date and the latitude (bare in
  * winter, blossom and fresh green in spring, fruit in late summer, autumn colours and falling leaves), with snow
  * while it snows, swaying in the wind.
@@ -3251,7 +4573,7 @@ function treesMore(name: string, code: string): string {
                 '        const g = new Group();',
                 '        for (const p of treeParts) {',
                 '          const tree = fp3dBuildTree(p.t, !!light);',
-                '          tree.position.set(p.t.x, p.y, p.t.z);',
+                '          tree.position.set(p.t.x, p.y + (p.t.y ?? 0), p.t.z);',
                 '          g.add(tree);',
                 '        }',
                 '        this.root.add(g);',
@@ -3343,6 +4665,8 @@ function treesMore(name: string, code: string): string {
                 '            h: f.h,',
                 '            season: fp3dSeason,',
                 '            snow: fp3dSnowing,',
+                '            // it stands on the ground there: a lawn on a hill, a raised bed (in a room: on its floor)',
+                '            y: fl.rooms.some((r) => r.points.length >= 3 && pointInPolygon([f.x, f.z], r.points)) ? 0 : outdoorGround(fl, f.x, f.z),',
                 '          })),',
                 '      ),',
                 '    );',
@@ -7434,6 +8758,17 @@ const patches: Plugin = {
         code = weatherMore(name, code);
         code = homeMore(name, code);
         code = treesMore(name, code);
+        code = groundFill(name, code);
+        code = balconyRails(name, code);
+        code = stairFlights(name, code);
+        code = bgStretch(name, code);
+        code = houseItems(name, code);
+        code = areaHeights(name, code);
+        code = outlineGaps(name, code);
+        code = roomLevels(name, code);
+        code = gardenWalls(name, code);
+        code = roofCuts(name, code);
+        code = gableGlass(name, code);
         code = kitchenMore(name, code);
         code = rainTankMore(name, code);
         code = serverMore(name, code);

@@ -4,8 +4,8 @@
 export const GEAR_TYPES = ['tank', 'rudder', 'propeller', 'nav_light', 'hatch'] as const;
 export type GearType = (typeof GEAR_TYPES)[number];
 
-/** What a tank holds: fresh water, diesel or petrol, gas, grey water, black water. */
-export const TANK_KINDS = ['water', 'fuel', 'gas', 'grey', 'black'] as const;
+/** What a tank holds: fresh water, diesel or petrol, gas, grey water, black water; in a house heating oil. */
+export const TANK_KINDS = ['water', 'fuel', 'gas', 'grey', 'black', 'oil'] as const;
 /** Navigation lights: all-round white at the masthead, the steaming light on the mast, port, starboard, bicolour at the bow, the stern light. */
 export const LIGHT_KINDS = ['anchor', 'steaming', 'port', 'starboard', 'bicolor', 'stern'] as const;
 

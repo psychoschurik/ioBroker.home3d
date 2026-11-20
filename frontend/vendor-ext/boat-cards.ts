@@ -87,6 +87,7 @@ const TEXTS: Record<string, Record<string, string>> = {
         tanks_ok: 'ok',
         water: 'Wasser',
         fuel: 'Kraftstoff',
+        oil: 'Heizöl',
         gas: 'Gas',
         grey: 'Grauwasser',
         black: 'Schwarzwasser',
@@ -149,6 +150,7 @@ const TEXTS: Record<string, Record<string, string>> = {
         tanks_ok: 'ok',
         water: 'Water',
         fuel: 'Fuel',
+        oil: 'Heating oil',
         gas: 'Gas',
         grey: 'Grey water',
         black: 'Black water',
@@ -211,6 +213,7 @@ const TEXTS: Record<string, Record<string, string>> = {
         tanks_ok: 'в норме',
         water: 'Вода',
         fuel: 'Топливо',
+        oil: 'Печное топливо',
         gas: 'Газ',
         grey: 'Серые воды',
         black: 'Чёрные воды',
@@ -371,7 +374,7 @@ export function tanksCard(host: BoatHost, floorId: string, tanks: BoatItem[]): R
             value: `${Math.round(fill * 100)} %${liters !== null ? ` · ${Math.round(liters).toLocaleString(lang)} l` : ''}`,
             at: fill * 100,
             fill: true,
-            color: bad ? RED : kind === 'fuel' ? ORANGE : kind === 'water' ? BLUE : '#a98bff',
+            color: bad ? RED : kind === 'fuel' || kind === 'oil' ? ORANGE : kind === 'water' ? BLUE : '#a98bff',
         });
     }
     if (!rows.length) {

@@ -53,6 +53,29 @@ test('a tree is bare in winter, the conifer and the bush keep their green', () =
     assert.ok(buildTree(spec('tree', 10)).getObjectByName('fp3dTreeLeaves'));
 });
 
+test('in the dark looks a bare tree has blue bark, not green, and its leaves are the looks green', () => {
+    type Colored = { geometry: { getAttribute(n: string): { count: number; getX(i: number): number; getY(i: number): number; getZ(i: number): number } } };
+    const mean = (o: unknown): [number, number, number] => {
+        const c = (o as Colored).geometry.getAttribute('color');
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        for (let i = 0; i < c.count; i++) {
+            r += c.getX(i);
+            g += c.getY(i);
+            b += c.getZ(i);
+        }
+        return [r / c.count, g / c.count, b / c.count];
+    };
+    const bare = buildTree(spec('tree', 1), false);
+    for (const name of ['fp3dTreeWood', 'fp3dTreeLimbs']) {
+        const [r, g, b] = mean(bare.getObjectByName(name));
+        assert.ok(b > g && b > r, `${name} is blue: ${r} ${g} ${b}`);
+    }
+    const [r, g, b] = mean(buildTree(spec('tree', 7), false).getObjectByName('fp3dTreeLeaf'));
+    assert.ok(g > b && g > r, `the leaves are green: ${r} ${g} ${b}`);
+});
+
 test('the same tree looks the same every time and is rebuilt when the season changes', () => {
     const a = buildTree(spec('tree', 7)).getObjectByName('fp3dTreeLeaf') as unknown as { geometry: { getAttribute(n: string): { count: number } } };
     const b = buildTree(spec('tree', 7)).getObjectByName('fp3dTreeLeaf') as unknown as { geometry: { getAttribute(n: string): { count: number } } };

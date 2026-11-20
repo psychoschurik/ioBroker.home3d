@@ -79,6 +79,7 @@ const TANK_COLORS: Record<string, number> = {
     gas: 0x9fbfd6,
     grey: 0x8c916c,
     black: 0x6b4f2e,
+    oil: 0xc98a1c,
 };
 const WHITE_LIGHT = 0xfff1cf;
 const LIGHT_COLORS: Record<string, number[]> = {

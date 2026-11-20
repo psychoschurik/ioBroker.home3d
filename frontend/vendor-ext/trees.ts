@@ -97,6 +97,8 @@ export interface TreeSpec {
     season: Season;
     /** Snow on crowns and branches, 0 … 1. */
     snow: number;
+    /** The ground it stands on above its floor (m): a lawn on a hill, a raised bed; missing: the floor itself. */
+    y?: number;
 }
 
 /** What makes a tree be built anew (rounded: the season moves slowly). */
@@ -108,7 +110,7 @@ export function treeKey(t: TreeSpec, floorY: number): string {
         t.kind,
         t.x.toFixed(2),
         t.z.toFixed(2),
-        floorY.toFixed(2),
+        (floorY + (t.y ?? 0)).toFixed(2),
         t.angle.toFixed(2),
         t.w.toFixed(2),
         t.d.toFixed(2),
@@ -230,16 +232,34 @@ function leafColor(kind: TreeKind, s: Season, k: number): Color {
     return c.lerp(autumn, s.autumn * (kind === 'bush' ? 0.5 * Math.min(1, s.leaf * 2) : 0.9));
 }
 
-/** In the dark looks: the colours become shades of the looks' green, by their brightness. */
+/** The bark in the dark looks: the blue of the furniture's wood there, a little lighter to stand out from the ground. */
+export const NEON_BARK = 0x3a4d78;
+
+/**
+ * In the dark looks: leaves, blossom and fruit become shades of the looks' green, by their brightness; trunk and
+ * branches shades of the furniture's dark blue (a bare tree in winter is no green skeleton), snow on them stays white.
+ */
 function neon(g: Object3D): void {
     const glow = new Color(0x3de0a0);
+    const bark = new Color(NEON_BARK);
+    const white = new Color(0xffffff);
+    const tint = new Color();
     g.traverse(o => {
         const c = (o as Mesh).geometry?.getAttribute('color');
         if (!c) {
             return;
         }
+        const wood = o.name === 'fp3dTreeWood' || o.name === 'fp3dTreeLimbs';
         for (let i = 0; i < c.count; i++) {
             const l = 0.3 * c.getX(i) + 0.59 * c.getY(i) + 0.11 * c.getZ(i);
+            if (wood) {
+                // the bark is dark (l about 0.1): around the blue itself; snow (l near 1) goes towards white
+                tint.copy(bark)
+                    .multiplyScalar(Math.min(1.2, 0.7 + 2.5 * l))
+                    .lerp(white, Math.max(0, Math.min(1, (l - 0.35) * 1.6)));
+                c.setXYZ(i, tint.r, tint.g, tint.b);
+                continue;
+            }
             const k = Math.min(1, 0.12 + 2.4 * l);
             c.setXYZ(i, glow.r * k, glow.g * k, glow.b * k);
         }
