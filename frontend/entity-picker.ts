@@ -54,8 +54,8 @@ export class EntityPicker extends LitElement {
             }),
         );
     }
-    /** The ioBroker ID of the chosen entity, from the hass of the editor around it; else the entity ID. */
-    private sourceId(value: string): string {
+    /** An attribute of the chosen entity, from the hass of the editor around it. */
+    private attribute(value: string, key: string): string {
         let node: Node = this;
         for (let i = 0; i < 8; i++) {
             const host = (node.getRootNode() as ShadowRoot).host as
@@ -64,19 +64,26 @@ export class EntityPicker extends LitElement {
             if (!host) {
                 break;
             }
-            const id = host.hass?.states?.[value]?.attributes?.iobroker_id;
-            if (typeof id === 'string' && id) {
-                return id;
+            const found = host.hass?.states?.[value]?.attributes?.[key];
+            if (typeof found === 'string' && found) {
+                return found;
             }
             if (host.hass) {
                 break;
             }
             node = host;
         }
-        return value;
+        return '';
+    }
+    /** The ioBroker ID of the chosen entity; else the entity ID. */
+    private sourceId(value: string): string {
+        return this.attribute(value, 'iobroker_id') || value;
     }
     render(): TemplateResult {
-        const current = [...this.fixed, ...this.options].find(o => o.id === this.value);
+        // a datapoint chosen outside the field's own choices (any datapoint of the object tree) shows by its name
+        const current =
+            [...this.fixed, ...this.options].find(o => o.id === this.value) ??
+            (this.value ? { id: this.value, label: this.attribute(this.value, 'friendly_name') } : undefined);
         // the chosen datapoint's ID below the field (not for "none" and the other fixed choices)
         const id = this.value && !this.fixed.some(o => o.id === this.value) ? this.sourceId(this.value) : '';
         return html`<button

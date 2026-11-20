@@ -32,9 +32,14 @@ export const TEXTS = {
         ru: 'Выберите точки данных в дереве объектов и примените их. Существующие привязки сохраняются.',
     },
     mapping_hint_single: {
-        de: 'Objektbaum öffnen oder nach Name und Objekt-ID suchen. Passende, bereits verbundene Datenpunkte werden angezeigt.',
-        en: 'Open the object tree or search by name and object ID. Matching datapoints that are connected already are shown.',
-        ru: 'Откройте дерево объектов или ищите по имени и ID объекта. Показываются подходящие, уже подключённые точки данных.',
+        de: 'Objektbaum öffnen oder nach Name und Objekt-ID suchen. Alle Datenpunkte stehen zur Wahl; ein noch nicht verbundener wird beim Auswählen verbunden.',
+        en: 'Open the object tree or search by name and object ID. All datapoints can be chosen; one not connected yet is connected when chosen.',
+        ru: 'Откройте дерево объектов или ищите по имени и ID объекта. Можно выбрать любую точку данных; ещё не подключённая подключается при выборе.',
+    },
+    connecting_datapoint: {
+        de: 'Datenpunkt wird verbunden …',
+        en: 'Connecting the datapoint …',
+        ru: 'Точка данных подключается …',
     },
     search_placeholder: {
         de: 'Objekt-ID oder Name suchen',

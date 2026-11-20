@@ -21,6 +21,8 @@ export function setupDeviceDialog({
         choose: ((value: string) => void) | null = null,
         pick: PickerDetail | null = null,
         single: string | null = null;
+    /** The single choice: datapoints not connected yet, by the entity they become when chosen. */
+    let fresh = new Map<string, Mapping>();
     // Values are read only for the rows that are shown, never for all objects.
     const values = new Map<string, unknown>(),
         requested = new Set<string>();
@@ -39,12 +41,10 @@ export function setupDeviceDialog({
             mode === 'single' ? t('choose_apply') : t('selected_new', { n: selected.size });
     });
     tree.onRows = items => {
-        if (mode === 'single') {
-            return;
-        }
-        // a media player is no datapoint of its own: its value column shows its parts
+        // a media player is no datapoint of its own: its value column shows its parts; the single choice's
+        // connected datapoints bring their value along
         const ids = items
-            .filter(i => !i.id.startsWith('media_player.'))
+            .filter(i => !i.id.startsWith('media_player.') && (mode !== 'single' || i.value === undefined))
             .map(i => i.path)
             .filter(id => !requested.has(id));
         if (!ids.length) {
@@ -78,18 +78,26 @@ export function setupDeviceDialog({
             })
             .catch(() => {});
     };
-    function filters(items: TreeItem[]): void {
+    /** The roles and rooms to filter by; `reset`: also the search and the chosen filters (else they stay). */
+    function filters(items: TreeItem[], reset = true): void {
         for (const [id, key, label] of [
             ['role-filter', 'role', 'all_roles'],
             ['room-filter', 'room', 'all_rooms'],
         ] as const) {
             const select = $(id);
+            const keep = select.value;
             select.replaceChildren(new Option(t(label), ''));
             for (const value of [
                 ...new Set(items.map(i => i[key]).filter((value): value is string => Boolean(value))),
             ].sort()) {
                 select.append(new Option(key === 'room' ? getHass()?.areas?.[value]?.name || value : value, value));
             }
+            if (!reset) {
+                select.value = keep;
+            }
+        }
+        if (!reset) {
+            return;
         }
         $('search').value = '';
         tree.query = '';
@@ -205,19 +213,73 @@ export function setupDeviceDialog({
             };
         });
     }
-    /** The single choice again: objects and values read anew, the field's choices as it offers them now. */
-    async function refreshPick(): Promise<void> {
-        const before = getHass();
-        reload();
-        await refresh();
-        // the page builds the new states a moment later (bridge.ts `schedule`), the field takes them on its next render
+    /**
+     * All the other datapoints for the single choice, as "Geräte verbinden" lists them: a connected one as its device,
+     * one not connected yet as the device it becomes (connected on "Auswählen"). Not the media players (no datapoint).
+     */
+    async function moreItems(shown: TreeItem[]): Promise<TreeItem[]> {
+        [mappings, candidates] = await Promise.all([
+            callWS({ type: 'iobroker/mappings/get' }),
+            callWS({ type: 'iobroker/discover' }),
+        ]);
+        const paths = new Set(shown.map(i => i.path));
+        const known = new Map(mappings.map(m => [m.state, m]));
+        fresh = new Map();
+        const more: TreeItem[] = [];
+        for (const c of candidates) {
+            if (c._meta?.path || paths.has(c.state)) {
+                continue;
+            }
+            paths.add(c.state);
+            const m = known.get(c.state);
+            if (!m) {
+                fresh.set(c.entity_id, c);
+            }
+            more.push({
+                id: m?.entity_id ?? c.entity_id,
+                path: c.state,
+                label: m?.name || c.name || c.state,
+                role: c._meta?.role,
+                type: c._meta?.type,
+                value: values.get(c.state),
+                room: c.area_id,
+            });
+        }
+        return more;
+    }
+    /** The field's choices first (they are what it looks for), then all the other datapoints. */
+    async function pickAll(shown: TreeItem[], detail: PickerDetail): Promise<void> {
+        $('mapping-result').textContent = t('loading_objects');
+        const more = await moreItems(shown);
+        // closed meanwhile, or opened for another field
+        if (pick !== detail || mode !== 'single' || !dialog.open) {
+            return;
+        }
+        const all = [...shown, ...more];
+        filters(all, false);
+        tree.setItems(all, selected);
+        $('mapping-result').textContent = t('available', { n: all.length });
+    }
+    /** Until the page has built its next states (bridge.ts `schedule`) and the editor has drawn them. */
+    async function nextHass(before: unknown): Promise<void> {
         for (let i = 0; i < 40 && getHass() === before; i++) {
             await new Promise(resolve => setTimeout(resolve, 50));
         }
         await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+    }
+    /** The single choice again: objects and values read anew, the field's choices as it offers them now. */
+    async function refreshPick(): Promise<void> {
+        const before = getHass();
+        reload();
+        values.clear();
+        requested.clear();
+        await refresh();
+        await nextHass(before);
         const items = pickItems(pick?.current?.() ?? pick?.options ?? []);
         tree.setItems(items, selected);
-        $('mapping-result').textContent = t('available', { n: items.length });
+        if (pick) {
+            await pickAll(items, pick);
+        }
     }
     $('discover').onclick = async () => {
         if (mode === 'single') {
@@ -300,6 +362,22 @@ export function setupDeviceDialog({
         try {
             if (mode === 'single') {
                 if (single !== null && choose) {
+                    // a datapoint not connected yet becomes a device first, then the field takes it
+                    const add = fresh.get(single);
+                    if (add) {
+                        $('mapping-result').textContent = t('connecting_datapoint');
+                        const current = ((await callWS({ type: 'iobroker/mappings/get' })) as Mapping[]).map(
+                            ({ _meta, ...m }) => m,
+                        );
+                        if (!current.some(m => m.entity_id === add.entity_id)) {
+                            const { _meta, ...m } = add;
+                            const before = getHass();
+                            await callWS({ type: 'iobroker/mappings/set', mappings: [...current, m] });
+                            await refresh();
+                            await nextHass(before);
+                        }
+                        fresh.delete(single);
+                    }
                     choose(single);
                 }
                 dialog.close();
@@ -330,6 +408,9 @@ export function setupDeviceDialog({
         configure(true);
         choose = detail.choose;
         pick = detail;
+        fresh = new Map();
+        values.clear();
+        requested.clear();
         const items = pickItems(detail.options);
         for (const fixed of detail.fixed || []) {
             const b = document.createElement('button');
@@ -352,5 +433,8 @@ export function setupDeviceDialog({
         filters(items);
         tree.setItems(items, selected);
         dialog.showModal();
+        pickAll(items, detail).catch(e => {
+            $('mapping-result').textContent = e.message;
+        });
     });
 }

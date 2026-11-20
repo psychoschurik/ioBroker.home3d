@@ -367,6 +367,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   entfallen
 - (bluefox) „Datenpunkt auswählen“ (Batterie, Landstrom und die anderen Felder im Editor) hat jetzt auch
   „↻ Aktualisieren“: liest Namen, Rollen, Typen und Werte der Datenpunkte neu, die Auswahl bleibt
+- (bluefox) „Datenpunkt auswählen“ zeigt jetzt alle Datenpunkte, nicht nur die schon verbundenen: Die passenden
+  stehen oben, ein noch nicht verbundener (z. B. `alias.0.Technik.onShorePower.POWER`) wird beim Auswählen verbunden
 
 ### 0.4.0 (2026-11-15)
 
