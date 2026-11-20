@@ -11,6 +11,10 @@ import { DEMO_INFO, demoSocketScript } from './scripts/demo-data';
 
 const root = __dirname;
 const version: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+/** The instance's own states (home3d.0.show, .places): the page creates them when an update did not. */
+const ownStates = (
+    JSON.parse(readFileSync(join(root, 'io-package.json'), 'utf8')) as { instanceObjects: { _id: string }[] }
+).instanceObjects.filter(o => o._id);
 const VENDOR = /^\.\/vendor\/home3d[\w-]*\.js$/;
 
 /** `./vendor/home3d.js` is the 3D frontend, loaded next to bridge.js at runtime: not part of this bundle. */
@@ -57,7 +61,7 @@ export default defineConfig({
     base: './',
     publicDir: join(root, 'frontend/public'),
     plugins: [vendor, demoSocket, react({})],
-    define: { __HOME3D_VERSION__: JSON.stringify(version) },
+    define: { __HOME3D_VERSION__: JSON.stringify(version), __HOME3D_STATES__: JSON.stringify(ownStates) },
     // FileViewer of @iobroker/gui-components imports Buffer
     resolve: { alias: { buffer: 'buffer/' } },
     build: {

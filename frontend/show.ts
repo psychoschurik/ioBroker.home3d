@@ -12,6 +12,11 @@ import { NAMESPACE, type IoBroker } from './iobroker.js';
 export const SHOW_ID = `${NAMESPACE}.show`;
 export const PLACES_ID = `${NAMESPACE}.places`;
 
+/** The instanceObjects of io-package.json with an id (vite.config.ts); missing in the tests. */
+declare const __HOME3D_STATES__:
+    { _id: string; type: string; common: Record<string, unknown>; native?: object }[] | undefined;
+const OWN_STATES = typeof __HOME3D_STATES__ === 'undefined' ? [] : __HOME3D_STATES__;
+
 /** What the panel offers (patched in `showFromIoBroker` of tasks.ts). */
 export interface Shower {
     fp3dShow?(words: string): Promise<string | null>;
@@ -54,11 +59,30 @@ export function setupShow(io: IoBroker, store: Store, panel: () => (HTMLElement 
             }
         })().catch(e => console.warn('[home3d] show', e));
     };
-    // an instance installed before these states existed gets them with the next install of the adapter
-    const exists = io.conn
-        .getObject(SHOW_ID)
-        .then(obj => !!obj)
-        .catch(() => false);
+    // An update does not create new instanceObjects for an existing instance, and this adapter has no process that
+    // would: a browser that may write creates them (once), the others wait for it.
+    const exists = (async (): Promise<boolean> => {
+        if (await io.conn.getObject(SHOW_ID).catch(() => null)) {
+            return true;
+        }
+        if (store.readOnly || !OWN_STATES.length) {
+            return false;
+        }
+        for (const def of OWN_STATES) {
+            const id = `${NAMESPACE}.${def._id}`;
+            if (!(await io.conn.getObject(id).catch(() => null))) {
+                await io.conn.setObject(id, {
+                    type: def.type,
+                    common: def.common,
+                    native: def.native ?? {},
+                } as ioBroker.SettableObject);
+            }
+        }
+        return true;
+    })().catch(e => {
+        console.warn('[home3d] create show', e);
+        return false;
+    });
     void (async () => {
         if (!(await exists)) {
             return;
