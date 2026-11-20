@@ -1,5 +1,5 @@
 import { element as $ } from './dom.js';
-import type { DeviceDialogOptions, Mapping } from './types.js';
+import type { DeviceDialogOptions, Mapping, PickerDetail } from './types.js';
 import type { TreeItem } from './object-tree.js';
 import { ObjectTree } from './object-tree.js';
 import { t } from './lang.js';
@@ -19,6 +19,7 @@ export function setupDeviceDialog({
         selected = new Set<string>(),
         mode = 'mapping',
         choose: ((value: string) => void) | null = null,
+        pick: PickerDetail | null = null,
         single: string | null = null;
     // Values are read only for the rows that are shown, never for all objects.
     const values = new Map<string, unknown>(),
@@ -165,7 +166,6 @@ export function setupDeviceDialog({
         $('mapping-save').disabled = isSingle;
         $('mapping-advanced').hidden = isSingle;
         $('configured').hidden = isSingle;
-        $('discover').hidden = isSingle;
         $('object-browser').hidden = isSingle;
         $('fixed-options').replaceChildren();
         $('mapping-result').textContent = '';
@@ -189,7 +189,45 @@ export function setupDeviceDialog({
             $('mapping-result').textContent = e.message;
         }
     };
+    /** The rows of the single choice: the field's choices with the name, role, type and value of their datapoint. */
+    function pickItems(options: { id: string; label: string }[]): TreeItem[] {
+        const hass = getHass();
+        return options.map(o => {
+            const entity = hass?.states[o.id];
+            return {
+                id: o.id,
+                path: entity?.attributes?.iobroker_id || o.id,
+                label: o.label,
+                role: entity?.attributes?.iobroker_role || '',
+                type: entity?.attributes?.iobroker_type || '',
+                value: entity?.state,
+                room: hass?.entities?.[o.id]?.area_id ?? undefined,
+            };
+        });
+    }
+    /** The single choice again: objects and values read anew, the field's choices as it offers them now. */
+    async function refreshPick(): Promise<void> {
+        const before = getHass();
+        reload();
+        await refresh();
+        // the page builds the new states a moment later (bridge.ts `schedule`), the field takes them on its next render
+        for (let i = 0; i < 40 && getHass() === before; i++) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+        const items = pickItems(pick?.current?.() ?? pick?.options ?? []);
+        tree.setItems(items, selected);
+        $('mapping-result').textContent = t('available', { n: items.length });
+    }
     $('discover').onclick = async () => {
+        if (mode === 'single') {
+            try {
+                await refreshPick();
+            } catch (e) {
+                $('mapping-result').textContent = e.message;
+            }
+            return;
+        }
         try {
             reload();
             values.clear();
@@ -291,19 +329,8 @@ export function setupDeviceDialog({
         const detail = event.detail;
         configure(true);
         choose = detail.choose;
-        const hass = getHass();
-        const items = detail.options.map(o => {
-            const entity = hass?.states[o.id];
-            return {
-                id: o.id,
-                path: entity?.attributes?.iobroker_id || o.id,
-                label: o.label,
-                role: entity?.attributes?.iobroker_role || '',
-                type: entity?.attributes?.iobroker_type || '',
-                value: entity?.state,
-                room: hass?.entities?.[o.id]?.area_id ?? undefined,
-            };
-        });
+        pick = detail;
+        const items = pickItems(detail.options);
         for (const fixed of detail.fixed || []) {
             const b = document.createElement('button');
             b.textContent = fixed.label;

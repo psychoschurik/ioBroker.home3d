@@ -11,6 +11,8 @@ export interface PickerDetail {
     fixed?: { id: string; label: string }[];
     value: string | null;
     choose: (value: string) => void;
+    /** The choices as the field offers them now (after "Aktualisieren" read the datapoints again). */
+    current?: () => { id: string; label: string }[];
 }
 declare global {
     interface WindowEventMap {

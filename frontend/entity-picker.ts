@@ -39,6 +39,7 @@ export class EntityPicker extends LitElement {
                     options: this.options,
                     fixed: this.fixed,
                     value: this.value,
+                    current: () => this.options,
                     choose: (value: string) => {
                         this.value = value;
                         this.dispatchEvent(

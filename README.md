@@ -365,6 +365,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Eine Kopfzeile statt zwei: Logo, Status, Projekte, Geräte verbinden, Kiosk und Hilfe stehen jetzt in der
   Leiste der 3D-Ansicht neben Grundriss-Auswahl, 3D/Editor, Version und ⚙; „3D Home“ und „Dein Zuhause im Überblick“
   entfallen
+- (bluefox) „Datenpunkt auswählen“ (Batterie, Landstrom und die anderen Felder im Editor) hat jetzt auch
+  „↻ Aktualisieren“: liest Namen, Rollen, Typen und Werte der Datenpunkte neu, die Auswahl bleibt
 
 ### 0.4.0 (2026-11-15)
 
