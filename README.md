@@ -380,6 +380,12 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   3D-Ansicht, Detail-Dialog, „Geräte verbinden“)
 - (bluefox) Die 3D-Ansicht zeigt „Projekte“, „Geräte verbinden“ und den Verbindungsstatus nicht mehr in der Leiste,
   nur der Editor; eine Störung (getrennt, Fehler) steht weiterhin auch in der 3D-Ansicht
+- (bluefox) „Ortung“ (wer in welchem Raum ist, per Bluetooth) ist ausgeblendet: Sie braucht einen Server, den ioBroker
+  nicht hat, und meldete nur „Noch nicht für ioBroker implementiert“
+- (bluefox) Steuern aus ioBroker: Ein Ort oder Gerät in Worten in `home3d.0.show` („Unterdeck“, „Küche“, „Diesel“,
+  „Haus“) lässt jede offene 3D-Ansicht dorthin fliegen, bestätigt mit `ack` und dem Namen des Gezeigten;
+  `home3d.0.places` nennt die bekannten Etagen, Räume und Geräte. So zeigt ein Sprachassistent oder pi-agent auf dem
+  Tablet, wovon die Rede ist
 
 ### 0.4.0 (2026-11-15)
 

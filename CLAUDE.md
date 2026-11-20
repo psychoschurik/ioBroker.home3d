@@ -21,6 +21,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 | `frontend/history.ts`, `sun.ts`, `more-info.ts`, `mdi-icon.ts` | `history/history_during_period`, `home3d/timetravel/history` and `recorder/statistics_during_period` (energy) from the history adapters (beside `Store.call()`); `sun.sun` from the system position; detail dialog with history curve; `<ha-icon>` drawn with `@mdi/js` (full set loaded on demand) |
 | `frontend/device-dialog.ts`, `object-tree.ts`, `entity-picker.ts` | "Geräte verbinden" dialog with object tree |
 | `frontend/media.ts` | Media players for "Geräte verbinden": a device whose states have media roles (media.state, button.play/pause/next/prev, level.volume, media.title/cover …, as the type-detector names them) becomes one `media_player` mapping with all its actions, shown as the entry `media_player` below its device |
+| `frontend/show.ts` | Steered from ioBroker: `home3d.0.show` (a place or device in words, written by a voice assistant, pi-agent or a script) makes every open 3D view fly there (`fp3dShow`, the matching of the spoken "Zeig …"; patch `showFromIoBroker` in tasks.ts) and confirms with ack and the name shown; `home3d.0.places` (JSON: floors, rooms, named devices) is written by a browser that may write. Their `common.desc` in `io-package.json` is what an agent reads (pi-agent `adapter_help`) |
 | `frontend/datapoint.ts` | Datapoints chosen at the device in the editor (events `iobroker-datapoint`, `iobroker-add-devices` from the patched editor): object browser, change or add mappings |
 | `frontend/project.ts` | Project files (one plan + its images + the mappings it uses): format, reading, naming |
 | `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
@@ -34,7 +35,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 | `test/*.test.ts` | Unit tests (`node:test`, `node:assert`) against an in-memory file storage |
 | `test/packageFiles.js` | `@iobroker/testing` package checks |
 
-## Storage (files of `home3d.0`, meta object from `instanceObjects`)
+## Storage (files of `home3d.0`, meta object from `instanceObjects`; states `show` and `places` from there too)
 
 - `data.json`: `{ version: 2, plans, images: {id → file}, mappings, locate_plan, position_id?, timetravel_instance?, health_stale_min? }` — written on every change;
   `position_id`: a datapoint with the position (GPS on a boat) for `sun.sun` instead of the system settings;
@@ -53,7 +54,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 - Never load all states. Subscribe only `mappedIds(mappings)`; the object tree loads objects only when the dialog opens.
   Exception, bounded: the health datapoints of the mapped devices (`health.ts`: the state objects below each mapped
   device or channel are read once, at most 400; their battery/unreach/reachable states and the adapter's
-  `info.connection`/`alive` are subscribed too).
+  `info.connection`/`alive` are subscribed too). And the instance's own `home3d.0.show` (`show.ts`).
 - Never reach external hosts from the page (only exception: a picture whose URL a mapped datapoint gives, e.g. the
   `entity_picture` of a media player such as a YouTube thumbnail); links of the upstream frontend are rewritten to `help.html` in `tasks.ts`.
 - A mapping may have a condition `when: { id, values, else }`: its state counts only while datapoint `id` has one of
@@ -78,6 +79,8 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 - Everything is free: no shop, customer account, licence, supporter pass, newsletter or "Pro" in the UI. `noShop` in
   `tasks.ts` removes their pages, teasers and locks and empties their texts (`SHOP_TEXTS`, also taken out of
   `frontend/public/vendor/lang/*.json`); new upstream texts of that kind get the same treatment.
+- Locating ("Ortung", Bluetooth presence) is hidden (`noLocate` in `tasks.ts`): it needs a server that reads the
+  receivers' signal strengths and learns the rooms, which ioBroker does not have.
 - Do not mention the former upstream project name anywhere; keep the MIT copyright in LICENSE/NOTICE.
 - Texts of the frame only through `t()` of `frontend/lang.ts` (de, en and ru for every key); texts of the 3D view as
   keys of its i18n (de/en patched in `tasks.ts`, other languages in `frontend/public/vendor/lang/<code>.json`, Russian included).

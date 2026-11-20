@@ -86,6 +86,9 @@ function connect(): unknown {
         return Object.fromEntries(ids.filter(id => states[id]).map(id => [id, states[id]]));
     };
     const fileKey = (namespace: string, name: string): string => `${namespace}/${name.replace(/^\/+/, '')}`;
+    // a write from another adapter (a voice assistant, a script), e.g. demoWrite('home3d.0.show', 'Küche') in the console
+    (globalThis as { demoWrite?: (id: string, val: unknown) => void }).demoWrite = (id, val) =>
+        changeState(id, { val, ack: false, ts: Date.now(), lc: Date.now(), q: 0, from: 'system.adapter.javascript.0' });
     const commands: Record<string, Callback> = {
         getVersion: (cb: Callback) => cb(null, '7.0.0', 'web'),
         authenticate: (cb: Callback) => cb(true, false),

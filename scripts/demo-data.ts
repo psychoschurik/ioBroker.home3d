@@ -79,9 +79,19 @@ export async function demoData(file?: string): Promise<string> {
         mappings: house.mappings,
         locate_plan: 'main',
     };
+    // the instance's own states (home3d.0.show, home3d.0.places) as the install creates them
+    const pkg = JSON.parse(await readFile(resolve('io-package.json'), 'utf8')) as {
+        instanceObjects: { _id: string; type: string; common: unknown; native: unknown }[];
+    };
+    const own = Object.fromEntries(
+        pkg.instanceObjects
+            .filter(o => o._id)
+            .map(o => [`home3d.0.${o._id}`, { type: o.type, common: o.common, native: o.native }]),
+    );
     return JSON.stringify({
         objects: {
             ...house.objects,
+            ...own,
             'system.config': { type: 'config', common: { language: process.env.DEMO_LANG || 'de' }, native: {} },
             'home3d.0': { type: 'meta', common: { name: '3D Home', type: 'meta.user' }, native: {} },
         },

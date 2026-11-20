@@ -8,6 +8,7 @@ import { historyDuringPeriod, historyEnabled, statisticsDuringPeriod, timeTravel
 import { parsePosition, sunState } from './sun.js';
 import { setupMoreInfo } from './more-info.js';
 import { joinBars, placeStatus } from './shell.js';
+import { setupShow } from './show.js';
 import { setupDeviceDialog } from './device-dialog.js';
 import { pickDatapoint, setupDatapoints } from './datapoint.js';
 import { IoBroker, NAMESPACE } from './iobroker.js';
@@ -320,6 +321,8 @@ async function start(): Promise<void> {
         })
         .catch(e => console.warn('[home3d] subscribeFiles', e));
     render();
+    // home3d.0.show: a voice assistant or a script tells the 3D view what to show
+    setupShow(io, store, () => (element?.localName === 'home3d-panel' ? element : undefined));
     // the sun moves on
     setInterval(schedule, 60_000);
 }

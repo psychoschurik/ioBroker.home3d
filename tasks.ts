@@ -4024,6 +4024,132 @@ function fixedDialogHeads(name: string, code: string): string {
 }
 
 /**
+ * The 3D view steered from ioBroker (frontend/show.ts): `home3d.0.show` names a place or a device in words, the view
+ * flies there as the spoken "Zeig …" would (the same matching: plan names, ioBroker rooms, furniture and device
+ * names, synonyms); `home3d.0.places` lists the names it knows, so an agent can pick one.
+ */
+function showFromIoBroker(name: string, code: string): string {
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '  private async handleSentence(',
+            [
+                '  /** ioBroker (home3d.0.show): shows the place or device named in words; the name shown, or null when none has it. */',
+                '  async fp3dShow(words: string): Promise<string | null> {',
+                '    const hass = this.hass;',
+                '    const b = this.building;',
+                '    if (!hass || !b || !words.trim()) return null;',
+                '    const v = await loadVoice();',
+                '    const { devices, items } = this.spokenDevices(hass, b, v.SYNONYMS);',
+                '    // a device answers only when it is asked to be shown',
+                '    const place = v.showTarget(`show ${words}`, b, devices, (r) => (r.area_id ? hass.areas?.[r.area_id]?.name : null));',
+                '    if (!place || place.kind === "cameras") return null;',
+                '    this.directing.touch(Date.now());',
+                '    if (place.kind === "device") {',
+                '      const item = items.get(place.id);',
+                '      if (!item) return null;',
+                '      this.goTo(item);',
+                '      return place.name;',
+                '    }',
+                '    if (place.kind === "house") {',
+                '      this.fire("floor-tap", { floorId: null });',
+                '      return translate(hass, "all_floors");',
+                '    }',
+                '    if (place.kind === "floor") {',
+                '      this.fire("floor-tap", { floorId: place.floorId });',
+                '      return place.name;',
+                '    }',
+                '    if (this.floorId !== place.floorId) this.fire("floor-tap", { floorId: place.floorId });',
+                '    // a tap on the open room would close it',
+                '    if (this.roomId !== place.roomId) setTimeout(() => this.fire("room-tap", { floorId: place.floorId, roomId: place.roomId }), 60);',
+                '    return place.name;',
+                '  }',
+                '',
+                '  /** ioBroker (home3d.0.places): the floors with their rooms and the named devices (with their room), as JSON. */',
+                '  async fp3dPlaces(): Promise<string | null> {',
+                '    const hass = this.hass;',
+                '    const b = this.building;',
+                '    if (!hass || !b) return null;',
+                '    const v = await loadVoice();',
+                '    const { devices } = this.spokenDevices(hass, b, v.SYNONYMS);',
+                '    const floors: Record<string, string[]> = {};',
+                '    for (const f of b.floors) floors[f.name] = zonesOf(f).map((r) => r.name).filter((n) => !!n);',
+                '    const seen = new Set<string>();',
+                '    const named: { name: string; room?: string }[] = [];',
+                '    for (const d of devices) {',
+                '      const key = `${d.name}|${d.room}`;',
+                '      if (!d.name || seen.has(key)) continue;',
+                '      seen.add(key);',
+                '      named.push(d.room ? { name: d.name, room: d.room } : { name: d.name });',
+                '    }',
+                '    return JSON.stringify({ floors, devices: named });',
+                '  }',
+                '',
+                '  private async handleSentence(',
+            ].join('\n'),
+            'show from ioBroker: view',
+        );
+    }
+    if (name === 'panel.ts') {
+        code = replaceRequired(
+            code,
+            '  private view3d() {',
+            [
+                '  /** ioBroker (home3d.0.show): the 3D view shows a place or device named in words; its name, or null (also in the editor). */',
+                '  fp3dShow(words: string): Promise<string | null> {',
+                '    const view = this._mode === "view" ? (this.view3d() as unknown as { fp3dShow?(w: string): Promise<string | null> } | null) : null;',
+                '    return view?.fp3dShow?.(words) ?? Promise.resolve(null);',
+                '  }',
+                '',
+                '  /** ioBroker (home3d.0.places): the names home3d.0.show knows, as JSON; null without a 3D view. */',
+                '  fp3dPlaces(): Promise<string | null> {',
+                '    const view = this.view3d() as unknown as { fp3dPlaces?(): Promise<string | null> } | null;',
+                '    return view?.fp3dPlaces?.() ?? Promise.resolve(null);',
+                '  }',
+                '',
+                '  private view3d() {',
+            ].join('\n'),
+            'show from ioBroker: panel',
+        );
+    }
+    return code;
+}
+
+/**
+ * No locating ("Ortung", "Live Presence"): who is in which room by Bluetooth needs the server that reads the signal
+ * strengths of all receivers, learns the rooms and works out the place; ioBroker has none of it. Hidden: the menu
+ * entry, the plan choice in ⚙ → Grundrisse, the located people; the voice no longer asks the server.
+ */
+function noLocate(name: string, code: string): string {
+    if (name === 'features.ts') {
+        code = replaceRequired(
+            code,
+            'export function released(feature: Gated): boolean {\n',
+            'export function released(feature: Gated): boolean {\n  // locating needs a server ioBroker does not have\n  if (feature === "locate") return false;\n',
+            'no locating',
+        );
+    }
+    if (name === 'components/plan-manager.ts') {
+        code = `import { released as fp3dReleased } from "../features.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '      ${this.plans.length > 1\n        ? html`<h4>${this.t("plan_locate")}</h4>',
+            '      ${this.plans.length > 1 && fp3dReleased("locate")\n        ? html`<h4>${this.t("plan_locate")}</h4>',
+            'no locating: plan',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '      const located = await hass\n        .callWS<{ text: string; rooms: string[]; admins_only: boolean } | null>({ type: "home3d/locate/ask"',
+            '      const located = !released("locate") ? null : await hass\n        .callWS<{ text: string; rooms: string[]; admins_only: boolean } | null>({ type: "home3d/locate/ask"',
+            'no locating: voice',
+        );
+    }
+    return code;
+}
+
+/**
  * The furniture library's pictures of a boat's anchor and gear: the viewer draws them itself, not as furniture, so
  * their pictures stayed empty; they are built as in the viewer (frontend/vendor-ext/boat-picture.ts). Patched after
  * every other picture of preview.ts. The pictures kept in the browser get a new key: the empty ones are drawn anew.
@@ -6870,6 +6996,8 @@ const patches: Plugin = {
         code = oneBar(name, code);
         code = boatPictures(name, code);
         code = fixedDialogHeads(name, code);
+        code = noLocate(name, code);
+        code = showFromIoBroker(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

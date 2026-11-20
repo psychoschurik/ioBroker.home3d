@@ -99,6 +99,50 @@
                 "type": "meta.user"
             },
             "native": {}
+        },
+        {
+            "_id": "show",
+            "type": "state",
+            "common": {
+                "name": {
+                    "en": "Show in the 3D view",
+                    "de": "In der 3D-Ansicht zeigen",
+                    "ru": "Показать в 3D-виде"
+                },
+                "desc": {
+                    "en": "Write a place or a device in words and every open 3D view (not one in the editor) flies there: a floor (\"Deck\"), a room (as named in the plan or in the ioBroker rooms), a device or piece of furniture (\"Diesel\"), or \"house\" for the whole house. The names it knows are in home3d.0.places. A 3D view that shows it confirms with ack=true and the name of what it shows; when the value stays ack=false, no 3D view is open or nothing has that name.",
+                    "de": "Einen Ort oder ein Gerät in Worten schreiben, jede offene 3D-Ansicht (nicht im Editor) fliegt dorthin: eine Etage („Deck“), ein Raum (wie im Grundriss oder in den ioBroker-Räumen benannt), ein Gerät oder Möbelstück („Diesel“) oder „Haus“ für das ganze Haus. Die bekannten Namen stehen in home3d.0.places. Eine 3D-Ansicht, die es zeigt, bestätigt mit ack=true und dem Namen des Gezeigten; bleibt der Wert ack=false, ist keine 3D-Ansicht offen oder nichts heißt so.",
+                    "ru": "Записать место или устройство словами, и каждый открытый 3D-вид (не в редакторе) перелетит туда: этаж («Deck»), комната (как названа в плане или в комнатах ioBroker), устройство или предмет мебели («Diesel») или «дом» для всего дома. Известные имена — в home3d.0.places. 3D-вид, который это показал, подтверждает ack=true и именем показанного; если значение остаётся ack=false, ни один 3D-вид не открыт или такого имени нет."
+                },
+                "type": "string",
+                "role": "text",
+                "read": true,
+                "write": true,
+                "def": ""
+            },
+            "native": {}
+        },
+        {
+            "_id": "places",
+            "type": "state",
+            "common": {
+                "name": {
+                    "en": "Places of the 3D view",
+                    "de": "Orte der 3D-Ansicht",
+                    "ru": "Места 3D-вида"
+                },
+                "desc": {
+                    "en": "What home3d.0.show understands, as JSON written by an open 3D view: {\"floors\": {floor: [rooms]}, \"devices\": [{\"name\", \"room\"}]}.",
+                    "de": "Was home3d.0.show versteht, als JSON, geschrieben von einer offenen 3D-Ansicht: {\"floors\": {Etage: [Räume]}, \"devices\": [{\"name\", \"room\"}]}.",
+                    "ru": "Что понимает home3d.0.show, в виде JSON, записанного открытым 3D-видом: {\"floors\": {этаж: [комнаты]}, \"devices\": [{\"name\", \"room\"}]}."
+                },
+                "type": "string",
+                "role": "json",
+                "read": true,
+                "write": false,
+                "def": ""
+            },
+            "native": {}
         }
     ]
 }
