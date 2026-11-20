@@ -3673,6 +3673,36 @@ function roundCardButtons(name: string, code: string): string {
 }
 
 /**
+ * One bar instead of two (frontend/shell.ts): the page's own bar (logo, status, projects, devices, kiosk, help) goes
+ * into the slots "start" (instead of the title "3D Home") and "end" (before the version and ⚙) of the panel's header.
+ * In the clean view, where the header is gone, a header with only those slots stays, as the page's bar did before.
+ */
+function oneBar(name: string, code: string): string {
+    if (name !== 'panel.ts') {
+        return code;
+    }
+    code = replaceRequired(
+        code,
+        '          <h1>3D Home</h1>\n',
+        '          <slot name="start"></slot>\n',
+        'one bar: start',
+    );
+    code = replaceRequired(
+        code,
+        '          <span class="fp3d-version" title=${this.t("version_hint"',
+        '          <slot name="end"></slot>\n          <span class="fp3d-version" title=${this.t("version_hint"',
+        'one bar: end',
+    );
+    code = replaceRequired(
+        code,
+        '${(this._clean && this._mode === "view") || this.kiosk ? nothing : html`<header class="fp3d-header">',
+        '${this.kiosk ? nothing : this._clean && this._mode === "view" ? (this.querySelector(":scope > [slot]") ? html`<header class="fp3d-header"><slot name="start"></slot><span class="fp3d-grow"></span><slot name="end"></slot></header>` : nothing) : html`<header class="fp3d-header">',
+        'one bar: the clean view keeps the page bar',
+    );
+    return code;
+}
+
+/**
  * Robot vacuums (device-cards.ts): the robot drives by the state of an ioBroker datapoint too (the codes of
  * Xiaomi/Roborock, plain words), and finds its datapoint by name when none is linked.
  */
@@ -6461,6 +6491,7 @@ const patches: Plugin = {
         code = mediaMore(name, code);
         code = cardModes(name, code);
         code = roundCardButtons(name, code);
+        code = oneBar(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

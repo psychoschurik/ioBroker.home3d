@@ -362,6 +362,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
 - (bluefox) Glaskarten „beim Zeigen“: Die Leuchtpunkte sitzen auf dem Gerät statt darüber zu schweben und werden
   mit der Entfernung kleiner wie die Karten (höchstens 5 px); ein unsichtbarer Ring um den Punkt fängt die Maus, auch
   bei offener Karte – sie blinkt unter der Maus nicht mehr jede Sekunde
+- (bluefox) Eine Kopfzeile statt zwei: Logo, Status, Projekte, Geräte verbinden, Kiosk und Hilfe stehen jetzt in der
+  Leiste der 3D-Ansicht neben Grundriss-Auswahl, 3D/Editor, Version und ⚙; „3D Home“ und „Dein Zuhause im Überblick“
+  entfallen
 
 ### 0.4.0 (2026-11-15)
 

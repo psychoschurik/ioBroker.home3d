@@ -7,6 +7,7 @@ import './vendor/home3d.js';
 import { historyDuringPeriod, historyEnabled, statisticsDuringPeriod, timeTravelHistory } from './history.js';
 import { parsePosition, sunState } from './sun.js';
 import { setupMoreInfo } from './more-info.js';
+import { joinBars } from './shell.js';
 import { setupDeviceDialog } from './device-dialog.js';
 import { pickDatapoint, setupDatapoints } from './datapoint.js';
 import { IoBroker, NAMESPACE } from './iobroker.js';
@@ -265,6 +266,9 @@ function render(): void {
                 ...(params.get('plan') ? { plan: params.get('plan') } : {}),
                 ...(params.get('template') ? { template: params.get('template') } : {}),
             });
+        }
+        if (element.localName === 'home3d-panel') {
+            joinBars(element);
         }
         $('app').append(element);
     }

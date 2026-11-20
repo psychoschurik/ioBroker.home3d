@@ -13,6 +13,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 | `frontend/` | Own browser code (TypeScript, React), built by Vite (`vite.config.ts`) into `www/` |
 | `frontend/index.html`, `frontend/public/` | The page; static files (`help.html`, `style.css`, `assets/`, `licenses/`, `vendor/lang`, `vendor/fonts`) copied to `www/` |
 | `frontend/bridge.ts` | Entry: connection, live states, provides the `hass`-like object the 3D frontend expects |
+| `frontend/shell.ts` | One bar: the page's bar (logo, status, Projekte, Geräte verbinden, Kiosk, Hilfe) moves into the slots "start"/"end" of the 3D view's header (`oneBar` in tasks.ts), not in the kiosk or the card view |
 | `frontend/iobroker.ts` | `IoBroker`: socket-client wrapper, implements `IoAccess` (objects/states) and `FileAccess` (files of `home3d.0`) |
 | `frontend/store.ts` | `Store`: plans, history, images, mappings; handles every `callWS` message of the 3D frontend |
 | `frontend/entities.ts` | Mapping ioBroker datapoints ↔ devices of the 3D frontend, validation, actions (`execute`) |
