@@ -633,6 +633,15 @@ function replaceEvery(code: string, text: string, replacement: string, label: st
 const SHOP_TEXTS =
     /^(?:(?:license|offers|supporter|print|nl|gift|news|beta|ext|diag)_\w+|pro_(?:feature_\w+|title|locked|shop|unlock)|fun_(?:intro|in_account|register|register_steps|moved|open_settings)|(?:halloween|winter)_deco_hint|pack_(?:pro_module|fun_module|features|needs_module|licensed|error_wrong_instance)|modules_pro_note|module_(?:import_hint|waits_where|imported_waits)|card_pro_hint|tt_locked|auto_pro_teaser|chk_pro_(?:active|get)|energy_pro_active(?:_hint)?|hh_teaser_\w+|household_teaser_\w+|solar_pro_\w+)$/;
 
+/**
+ * The voice assistant of ioBroker is the adapter "Assistant": the 3D view's texts name it so, in every language
+ * (i18n.ts, the microphone test in mic-probe.ts and the language files). A whole word only: "Home Assistant" has become "ioBroker" before, and
+ * "HomeAssistant" in code is not touched.
+ */
+function assistantName(text: string): string {
+    return text.replace(/\bAssist\b/g, 'Assistant');
+}
+
 /** de and en of a key of the 3D view's i18n. */
 function setTexts(code: string, key: string, de: string, en: string): string {
     const texts = [de, en];
@@ -7037,7 +7046,12 @@ const patches: Plugin = {
         }
         // Only human-readable names are changed, never protocol IDs.
         code = localLinks(code).replaceAll('Home Assistant', 'ioBroker');
+        if (name === 'voice/mic-probe.ts') {
+            // the microphone test has its own texts
+            code = assistantName(code);
+        }
         if (name === 'i18n.ts') {
+            code = assistantName(code);
             // the language files lie next to the bundle at runtime, not in the sources
             code = replaceRequired(code, 'new URL(`./lang/', 'new URL(/* @vite-ignore */ `./lang/', 'language files');
             // Russian: our own language file (frontend/public/vendor/lang/ru.json)
@@ -7108,7 +7122,10 @@ async function buildVendor(): Promise<void> {
     const lang = `${www}/vendor/lang`;
     for (const file of await readdir(lang).catch(() => [] as string[])) {
         const target = `${lang}/${file}`;
-        await writeFile(target, localLinks(await readFile(target, 'utf8')).replaceAll('Home Assistant', 'ioBroker'));
+        await writeFile(
+            target,
+            assistantName(localLinks(await readFile(target, 'utf8')).replaceAll('Home Assistant', 'ioBroker')),
+        );
     }
     console.log(`3D frontend ${version}: ${Object.keys(entries).length} bundles built.`);
 }

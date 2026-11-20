@@ -386,6 +386,8 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   „Haus“) lässt jede offene 3D-Ansicht dorthin fliegen, bestätigt mit `ack` und dem Namen des Gezeigten;
   `home3d.0.places` nennt die bekannten Etagen, Räume und Geräte. So zeigt ein Sprachassistent oder pi-agent auf dem
   Tablet, wovon die Rede ist
+- (bluefox) Die Texte der Sprachsteuerung nennen den Sprachassistenten von ioBroker so, wie er heißt: „Assistant“
+  statt „Assist“, in allen Sprachen
 
 ### 0.4.0 (2026-11-15)
 
