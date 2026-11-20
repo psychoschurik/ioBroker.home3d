@@ -388,6 +388,13 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   Tablet, wovon die Rede ist
 - (bluefox) Die Texte der Sprachsteuerung nennen den Sprachassistenten von ioBroker so, wie er heißt: „Assistant“
   statt „Assist“, in allen Sprachen
+- (bluefox) Sprachsteuerung über den Adapter Assistant: Das Mikrofon der 3D-Ansicht schickt den Satz an die erste
+  eingeschaltete Instanz von Assistant (Spracherkennung und Antwort kommen von dort, ein Tablet in einem Raum nennt den
+  Raum mit). Die Sätze und der Bildschirmname, die nur der frühere Sprachdienst kannte, sind aus dem Editor entfernt
+- (bluefox) Editor: In der Geräteliste eines Raums bleiben der Name und alle Knöpfe sichtbar („Platzieren“ und
+  „Entfernen“ wurden in einer schmalen Leiste abgeschnitten)
+- (bluefox) Editor: Neuer Knopf „Im Plan zeigen“ neben einem platzierten Gerät – der Plan rückt das Gerät in die
+  Mitte, wählt es aus und lässt Ringe von ihm ausgehen
 
 ### 0.4.0 (2026-11-15)
 

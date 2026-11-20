@@ -747,8 +747,6 @@ export class Store {
                 return [];
             case 'energy/get_prefs':
                 return { energy_sources: [], device_consumption: [] };
-            case 'assist_pipeline/pipeline/list':
-                return { pipelines: [], preferred_pipeline: null };
             default:
                 error('not_supported', t('not_implemented', { type: String(m.type) }));
         }

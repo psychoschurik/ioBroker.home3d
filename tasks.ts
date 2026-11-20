@@ -4033,6 +4033,231 @@ function fixedDialogHeads(name: string, code: string): string {
 }
 
 /**
+ * Voice control through the adapter Assistant (frontend/assistant.ts answers the voice requests): the settings lose
+ * what only the upstream platform has (the sentence file it reads, the screen name for its service), the pipeline is
+ * an instance of assistant, and the texts say so.
+ */
+function assistantVoice(name: string, code: string): string {
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            / {6}<label class="fp3d-field fp3d-wide"\n {8}>\$\{this\.t\("voice_sentences"\)\}[\s\S]*?\$\{this\.t\("voice_sentences_file"\)\}<\/p>\n/,
+            '',
+            'voice sentences',
+        );
+        code = replaceRequired(
+            code,
+            / {8}<label class="fp3d-wide"\n {10}>\$\{this\.t\("screen_name"\)\}[\s\S]*?<\/label>\n {6}<\/div>\n {6}<p class="fp3d-sub">\$\{this\.t\("screen_name_hint"\)\}<\/p>\n/,
+            '      </div>\n',
+            'screen name',
+        );
+    }
+    if (name === 'voice/mic-probe.ts') {
+        code = replaceRequired(code, '    pipe_ok: "Assist-Pipeline",', '    pipe_ok: "Assistant",', 'mic test de');
+        code = replaceRequired(code, '    pipe_ok: "Assist pipeline",', '    pipe_ok: "Assistant",', 'mic test en');
+        code = replaceRequired(
+            code,
+            / {4}pipe_no: "Keine Assist-Pipeline[^\n]*",/,
+            `    pipe_no: ${JSON.stringify('Kein Adapter Assistant gefunden. Installiere ihn, schalte ihn ein und richte in seinen Einstellungen eine Spracherkennung ein.')},`,
+            'mic test de',
+        );
+        code = replaceRequired(
+            code,
+            / {4}pipe_no: "No Assist pipeline[^\n]*",/,
+            `    pipe_no: ${JSON.stringify('No adapter Assistant found. Install it, switch it on and set up speech to text in its settings.')},`,
+            'mic test en',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const texts: Record<string, [string, string]> = {
+            voice_hint: [
+                'Ein Mikrofon-Knopf unten links in der 3D-Ansicht: antippen und sprechen. „Zeig das Wohnzimmer“, „Obergeschoss“ oder „das ganze Haus“ zeigt den Ort; alles andere („Licht im Flur an“) geht an den Assistant von ioBroker.',
+                "A microphone button at the bottom left of the 3D view: tap it and speak. “Show the living room”, “upper floor” or “the whole house” shows the place; anything else (“turn on the hall light”) goes to ioBroker's Assistant.",
+            ],
+            voice_examples: [
+                '„Zeig das Wohnzimmer“|„Geh ins Obergeschoss“|„Zeig das ganze Haus“|„Zeig die Waschmaschine“ / „Wo ist der Trockner?“|„Zeig die Kamera Haustür“ / „Zeig die Auffahrtkamera“|„Zeig die Kameras“|Alles andere („Licht im Flur an“) geht an den Assistant',
+                '“Show the living room”|“Go to the upper floor”|“Show the whole house”|“Show the washing machine” / “Where is the dryer?”|“Show the front door camera” / “Show the driveway camera”|“Show the cameras”|Anything else (“turn on the hall light”) goes to the Assistant',
+            ],
+            voice_needs: [
+                'Braucht https, die Freigabe des Mikrofons (in Fully Kiosk: Web Content Settings → Mikrofonzugriff) und den Adapter Assistant mit einer Spracherkennung, eingerichtet in seinen Einstellungen.',
+                'Needs https, the microphone allowed (in Fully Kiosk: Web Content Settings → microphone access) and the adapter Assistant with speech to text, set up in its settings.',
+            ],
+            voice_no_pipeline: [
+                'Kein Assistant gefunden: Installiere den Adapter Assistant, schalte ihn ein und richte dort eine Spracherkennung ein.',
+                'No Assistant found: install the adapter Assistant, switch it on and set up its speech to text.',
+            ],
+            card_voice_hint: [
+                '„Zeig das Wohnzimmer“ zeigt den Raum, andere Sätze gehen an den Assistant von ioBroker. Braucht https und ein freigegebenes Mikrofon',
+                "“Show the living room” shows the room, other sentences go to ioBroker's Assistant. Needs https and an allowed microphone",
+            ],
+            director_mic_hint: [
+                'Prüft auf diesem Gerät https, Mikrofon und die Spracherkennung des Assistant und zeigt, welchen Raum ein Satz öffnen würde. Es wird nichts geschaltet.',
+                "Checks https, the microphone and the Assistant's speech to text on this device and shows which room a sentence would open. Nothing is switched.",
+            ],
+            voice_pipeline: ['Assistant auf diesem Gerät', 'Assistant on this device'],
+            voice_pipeline_preferred: ['Der erste eingeschaltete', 'The first one switched on'],
+            voice_room_hint: [
+                'Hängt das Tablet in einem Raum, reichen Sätze ohne Raumnamen: „Licht an“, „Mach hier das Licht aus“ oder „Rollladen runter“ gelten dann für diesen Raum. Nennst du einen Raum, gilt der genannte. Zur Auswahl stehen die Räume des Plans, die mit einem ioBroker-Raum verknüpft sind.',
+                'When the tablet hangs in a room, sentences without a room name are enough: "Lights on", "Turn off the lights here" or "Close the blinds" then apply to this room. When you name a room, that room counts. You can choose the plan\'s rooms that are linked to an ioBroker room.',
+            ],
+        };
+        for (const [key, [de, en]] of Object.entries(texts)) {
+            code = setTexts(code, key, de, en);
+        }
+    }
+    return code;
+}
+
+/**
+ * "Zeigen" beside a placed device in the editor's list of a room: the device is chosen, the plan moves it into the
+ * middle (zoomed in enough to see it), and rings run out from it for a moment. Without it a device just placed is
+ * hard to find among the other symbols.
+ */
+function findDevice(name: string, code: string): string {
+    if (name === 'components/editor.ts') {
+        code = replaceEvery(
+            code,
+            '</small>` : nothing}</span>\n        </button>\n',
+            [
+                '</small>` : nothing}</span>',
+                '        </button>',
+                '        ${placed',
+                '          ? html`<button class="fp3d-pin fp3d-find" title=${this.t("devices_find")} aria-label=${this.t("devices_find")} @click=${() => this.fp3dFind(id)}>',
+                '              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">',
+                '                <circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" />',
+                '              </svg>',
+                '            </button>`',
+                '          : nothing}',
+                '',
+            ].join('\n'),
+            'find a device: button',
+            1,
+        );
+        code = replaceRequired(
+            code,
+            '\n  private selectItem(kind: "room" | "opening" | "furniture" | "device" | "outdoor" | "wall", id: string | null): void {',
+            [
+                '',
+                '  /**',
+                '   * "Zeigen": the device is chosen (a light placed as a lamp: the lamp), the plan moves it into the middle,',
+                '   * and rings run out from it.',
+                '   */',
+                '  private fp3dFind(id: string): void {',
+                '    const pl = this.floor?.placements.find((x) => x.entity_id === id);',
+                '    const lamp = pl ? undefined : this.floor?.furniture.find((m) => isLamp(m.type) && m.entity === id);',
+                '    const at: Vec2 | null = pl ? [pl.x, pl.z] : lamp ? [lamp.x, lamp.z] : null;',
+                '    if (!at) return;',
+                '    if (lamp) this.selectItem("furniture", lamp.id);',
+                '    else this.selectItem("device", id);',
+                '    const scale = Math.max(this._view.scale, 40);',
+                '    const { w, h } = this._size ?? { w: 800, h: 600 };',
+                '    this._view = { scale, ox: w / 2 - at[0] * scale, oy: h / 2 - at[1] * scale };',
+                '    void this.updateComplete.then(() => {',
+                '      const plan = this.renderRoot.querySelector("svg.fp3d-plan");',
+                '      if (!plan) return;',
+                '      plan.querySelector(".fp3d-find-at")?.remove();',
+                '      const [x, y] = this.toScreen(at);',
+                '      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");',
+                '      g.setAttribute("class", "fp3d-find-at");',
+                '      g.setAttribute("transform", `translate(${x} ${y})`);',
+                '      const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");',
+                '      ring.setAttribute("r", "14");',
+                '      ring.setAttribute("class", "fp3d-find-ring");',
+                '      g.append(ring);',
+                '      plan.append(g);',
+                '      setTimeout(() => g.remove(), 3300);',
+                '    });',
+                '  }',
+                '',
+                '  private selectItem(kind: "room" | "opening" | "furniture" | "device" | "outdoor" | "wall", id: string | null): void {',
+            ].join('\n'),
+            'find a device: method',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-device-sel circle:not(.fp3d-hit) {',
+            [
+                '      .fp3d-find-ring {',
+                '        fill: none;',
+                '        stroke: #ff9f1c;',
+                '        stroke-width: 4;',
+                '        vector-effect: non-scaling-stroke;',
+                '        pointer-events: none;',
+                '        transform-box: fill-box;',
+                '        transform-origin: center;',
+                '        animation: fp3d-find 1.1s ease-out 3;',
+                '      }',
+                '      @keyframes fp3d-find {',
+                '        from {',
+                '          transform: scale(1);',
+                '          opacity: 1;',
+                '        }',
+                '        to {',
+                '          transform: scale(4);',
+                '          opacity: 0;',
+                '        }',
+                '      }',
+                '      .fp3d-device-sel circle:not(.fp3d-hit) {',
+            ].join('\n'),
+            'find a device: rings',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  devices_place: "Platzieren",',
+            '  devices_place: "Platzieren",\n  devices_find: "Im Plan zeigen",',
+            'find a device de',
+        );
+        code = replaceRequired(
+            code,
+            '  devices_place: "Place",',
+            '  devices_place: "Place",\n  devices_find: "Show in the plan",',
+            'find a device en',
+        );
+    }
+    return code;
+}
+
+/**
+ * The device rows of a room in the editor fit the panel: the name gives way (it breaks inside a long word too), the
+ * buttons beside it keep their size, so "Platzieren" is never cut off.
+ */
+function deviceRowsFit(name: string, code: string): string {
+    if (name !== 'components/editor.ts') {
+        return code;
+    }
+    return replaceRequired(
+        code,
+        '      .fp3d-dev-name span {\n        overflow: hidden;\n        text-overflow: ellipsis;\n      }',
+        [
+            '      .fp3d-dev-name span {',
+            '        overflow: hidden;',
+            '        text-overflow: ellipsis;',
+            '        min-width: 0;',
+            '        overflow-wrap: anywhere;',
+            '      }',
+            '      .fp3d-dev-row {',
+            '        flex-wrap: wrap;',
+            '        justify-content: flex-end;',
+            '        gap: 2px 4px;',
+            '      }',
+            // a narrow panel: the buttons move below the name, at the right
+            '      .fp3d-dev-row > .fp3d-dev-name {',
+            '        flex: 1 1 9em;',
+            '      }',
+            '      .fp3d-dev-row > :not(.fp3d-dev-name) {',
+            '        flex: none;',
+            '      }',
+            '      .fp3d-dev-row > .fp3d-pin {',
+            '        padding: 2px 4px;',
+            '      }',
+        ].join('\n'),
+        'device rows fit',
+    );
+}
+
+/**
  * The 3D view steered from ioBroker (frontend/show.ts): `home3d.0.show` names a place or a device in words, the view
  * flies there as the spoken "Zeig …" would (the same matching: plan names, ioBroker rooms, furniture and device
  * names, synonyms); `home3d.0.places` lists the names it knows, so an agent can pick one.
@@ -7007,6 +7232,9 @@ const patches: Plugin = {
         code = fixedDialogHeads(name, code);
         code = noLocate(name, code);
         code = showFromIoBroker(name, code);
+        code = assistantVoice(name, code);
+        code = deviceRowsFit(name, code);
+        code = findDevice(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

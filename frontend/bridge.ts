@@ -9,6 +9,7 @@ import { parsePosition, sunState } from './sun.js';
 import { setupMoreInfo } from './more-info.js';
 import { joinBars, placeStatus } from './shell.js';
 import { setupShow } from './show.js';
+import { Assistant, type RunMessage } from './assistant.js';
 import { setupDeviceDialog } from './device-dialog.js';
 import { pickDatapoint, setupDatapoints } from './datapoint.js';
 import { IoBroker, NAMESPACE } from './iobroker.js';
@@ -73,6 +74,11 @@ setLanguage(lastLanguage || navigator.language);
 showLanguage();
 const io = new IoBroker();
 const store = new Store(io, io, () => io.legacy());
+const assistant = new Assistant(
+    io,
+    () => language,
+    id => areas[id]?.name ?? null,
+);
 io.conn.registerConnectionHandler(connected => {
     if (!connected) {
         setStatus(t('offline'));
@@ -90,6 +96,13 @@ function preferredHistory(): string | null {
 }
 // The history is read beside the store: Store.call() serializes, a long query would hold up saving.
 const callWS: CallWS = msg => {
+    // voice control: the adapter Assistant instead of the voice pipelines of the upstream platform
+    if (msg?.type === 'assist_pipeline/pipeline/list') {
+        return assistant.pipelines();
+    }
+    if (msg?.type === 'conversation/process' || msg?.type === 'home3d/voice/converse') {
+        return assistant.converse(msg as { text?: unknown; area_id?: unknown });
+    }
     if (msg?.type === 'history/history_during_period') {
         return historyDuringPeriod(io, store.data.mappings, msg, preferredHistory());
     }
@@ -248,6 +261,9 @@ function render(): void {
                 callback: (payload: unknown) => void,
                 msg: ProtocolMessage,
             ): Promise<() => Promise<void>> => {
+                if (msg.type === 'assist_pipeline/run') {
+                    return Promise.resolve(assistant.run(callback, msg as unknown as RunMessage));
+                }
                 const s = { callback, msg };
                 subscriptions.add(s);
                 return Promise.resolve(() => {
@@ -255,6 +271,8 @@ function render(): void {
                     return Promise.resolve();
                 });
             },
+            // the microphone of a voice run, binary as over the socket of the upstream platform
+            socket: { send: (data: ArrayBufferLike | ArrayBufferView) => assistant.send(data) },
         },
         localize: (key: string) => key,
     };

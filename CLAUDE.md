@@ -22,6 +22,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 | `frontend/device-dialog.ts`, `object-tree.ts`, `entity-picker.ts` | "Geräte verbinden" dialog with object tree |
 | `frontend/media.ts` | Media players for "Geräte verbinden": a device whose states have media roles (media.state, button.play/pause/next/prev, level.volume, media.title/cover …, as the type-detector names them) becomes one `media_player` mapping with all its actions, shown as the entry `media_player` below its device |
 | `frontend/show.ts` | Steered from ioBroker: `home3d.0.show` (a place or device in words, written by a voice assistant, pi-agent or a script) makes every open 3D view fly there (`fp3dShow`, the matching of the spoken "Zeig …"; patch `showFromIoBroker` in tasks.ts) and confirms with ack and the name shown; `home3d.0.places` (JSON: floors, rooms, named devices) is written by a browser that may write; such a browser also creates both states when missing (an update does not create new `instanceObjects`, and there is no process). Their `common.desc` in `io-package.json` is what an agent reads (pi-agent `adapter_help`) |
+| `frontend/assistant.ts` | Voice control through the adapter Assistant: the bridge answers `assist_pipeline/pipeline/list` (the instances of `assistant` switched on), `assist_pipeline/run` (the microphone's PCM over `connection.socket.send` until `SpeechEnd` hears the pause → `sendTo stt` as WAV; a run from `tts` → `sendTo tts`, played as a blob URL) and `conversation/process` / `home3d/voice/converse` (`sendTo ask`, with the room of a tablet in its words) |
 | `frontend/datapoint.ts` | Datapoints chosen at the device in the editor (events `iobroker-datapoint`, `iobroker-add-devices` from the patched editor): object browser, change or add mappings |
 | `frontend/project.ts` | Project files (one plan + its images + the mappings it uses): format, reading, naming |
 | `frontend/react/` | React dialogs with MUI and `@iobroker/gui-components` ("Projekte", object browser `DialogSelectID`, file picker `DialogSelectFile`); loaded on demand into `www/chunks/` |
@@ -74,6 +75,9 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
   `Store.readOnly` refuses every change in `MUTATING` and writes nothing, not even on the first start.
 - `crypto.randomUUID`/`crypto.subtle` are not available on plain http; use `uuid()` / the FNV hash in `entities.ts`.
 - All page links are relative (web serves the page under `/home3d/`, possibly behind a proxy).
+- Voice: the 3D view speaks the voice protocol of its upstream platform; `frontend/assistant.ts` turns it into `sendTo`
+  to an instance of the adapter Assistant (`stt`, `tts`, `ask` with `source: 'home3d'`), never its `voice` command
+  (that registers satellites). Texts that named the former voice service are patched in `assistantVoice` (tasks.ts).
 - Pro add-ons: only those whose backend this page brings are unlocked (`SERVED` in `tasks.ts`: weather, time travel, energy, household, pool, sound (now-playing cards, sound rings), screens (cover and app colour on TVs) — shown as "Energie" and "Haushalt", without "Pro"; the pool's module is built in, `frontend/vendor-ext/pool-module.ts`);
   buttons of the others are removed (`proButtons`). The fun extras are unlocked too (`FUN_EXTRAS`).
 - Everything is free: no shop, customer account, licence, supporter pass, newsletter or "Pro" in the UI. `noShop` in

@@ -124,6 +124,18 @@ export const TEXTS = {
         ru: 'Нет подходящих точек данных. Измените поиск или фильтры.',
     },
     show_more: { de: 'Weitere anzeigen ({n})', en: 'Show more ({n})', ru: 'Показать ещё ({n})' },
+    // voice control through the adapter Assistant (assistant.ts)
+    voice_in_room: { de: '{text} im Raum {room}', en: '{text} in the room {room}', ru: '{text} в комнате {room}' },
+    voice_no_assistant: {
+        de: 'Kein Assistant gefunden: Installiere den Adapter Assistant und schalte ihn ein.',
+        en: 'No Assistant found: install the adapter Assistant and switch it on.',
+        ru: 'Assistant не найден: установите адаптер Assistant и включите его.',
+    },
+    voice_no_answer: {
+        de: '{instance} antwortet nicht (läuft er?)',
+        en: '{instance} does not answer (is it running?)',
+        ru: '{instance} не отвечает (он запущен?)',
+    },
     choose_datapoint: { de: 'Datenpunkt auswählen', en: 'Choose a datapoint', ru: 'Выбрать точку данных' },
     choose_datapoints: { de: 'Datenpunkte auswählen', en: 'Choose datapoints', ru: 'Выбрать точки данных' },
     // status line
