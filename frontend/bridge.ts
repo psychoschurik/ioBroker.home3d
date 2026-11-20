@@ -7,7 +7,7 @@ import './vendor/home3d.js';
 import { historyDuringPeriod, historyEnabled, statisticsDuringPeriod, timeTravelHistory } from './history.js';
 import { parsePosition, sunState } from './sun.js';
 import { setupMoreInfo } from './more-info.js';
-import { joinBars } from './shell.js';
+import { joinBars, placeStatus } from './shell.js';
 import { setupDeviceDialog } from './device-dialog.js';
 import { pickDatapoint, setupDatapoints } from './datapoint.js';
 import { IoBroker, NAMESPACE } from './iobroker.js';
@@ -51,8 +51,10 @@ let objects: Record<string, StateObject> = {},
           })
         | undefined;
 
-function setStatus(text: string): void {
+/** `ok`: connected, no error – the 3D view then hides the status (only the editor shows it). */
+function setStatus(text: string, ok = false): void {
     $('status').textContent = text;
+    placeStatus($('status'), ok);
 }
 /** The frame in the page's language; the help in it too (German: help.html). */
 function showLanguage(): void {
@@ -273,7 +275,7 @@ function render(): void {
         $('app').append(element);
     }
     element.hass = hass;
-    setStatus(t('connected', { n: Object.keys(hass.states).length }));
+    setStatus(t('connected', { n: Object.keys(hass.states).length }), true);
 }
 store.onEvent((type, payload) => {
     if (type === 'iobroker/mappings') {

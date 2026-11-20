@@ -313,10 +313,10 @@ export const TEXTS = {
         en: 'The main floor plan stays.',
         ru: 'Основной план остаётся.',
     },
-    no_shop: {
-        de: 'Shop-Pakete werden in ioBroker nicht unterstützt.',
-        en: 'Shop packs are not supported in ioBroker.',
-        ru: 'Пакеты из магазина в ioBroker не поддерживаются.',
+    no_packs: {
+        de: 'Möbel-Packs werden in ioBroker nicht unterstützt.',
+        en: 'Furniture packs are not supported in ioBroker.',
+        ru: 'Пакеты мебели в ioBroker не поддерживаются.',
     },
     not_implemented: {
         de: 'Noch nicht für ioBroker implementiert: {type}',

@@ -628,7 +628,7 @@ export class Store {
                     skipped: [
                         ...(m.packs || []).map((p: { id: string }) => ({
                             id: p.id,
-                            reason: t('no_shop'),
+                            reason: t('no_packs'),
                         })),
                         ...(devices?.skipped || []).map(d => ({ id: d.entity_id, reason: d.reason })),
                     ],

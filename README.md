@@ -369,6 +369,17 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   „↻ Aktualisieren“: liest Namen, Rollen, Typen und Werte der Datenpunkte neu, die Auswahl bleibt
 - (bluefox) „Datenpunkt auswählen“ zeigt jetzt alle Datenpunkte, nicht nur die schon verbundenen: Die passenden
   stehen oben, ein noch nicht verbundener (z. B. `alias.0.Technik.onShorePower.POWER`) wird beim Auswählen verbunden
+- (bluefox) Kein Shop, kein Kundenkonto, kein „Pro“: Hinweise auf Konto, Shop, Lizenz, Supporter, Newsletter,
+  Geschenke und Freischalten sind aus der 3D-Ansicht und dem Editor entfernt (auch in allen Sprachen), ebenso
+  „Module einspielen“ und „Hilf mit“ (Berichte an einen fremden Server). Die Spaß-Extras sind freigeschaltet:
+  Haustiere, Lichterketten, Schnee und Feuerwerk im Winter, der Halloween-Geist (erst nach Einschalten). Regie und
+  Kamera-Erkennung erscheinen nur noch, wo die Kamera-Funktionen verfügbar sind
+- (bluefox) Möbel-Bibliothek: Anker, Tank, Luke, Ruder, Antrieb mit Propeller und Positionslicht haben jetzt ein
+  Vorschaubild
+- (bluefox) Dialoge scrollen nur ihren Inhalt: Titel und ✕ bleiben oben (Einstellungen im Editor, Fenster der
+  3D-Ansicht, Detail-Dialog, „Geräte verbinden“)
+- (bluefox) Die 3D-Ansicht zeigt „Projekte“, „Geräte verbinden“ und den Verbindungsstatus nicht mehr in der Leiste,
+  nur der Editor; eine Störung (getrennt, Fehler) steht weiterhin auch in der 3D-Ansicht
 
 ### 0.4.0 (2026-11-15)
 

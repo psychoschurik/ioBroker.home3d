@@ -31,7 +31,7 @@ const RANGES: { label: () => string; ms: number }[] = [
 ];
 const COLORS = ['#f5a623', '#4fc3f7'];
 const STYLE = `
-.mi{max-width:720px}.mi-head{display:flex;align-items:center;gap:14px}.mi-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:#2b3d4e;color:#8fd0f3;--mdc-icon-size:26px;flex-shrink:0}
+.mi{max-width:720px}.mi-head{display:flex;align-items:center;gap:14px;position:sticky;top:-24px;z-index:3;margin:-24px -24px 0;padding:24px 24px 10px;background:#202c38}@media(max-width:850px){.mi-head{top:-16px;margin:-16px -16px 0;padding:16px 16px 8px}}.mi-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:#2b3d4e;color:#8fd0f3;--mdc-icon-size:26px;flex-shrink:0}
 .mi-icon.on{background:#f5a623;color:#1b2631}.mi-name{flex:1;min-width:0}.mi-name h2{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mi-name small{color:#8faabd;font-size:11px;word-break:break-all}
 .mi-close{border:0;background:transparent;font-size:22px;padding:4px 10px}.mi-now{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:18px 0 6px}.mi-value{font-size:34px;font-weight:500}.mi-value small{font-size:16px;color:#a9bdce;margin-left:4px}
 .mi [hidden]{display:none!important}.mi-since{color:#8faabd;font-size:12px}.mi-actions{display:flex;gap:8px;margin:10px 0}.mi-ranges{display:flex;gap:6px;margin:16px 0 8px;flex-wrap:wrap}.mi-ranges button{padding:5px 12px;font-size:12px}.mi-ranges button[aria-pressed=true]{background:#288cbd;border-color:#288cbd;color:#fff}

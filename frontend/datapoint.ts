@@ -18,7 +18,7 @@ export interface DatapointOptions {
     socket: Connection;
     getLanguage: () => string;
     refresh: () => Promise<void>;
-    setStatus: (text: string) => void;
+    setStatus: (text: string, ok?: boolean) => void;
     /** The datapoint of the position (null: the one of the system settings). */
     getPositionId: () => string | null;
 }
@@ -53,6 +53,8 @@ export async function pickDatapoint(o: DatapointOptions, m: Mapping): Promise<Ma
 
 export function setupDatapoints(o: DatapointOptions): void {
     const fail = (e: unknown): void => o.setStatus(t('error', { error: (e as Error).message || String(e) }));
+    // a message of success: like the status "connected", the 3D view does not show it
+    const info = (text: string): void => o.setStatus(text, true);
 
     // the editor's device form: another datapoint for the device
     window.addEventListener('iobroker-datapoint', ev => {
@@ -72,7 +74,7 @@ export function setupDatapoints(o: DatapointOptions): void {
                 mappings: mappings.map(x => (x.entity_id === m.entity_id ? next : x)),
             });
             await o.refresh();
-            o.setStatus(`${m.name || m.entity_id} · ${next.state}`);
+            info(`${m.name || m.entity_id} · ${next.state}`);
         })().catch(fail);
     });
 
@@ -108,7 +110,7 @@ export function setupDatapoints(o: DatapointOptions): void {
                 mappings: mappings.map(x => (x.entity_id === m.entity_id ? next : x)),
             });
             await o.refresh();
-            o.setStatus(t('reach_saved', { name: m.name || m.entity_id }));
+            info(t('reach_saved', { name: m.name || m.entity_id }));
         })().catch(fail);
     });
 
@@ -159,7 +161,7 @@ export function setupDatapoints(o: DatapointOptions): void {
             });
             await o.callWS({ type: 'iobroker/mappings/set', mappings: next });
             await o.refresh();
-            o.setStatus(
+            info(
                 t('battery_saved', {
                     name,
                     battery: battery === 'none' ? t('battery_none') : (battery ?? t('battery_auto')),
@@ -178,7 +180,7 @@ export function setupDatapoints(o: DatapointOptions): void {
             }
             await o.callWS({ type: 'iobroker/position/set', id });
             await o.refresh();
-            o.setStatus(id ? t('position_from', { id }) : t('position_system'));
+            info(id ? t('position_from', { id }) : t('position_system'));
         })().catch(fail);
     });
 
@@ -188,7 +190,7 @@ export function setupDatapoints(o: DatapointOptions): void {
         void (async () => {
             await o.callWS({ type: 'iobroker/timetravel/set', instance });
             await o.refresh();
-            o.setStatus(instance ? t('timetravel_from', { id: instance }) : t('timetravel_auto'));
+            info(instance ? t('timetravel_from', { id: instance }) : t('timetravel_auto'));
         })().catch(fail);
     });
 
@@ -198,7 +200,7 @@ export function setupDatapoints(o: DatapointOptions): void {
         void (async () => {
             await o.callWS({ type: 'iobroker/health/set', minutes });
             await o.refresh();
-            o.setStatus(minutes ? t('reach_after', { n: minutes }) : t('reach_report'));
+            info(minutes ? t('reach_after', { n: minutes }) : t('reach_report'));
         })().catch(fail);
     });
 
@@ -227,7 +229,7 @@ export function setupDatapoints(o: DatapointOptions): void {
             const entityIds = ids.map(id => known.get(id) ?? found.find(m => m.state === id)?.entity_id);
             done?.(entityIds.filter((id): id is string => !!id));
             const skipped = ids.filter((_, i) => !entityIds[i]);
-            o.setStatus(
+            info(
                 t('added_devices', { n: added.length }) +
                     (skipped.length ? t('added_skipped', { ids: skipped.join(', ') }) : ''),
             );

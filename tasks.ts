@@ -583,7 +583,13 @@ function solarText(name: string, code: string): string {
  */
 const SERVED = ['weather', 'time_travel', 'energy_pro', 'household', 'pool', 'sound', 'screens'];
 
-/** The served add-ons count as unlocked without a pack. */
+/**
+ * The fun extras, drawn by the page alone: pets, the Halloween ghost, the fairy lights along the eaves in Advent, snow
+ * while it snows and the firework at New Year (their decorations of the furniture library came in packs: not here).
+ */
+const FUN_EXTRAS = ['fun_pets', 'fun_halloween', 'fun_winter'];
+
+/** The served add-ons and the fun extras count as unlocked without a pack. */
 function unlockServed(name: string, code: string): string {
     if (name !== 'features.ts') {
         return code;
@@ -591,9 +597,278 @@ function unlockServed(name: string, code: string): string {
     return replaceRequired(
         code,
         '  const out = new Set<Feature>();',
-        `  const out = new Set<Feature>(${JSON.stringify(SERVED)} as Feature[]);`,
+        `  const out = new Set<Feature>(${JSON.stringify([...SERVED, ...FUN_EXTRAS])} as Feature[]);`,
         'served add-ons',
     );
+}
+
+/**
+ * A method of a class of the 3D frontend (indented by two spaces, its body ends at the first line "  }") gets another
+ * body; `signature` is the part before " {".
+ */
+function replaceMethod(code: string, signature: string, body: string, label: string): string {
+    const head = `\n  ${signature} {\n`;
+    const at = code.indexOf(head);
+    const end = at < 0 ? -1 : code.indexOf('\n  }\n', at);
+    if (at < 0 || end < 0 || code.indexOf(head, at + 1) >= 0) {
+        throw new Error(`Upstream patch no longer matches: ${label}`);
+    }
+    return `${code.slice(0, at)}\n  ${signature} {\n    ${body}\n  }\n${code.slice(end + '\n  }\n'.length)}`;
+}
+
+/** Replaces every occurrence of `text`, which must occur `count` times. */
+function replaceEvery(code: string, text: string, replacement: string, label: string, count: number): string {
+    const parts = code.split(text);
+    if (parts.length - 1 !== count) {
+        throw new Error(`Upstream patch no longer matches: ${label} (${parts.length - 1} times)`);
+    }
+    return parts.join(replacement);
+}
+
+/**
+ * Texts of the shop, the customer account, the licence, the supporter pass, the newsletter, the gifts, the Pro
+ * teasers and the usage reports to the shop's server: emptied in de/en (and taken out of the language files), as
+ * nothing shows them any more (`noShop`).
+ */
+const SHOP_TEXTS =
+    /^(?:(?:license|offers|supporter|print|nl|gift|news|beta|ext|diag)_\w+|pro_(?:feature_\w+|title|locked|shop|unlock)|fun_(?:intro|in_account|register|register_steps|moved|open_settings)|(?:halloween|winter)_deco_hint|pack_(?:pro_module|fun_module|features|needs_module|licensed|error_wrong_instance)|modules_pro_note|module_(?:import_hint|waits_where|imported_waits)|card_pro_hint|tt_locked|auto_pro_teaser|chk_pro_(?:active|get)|energy_pro_active(?:_hint)?|hh_teaser_\w+|household_teaser_\w+|solar_pro_\w+)$/;
+
+/** de and en of a key of the 3D view's i18n. */
+function setTexts(code: string, key: string, de: string, en: string): string {
+    const texts = [de, en];
+    let i = 0;
+    const next = code.replace(new RegExp(String.raw`^ {2}${key}: "(?:[^"\\]|\\.)*",$`, 'gm'), line =>
+        i < 2 ? `  ${key}: ${JSON.stringify(texts[i++])},` : line,
+    );
+    if (i !== 2) {
+        throw new Error(`Upstream patch no longer matches: texts of ${key}`);
+    }
+    return next;
+}
+
+/**
+ * Everything is free in ioBroker: no customer account, no shop, no licence, no supporter pass, no newsletter and no
+ * "Pro". What the 3D view showed of them goes: the extensions page (also by `?tab=extensions` and the buttons that
+ * opened it), the gift and the news, the teasers and locks of add-ons, the module import (modules came from the shop
+ * as signed packs) and the usage reports to the shop's server. Add-ons whose backend is missing here (camera cockpit,
+ * car) are left out instead of being offered. The fun extras are unlocked (`FUN_EXTRAS`); the ghost comes only when
+ * switched on.
+ */
+function noShop(name: string, code: string): string {
+    if (name === 'features.ts') {
+        code = replaceRequired(
+            code,
+            'export function released(feature: Gated): boolean {\n',
+            'export function released(feature: Gated): boolean {\n  // the usage reports went to the shop\'s server\n  if (feature === "diagnostics") return false;\n',
+            'no usage reports',
+        );
+    }
+    if (name === 'panel.ts') {
+        code = replaceRequired(
+            code,
+            '    if (query.get("tab") === "extensions") this._mode = "extensions";\n',
+            '',
+            'no link to the extensions',
+        );
+        code = replaceEvery(
+            code,
+            '@open-extensions=${() => this.setMode("extensions")}',
+            '',
+            'no extensions buttons',
+            2,
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceMethod(code, 'private renderNews()', 'return nothing;', 'no news of the shop');
+        // the extensions page (shop connection, packs, offers, supporters, newsletter) is not even loaded
+        code = replaceRequired(
+            code,
+            '// the extensions page is part of this bundle: the panel loads it the same way as the editor\nimport "./extensions.ts";\n',
+            '',
+            'no extensions page',
+        );
+        code = replaceRequired(
+            code,
+            '      { key: "modules", icon: "🧩", label: this.t("settings_modules"), admin: true },\n',
+            '',
+            'no module import',
+        );
+        code = replaceRequired(
+            code,
+            '      { key: "director", icon: "🎬", label: this.t("card_director"), admin: true },',
+            '      ...(hasFeature("camera_cockpit") ? [{ key: "director" as const, icon: "🎬", label: this.t("card_director"), admin: true }] : []),',
+            'director only with the camera cockpit',
+        );
+        code = replaceRequired(
+            code,
+            '      ${pro ? nothing : html`<p class="fp3d-sub">🔒 ${this.t("pro_feature_camera_cockpit")}</p>`}\n',
+            '',
+            'no lock of the director',
+        );
+        code = replaceRequired(
+            code,
+            '  private renderCameraDetections(cameraId: string) {\n    if (!this.hass) return nothing;',
+            '  private renderCameraDetections(cameraId: string) {\n    if (!this.hass || !hasFeature("camera_cockpit")) return nothing;',
+            'detections only with the camera cockpit',
+        );
+        code = replaceRequired(
+            code,
+            '      pro ? { state: "ok", label: this.t("chk_pro_active") } : { state: "opt", label: this.t("chk_pro_get"), href: shopUrl(this.hass?.language) },\n',
+            '',
+            'no energy unlock',
+        );
+        code = replaceRequired(
+            code,
+            /\n {4}<div class="fp3d-ext-teaser">[\s\S]*?<\/div>`;/,
+            '`;',
+            'no extensions teaser',
+        );
+        code = replaceRequired(
+            code,
+            /if \(!hasFeature\("auto_pro"\)\)\n\s+return html`<section class="fp3d-teaser">[\s\S]*?<\/section>`;/,
+            'if (!hasFeature("auto_pro")) return nothing;',
+            'no car teaser',
+        );
+        code = replaceRequired(
+            code,
+            /const teaser = !pro && released\("household"\)\n\s+\? html`[\s\S]*?<\/section>`\n\s+: nothing;/,
+            'const teaser = nothing;',
+            'no household teaser',
+        );
+        code = replaceRequired(
+            code,
+            /if \(!released\("household"\) \|\| !\(plant \|\| appliance \|\| fridge\)\) return nothing;[\s\S]*?<\/section>`;/,
+            'return nothing;',
+            'no household teaser of plants and appliances',
+        );
+        code = replaceRequired(
+            code,
+            /<p class="fp3d-sub">🔒 \$\{this\.t\("pro_feature_screens"\)\}[^\n]*<\/p>/,
+            '',
+            'no lock of the screen pictures',
+        );
+        // no supporter pass, so no 3D print of the plan for supporters in the backup
+        code = replaceMethod(code, 'private checkSupporter(): void', 'return;', 'no supporter check');
+        code = replaceRequired(
+            code,
+            /\n {8}\$\{this\._supporter && this\.isAdmin\n {10}\? html`<button[\s\S]*?<\/button>`\n {10}: nothing\}/,
+            '',
+            'no 3D print',
+        );
+        code = replaceRequired(
+            code,
+            '\n      ${this._supporter && this.isAdmin ? html`<p class="fp3d-sub">${this.t("print_editor_hint")}</p>` : nothing}',
+            '',
+            'no 3D print hint',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceMethod(code, 'private renderProHint()', 'return nothing;', 'no pro hint');
+        code = replaceRequired(
+            code,
+            '        <p class="fp3d-wall-pro">🔒 ${translate(hass, "pro_feature_camera_cockpit")}</p>\n',
+            '',
+            'no lock of the camera wall',
+        );
+        code = replaceRequired(code, /(?<=\/\* |\()(Energie|Pool) Pro: /g, '', 'styles without Pro');
+        code = replaceRequired(
+            code,
+            'hasFeature("fun_halloween") && b.settings.halloween?.ghost !== false',
+            'hasFeature("fun_halloween") && b.settings.halloween?.ghost === true',
+            'the ghost only when switched on',
+        );
+    }
+    if (name === 'components/fun-packs.ts') {
+        code = replaceRequired(
+            code,
+            'const ghost = this.building?.settings.halloween?.ghost !== false;',
+            'const ghost = this.building?.settings.halloween?.ghost === true;',
+            'the ghost switch off at first',
+        );
+        code = replaceRequired(
+            code,
+            '      <span class="fp3d-sub">${this.t("winter_deco_hint")}</span>\n',
+            '',
+            'no winter decorations',
+        );
+        code = replaceRequired(
+            code,
+            '      <span class="fp3d-sub">${this.t("halloween_deco_hint")}</span>\n',
+            '',
+            'no Halloween decorations',
+        );
+        code = replaceMethod(
+            code,
+            'private renderFunLocked(icon: string, name: string, feature: string)',
+            'return nothing;',
+            'no customer account',
+        );
+    }
+    if (name === 'components/time-bar.ts') {
+        code = replaceRequired(
+            code,
+            '${isBeta("time_travel") ? html` <a class="beta" href=${DISCORD_URL} target="_blank" rel="noopener" title=${t("beta_bar")}>🧪 BETA</a>` : nothing}',
+            '',
+            'no supporter beta',
+        );
+    }
+    if (name === 'card-editor.ts') {
+        code = replaceRequired(
+            code,
+            '\n      <p class="hint">${this.t("card_pro_hint")}</p>',
+            '',
+            'no pro hint of the card',
+        );
+    }
+    if (name === 'packs.ts') {
+        // the English names of the shop's packs ("Pro: Car Pro"): without "Pro" as well
+        code = replaceRequired(code, /"Pro: ([^"]*?)(?: Pro)?"/g, '"$1"', 'pack names without Pro');
+    }
+    if (name === 'i18n.ts') {
+        let blank = 0;
+        code = code.replace(/^ {2}(\w+): "(?:[^"\\]|\\.)*",$/gm, (line, key: string) => {
+            if (!SHOP_TEXTS.test(key)) {
+                return line;
+            }
+            blank++;
+            return `  ${key}: "",`;
+        });
+        if (blank < 300) {
+            throw new Error(`Upstream patch no longer matches: shop texts (${blank})`);
+        }
+        code = setTexts(code, 'fun_title', 'Spaß-Extras', 'Fun extras');
+        code = setTexts(
+            code,
+            'fun_intro_settings',
+            'Extras zum Spaß: Haustiere, ein kleiner Geist zu Halloween, Lichterketten, Schnee und ein Feuerwerk im Winter. Hier schaltest du sie ein und aus.',
+            'Extras for fun: pets, a little ghost at Halloween, fairy lights, snow and a firework in winter. Switch them on and off here.',
+        );
+        code = setTexts(
+            code,
+            'fun_feature_halloween',
+            'Ein kleiner Geist, der ab und zu durchs Haus schwebt – nachts öfter.',
+            'A little ghost that floats through the house now and then – more often at night.',
+        );
+        code = setTexts(
+            code,
+            'fun_feature_winter',
+            'Lichterketten an der Dachtraufe in der Adventszeit, Schnee auf Dach und Rasen, solange es schneit, und ein Feuerwerk über dem Haus zu Silvester um Mitternacht.',
+            "Fairy lights along the eaves in Advent, snow on the roof and the lawn while it snows, and a firework over the house at New Year's midnight.",
+        );
+        code = setTexts(
+            code,
+            'backup_full_hint',
+            'Eine Datei mit dem Plan und allen Hintergrund- und Bildschirmbildern.',
+            'One file with the plan and every background and screen picture.',
+        );
+        code = setTexts(
+            code,
+            'vehicle_to_spot_hint',
+            'Ein Fahrzeug als einfaches Möbel steht immer da. Als Stellplatz erscheint es nur, wenn ein Sensor das Auto meldet.',
+            'A vehicle as plain furniture always stands there. As a parking spot it appears only while a sensor reports the car.',
+        );
+    }
+    return code;
 }
 
 /** Buttons of Pro add-ons that are not unlocked go (see gateButton). */
@@ -3672,6 +3947,124 @@ function roundCardButtons(name: string, code: string): string {
     return code;
 }
 
+/** A dialog's head (its title and ✕) that stays at the top while the rest scrolls; `pad`: the dialog's padding. */
+const stickyHead = (selector: string, pad: [number, number]): string =>
+    [
+        `      ${selector} {`,
+        '        position: sticky;',
+        `        top: -${pad[0]}px;`,
+        '        z-index: 3;',
+        `        margin: -${pad[0]}px -${pad[1]}px 0;`,
+        `        padding: ${pad[0]}px ${pad[1]}px 8px;`,
+        '        background: var(--fp3d-chrome-solid);',
+        '        border-top-left-radius: inherit;',
+        '        border-top-right-radius: inherit;',
+        '      }',
+        '',
+    ].join('\n');
+
+/**
+ * Dialogs scroll only their content: the title and ✕ stay at the top. The editor's settings dialogs get a scrolling
+ * body; the sheets of the 3D view (device sheets, pop-ups, view settings), the central and the editor's part card,
+ * which scroll as a whole, keep their head sticky.
+ */
+function fixedDialogHeads(name: string, code: string): string {
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            '        max-height: calc(100% - 16px);\n        overflow: auto;\n        padding: 14px 18px 18px;',
+            '        max-height: calc(100% - 16px);\n        overflow: hidden;\n        display: flex;\n        flex-direction: column;\n        padding: 14px 8px 18px 18px;',
+            'dialog: head and body',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-dialog-head h3 {\n        margin: 0;\n      }\n',
+            [
+                '      .fp3d-dialog-head h3 {',
+                '        margin: 0;',
+                '      }',
+                '      .fp3d-dialog-head {',
+                '        flex: none;',
+                '        padding-right: 10px;',
+                '      }',
+                '      /* only the content scrolls: the title and ✕ stay at the top */',
+                '      .fp3d-dialog-body {',
+                '        flex: 1 1 auto;',
+                '        min-height: 0;',
+                '        overflow-y: auto;',
+                '        margin-left: -4px;',
+                '        padding: 2px 10px 4px 4px;',
+                '      }',
+                '',
+            ].join('\n'),
+            'dialog: scrolling body',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-pc-title {\n',
+            `${stickyHead('.fp3d-pc > .fp3d-wv-head', [14, 16])}      .fp3d-pc-title {\n`,
+            'part card: sticky head',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '      .fp3d-sheet header {\n',
+            `${stickyHead('.fp3d-sheet > header', [14, 16])}      .fp3d-sheet header {\n`,
+            'sheets: sticky head',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-central-top {\n',
+            `${stickyHead('.fp3d-central > .fp3d-central-top', [12, 14])}      .fp3d-central-top {\n`,
+            'central: sticky head',
+        );
+    }
+    return code;
+}
+
+/**
+ * The furniture library's pictures of a boat's anchor and gear: the viewer draws them itself, not as furniture, so
+ * their pictures stayed empty; they are built as in the viewer (frontend/vendor-ext/boat-picture.ts). Patched after
+ * every other picture of preview.ts. The pictures kept in the browser get a new key: the empty ones are drawn anew.
+ */
+function boatPictures(name: string, code: string): string {
+    if (name === 'viewer/preview.ts') {
+        code = `import { boatPicture as fp3dBoatPicture, disposeBoatPicture as fp3dBoatDispose } from "${root}/frontend/vendor-ext/boat-picture.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  const fp3dOwn = fp3dPrevIsTree(item.type)',
+            '  const fp3dOwn0 = fp3dPrevIsTree(item.type)',
+            'boat pictures',
+        );
+        code = replaceRequired(
+            code,
+            '  if (fp3dOwn) scene.add(fp3dOwn);',
+            [
+                '  const fp3dBoat = fp3dOwn0 ? null : fp3dBoatPicture(item.type, item.w, item.d, item.h, item.variant ?? null);',
+                '  const fp3dOwn = fp3dOwn0 ?? fp3dBoat;',
+                '  if (fp3dOwn) scene.add(fp3dOwn);',
+            ].join('\n'),
+            'boat pictures: built',
+        );
+        code = replaceRequired(
+            code,
+            '  if (fp3dOwn) fp3dPrevDispose(fp3dOwn);',
+            '  if (fp3dBoat) fp3dBoatDispose(fp3dBoat);\n  else if (fp3dOwn) fp3dPrevDispose(fp3dOwn);',
+            'boat pictures: freed',
+        );
+    }
+    if (name === 'components/library.ts') {
+        code = replaceRequired(
+            code,
+            '|${THUMB_PX}|2`;',
+            '|${THUMB_PX}|${/^(anchor|tank|rudder|propeller|nav_light|hatch)$/.test(entry.type) ? 3 : 2}`;',
+            'boat pictures: drawn anew',
+        );
+    }
+    return code;
+}
+
 /**
  * One bar instead of two (frontend/shell.ts): the page's own bar (logo, status, projects, devices, kiosk, help) goes
  * into the slots "start" (instead of the title "3D Home") and "end" (before the version and ⚙) of the panel's header.
@@ -3690,13 +4083,15 @@ function oneBar(name: string, code: string): string {
     code = replaceRequired(
         code,
         '          <span class="fp3d-version" title=${this.t("version_hint"',
-        '          <slot name="end"></slot>\n          <span class="fp3d-version" title=${this.t("version_hint"',
+        // "status": the page's status while something is wrong; "edit": its status while all is fine, "Projekte" and
+        // "Geräte verbinden", only in the editor (`placeStatus` in shell.ts)
+        '          <slot name="status"></slot>${this._mode === "editor" ? html`<slot name="edit"></slot>` : nothing}<slot name="end"></slot>\n          <span class="fp3d-version" title=${this.t("version_hint"',
         'one bar: end',
     );
     code = replaceRequired(
         code,
         '${(this._clean && this._mode === "view") || this.kiosk ? nothing : html`<header class="fp3d-header">',
-        '${this.kiosk ? nothing : this._clean && this._mode === "view" ? (this.querySelector(":scope > [slot]") ? html`<header class="fp3d-header"><slot name="start"></slot><span class="fp3d-grow"></span><slot name="end"></slot></header>` : nothing) : html`<header class="fp3d-header">',
+        '${this.kiosk ? nothing : this._clean && this._mode === "view" ? (this.querySelector(":scope > [slot]") ? html`<header class="fp3d-header"><slot name="start"></slot><span class="fp3d-grow"></span><slot name="status"></slot><slot name="end"></slot></header>` : nothing) : html`<header class="fp3d-header">',
         'one bar: the clean view keeps the page bar',
     );
     return code;
@@ -6124,16 +6519,17 @@ function looks(name: string, code: string): string {
             '  style_warm: "Warm / Wood & paper",\n  style_dollhouse: "Dollhouse",\n  style_comic: "Comic",\n  style_gouache: "Gouache",\n  style_hygge: "Hygge (diorama)",',
             'style names en',
         );
-        // the energy view and the household are part of the adapter, not Pro add-ons
+        // the energy view and the household are part of the adapter, not Pro add-ons; nothing is "Pro" here
         code = code
             .replace('Was Energie und Energie Pro brauchen.', 'Was die Energie-Ansicht braucht.')
             .replace('What energy and Energy Pro need.', 'What the energy view needs.')
             .replaceAll(/ \((Energie|Energy|Haushalt|Household) Pro\)/g, '')
+            .replaceAll(/ \(Pro: [^)]*\)/g, '')
             .replaceAll(
                 /"(Energie|Energy|Haushalt|Household) Pro: (\w)/g,
                 (_, _name: string, c: string) => `"${c.toUpperCase()}`,
             )
-            .replaceAll(/(Energie|Energy|Haushalt|Household) Pro\b/g, '$1');
+            .replaceAll(/(Energie|Energy|Haushalt|Household|Auto|Car|Pool) Pro\b/g, '$1');
     }
     if (name === 'viewer/theme.ts') {
         code = replaceRequired(
@@ -6413,18 +6809,8 @@ const patches: Plugin = {
                 '',
                 'extensions tab',
             );
-            code = replaceRequired(
-                code,
-                'private renderGift() {',
-                'private renderGift() { return nothing; }\n  private unusedGift() {',
-                'gift',
-            );
-            code = replaceRequired(
-                code,
-                'private renderExtensions() {',
-                'private renderExtensions() { return html`<div class="fp3d-empty"><h2>ioBroker 3D Home</h2><p>Geräte werden über den Objektbaum verbunden.</p><a class="fp3d-btn" href="help.html" target="_blank">Lokale Hilfe öffnen</a></div>`; }\n  private unusedExtensions() {',
-                'extensions page',
-            );
+            code = replaceMethod(code, 'private renderGift()', 'return nothing;', 'gift');
+            code = replaceMethod(code, 'private renderExtensions()', 'return nothing;', 'extensions page');
         }
         if (name === 'components/editor.ts') {
             code = replaceRequired(
@@ -6433,22 +6819,12 @@ const patches: Plugin = {
                 'private renderHelpLinks() { return html`<section class="fp3d-help"><h3>ioBroker</h3><p class="fp3d-sub">Geräte über den Objektbaum auswählen. Die Zuordnung verwendet deine ioBroker-Datenpunkt-IDs.</p><a class="fp3d-btn" href="help.html" target="_blank">Hilfe & Bedienung</a></section>`; }',
                 'help',
             );
-            code = replaceRequired(
-                code,
-                'private renderProCard() {',
-                'private renderProCard() { return nothing; }\n  private unusedProCard() {',
-                'pro teaser',
-            );
-            code = replaceRequired(
-                code,
-                'new URL("./images/solar-pro.jpg", import.meta.url)',
-                'new URL(/* @vite-ignore */ "../assets/connected-home.svg", import.meta.url)',
-                'shop picture',
-            );
+            code = replaceMethod(code, 'private renderProCard()', 'return nothing;', 'pro teaser');
         }
         code = looks(name, code);
         code = unlockServed(name, code);
         code = proButtons(name, code);
+        code = noShop(name, code);
         code = keepUndoHistory(name, code);
         code = keepEditorView(name, code);
         code = tvAppLogo(name, code);
@@ -6492,6 +6868,8 @@ const patches: Plugin = {
         code = cardModes(name, code);
         code = roundCardButtons(name, code);
         code = oneBar(name, code);
+        code = boatPictures(name, code);
+        code = fixedDialogHeads(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

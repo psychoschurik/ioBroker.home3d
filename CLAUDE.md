@@ -13,7 +13,7 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 | `frontend/` | Own browser code (TypeScript, React), built by Vite (`vite.config.ts`) into `www/` |
 | `frontend/index.html`, `frontend/public/` | The page; static files (`help.html`, `style.css`, `assets/`, `licenses/`, `vendor/lang`, `vendor/fonts`) copied to `www/` |
 | `frontend/bridge.ts` | Entry: connection, live states, provides the `hass`-like object the 3D frontend expects |
-| `frontend/shell.ts` | One bar: the page's bar (logo, status, Projekte, Geräte verbinden, Kiosk, Hilfe) moves into the slots "start"/"end" of the 3D view's header (`oneBar` in tasks.ts), not in the kiosk or the card view |
+| `frontend/shell.ts` | One bar: the page's bar (logo, status, Projekte, Geräte verbinden, Kiosk, Hilfe) moves into the slots "start"/"end" of the 3D view's header (`oneBar` in tasks.ts), not in the kiosk or the card view; Projekte and Geräte verbinden (slot "edit") only in the editor, the status there too unless it reports a problem (`placeStatus`) |
 | `frontend/iobroker.ts` | `IoBroker`: socket-client wrapper, implements `IoAccess` (objects/states) and `FileAccess` (files of `home3d.0`) |
 | `frontend/store.ts` | `Store`: plans, history, images, mappings; handles every `callWS` message of the 3D frontend |
 | `frontend/entities.ts` | Mapping ioBroker datapoints ↔ devices of the 3D frontend, validation, actions (`execute`) |
@@ -74,7 +74,10 @@ Setup on a new machine, the test system vitanova (boat) and what is configured t
 - `crypto.randomUUID`/`crypto.subtle` are not available on plain http; use `uuid()` / the FNV hash in `entities.ts`.
 - All page links are relative (web serves the page under `/home3d/`, possibly behind a proxy).
 - Pro add-ons: only those whose backend this page brings are unlocked (`SERVED` in `tasks.ts`: weather, time travel, energy, household, pool, sound (now-playing cards, sound rings), screens (cover and app colour on TVs) — shown as "Energie" and "Haushalt", without "Pro"; the pool's module is built in, `frontend/vendor-ext/pool-module.ts`);
-  buttons of the others are removed (`proButtons`).
+  buttons of the others are removed (`proButtons`). The fun extras are unlocked too (`FUN_EXTRAS`).
+- Everything is free: no shop, customer account, licence, supporter pass, newsletter or "Pro" in the UI. `noShop` in
+  `tasks.ts` removes their pages, teasers and locks and empties their texts (`SHOP_TEXTS`, also taken out of
+  `frontend/public/vendor/lang/*.json`); new upstream texts of that kind get the same treatment.
 - Do not mention the former upstream project name anywhere; keep the MIT copyright in LICENSE/NOTICE.
 - Texts of the frame only through `t()` of `frontend/lang.ts` (de, en and ru for every key); texts of the 3D view as
   keys of its i18n (de/en patched in `tasks.ts`, other languages in `frontend/public/vendor/lang/<code>.json`, Russian included).

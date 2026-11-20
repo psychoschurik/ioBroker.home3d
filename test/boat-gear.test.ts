@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { defaultLightY, hatchOpen, isGear, lightOn, tankFill, tankWarn } from '../frontend/vendor-ext/boat-kinds';
+import { Box3 } from 'three';
 import { buildGear } from '../frontend/vendor-ext/boat-gear';
+import { boatPicture, disposeBoatPicture } from '../frontend/vendor-ext/boat-picture';
 import { wakeStrength } from '../frontend/vendor-ext/sea';
 
 test('a tank reads its fill in % or as a fraction and warns when a supply runs out or a holding tank fills up', () => {
@@ -59,4 +61,20 @@ test('a deck hatch opens from its contact and is drawn shut, open with its strut
     // the lid stands up by its angle about the front edge
     const lid = open.children.find((c: { type: string }) => c.type === 'Group')!;
     assert.ok(Math.abs(lid.rotation.x + (70 * Math.PI) / 180) < 1e-9);
+});
+
+test('the library pictures of a boat: anchor and gear are built as in the viewer, other furniture not', () => {
+    for (const [type, w, d, h] of [
+        ['anchor', 0.36, 0.8, 0.3],
+        ['tank', 0.8, 0.5, 0.4],
+        ['rudder', 0.12, 0.55, 1],
+        ['propeller', 0.42, 0.35, 0.6],
+        ['hatch', 0.6, 0.6, 0.06],
+    ] as const) {
+        const group = boatPicture(type, w, d, h, null);
+        assert.ok(group, type);
+        assert.ok(!new Box3().setFromObject(group).isEmpty(), type);
+        disposeBoatPicture(group);
+    }
+    assert.equal(boatPicture('sofa', 2, 1, 0.8, null), null);
 });
