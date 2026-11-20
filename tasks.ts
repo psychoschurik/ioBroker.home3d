@@ -4109,6 +4109,230 @@ function assistantVoice(name: string, code: string): string {
 }
 
 /**
+ * A speaker beside the volume of a media player (frontend/vendor-ext/media-mute.ts): in the glass card, the quick menu
+ * and the room's panel. A click mutes it by its own mute, or sets its volume to 0 and back; while silent the speaker is
+ * crossed out and orange and the slider dims.
+ */
+function mediaMute(name: string, code: string): string {
+    const imports = `import { canMute as fp3dCanMute, isMuted as fp3dIsMuted, muteCall as fp3dMuteCall, speakerPath as fp3dSpeakerPath } from "${root}/frontend/vendor-ext/media-mute.ts";\n`;
+    const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d=${fp3dSpeakerPath(MUTED)} /></svg>';
+    if (name === 'components/view3d.ts') {
+        code = imports + code;
+        code = replaceRequired(
+            code,
+            '        call("volume_set", { volume_level: v / 100 });\n      }\n    };\n',
+            [
+                '        call("volume_set", { volume_level: v / 100 });',
+                '      }',
+                '    };',
+                '    const fp3dPlayer = hass.states[m.id];',
+                '    const fp3dMuted = !!fp3dPlayer && fp3dCanMute(fp3dPlayer) && fp3dIsMuted(fp3dPlayer);',
+                '    const fp3dMute = () => {',
+                '      const c = fp3dPlayer && fp3dMuteCall(fp3dPlayer);',
+                '      if (!c) return;',
+                '      this.requestUpdate();',
+                '      if (c.service === "volume_set") setVolume(Math.round((c.data.volume_level as number) * 100), true);',
+                '      else call(c.service, c.data);',
+                '    };',
+                '',
+            ].join('\n'),
+            'mute: the card',
+        );
+        code = replaceRequired(
+            code,
+            '                <input\n                  type="range"\n                  min="0"\n                  max="100"\n                  .value=${String(volume)}\n',
+            [
+                '                ${fp3dPlayer && fp3dCanMute(fp3dPlayer)',
+                `                  ? html\`<button class="fp3d-mute \${fp3dMuted ? "fp3d-mute-on" : ""}" aria-label=\${t(fp3dMuted ? "media_unmute" : "media_mute")} title=\${t(fp3dMuted ? "media_unmute" : "media_mute")} @pointerdown=\${press.down} @pointerup=\${press.up(fp3dMute)} @click=\${press.key(fp3dMute)}>${icon.replace('MUTED', 'fp3dMuted')}</button>\``,
+                '                  : nothing}',
+                '                <input',
+                '                  type="range"',
+                '                  min="0"',
+                '                  max="100"',
+                '                  .value=${String(volume)}',
+                '',
+            ].join('\n'),
+            'mute: the card button',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-holo-media-controls input[type="range"] {\n',
+            [
+                '      .fp3d-holo-media-controls .fp3d-mute {',
+                '        display: inline-flex;',
+                '        align-items: center;',
+                '        justify-content: center;',
+                '        flex: none;',
+                '        padding: 0;',
+                '      }',
+                '      .fp3d-mute svg {',
+                '        width: 15px;',
+                '        height: 15px;',
+                '        fill: currentColor;',
+                '      }',
+                '      .fp3d-holo-media-controls .fp3d-mute-on {',
+                '        color: #ff9f1c;',
+                '        border-color: #ff9f1c;',
+                '      }',
+                '      .fp3d-mute-on + input[type="range"] {',
+                '        opacity: 0.4;',
+                '      }',
+                '      .fp3d-holo-media-controls input[type="range"] {',
+                '',
+            ].join('\n'),
+            'mute: the card style',
+        );
+    }
+    if (name === 'components/quick-menu.ts') {
+        code = imports + code;
+        code = replaceRequired(
+            code,
+            // the volume's slider (the quick menu has other sliders before it)
+            '      ${vol !== null\n        ? html`<input\n            class="qm-slider"\n',
+            [
+                '      ${vol !== null',
+                '        ? html`<div class="qm-volume">${fp3dCanMute(st)',
+                `            ? html\`<button class="qm-mute \${fp3dIsMuted(st) ? "qm-mute-on" : ""}" aria-label=\${this.t(fp3dIsMuted(st) ? "media_unmute" : "media_mute")} title=\${this.t(fp3dIsMuted(st) ? "media_unmute" : "media_mute")} @click=\${() => { const c = fp3dMuteCall(st); if (c) { this.call("media_player", c.service, c.data); this.requestUpdate(); } }}>${icon.replace('MUTED', 'fp3dIsMuted(st)')}</button>\``,
+                '            : nothing}<input',
+                '            class="qm-slider"',
+                '',
+            ].join('\n'),
+            'mute: quick menu button',
+        );
+        code = replaceRequired(
+            code,
+            '            @change=${(e: Event) => this.call("media_player", "volume_set", { volume_level: Number((e.target as HTMLInputElement).value) / 100 })}\n          />`',
+            '            @change=${(e: Event) => this.call("media_player", "volume_set", { volume_level: Number((e.target as HTMLInputElement).value) / 100 })}\n          /></div>`',
+            'mute: quick menu row',
+        );
+        code = replaceRequired(
+            code,
+            '      .qm-slider {\n',
+            [
+                '      .qm-volume {',
+                '        display: flex;',
+                '        align-items: center;',
+                '        gap: 8px;',
+                '      }',
+                '      .qm-volume .qm-slider {',
+                '        flex: 1;',
+                '        min-width: 0;',
+                '      }',
+                '      .qm-mute {',
+                '        flex: none;',
+                '        display: inline-flex;',
+                '        align-items: center;',
+                '        justify-content: center;',
+                '        width: 32px;',
+                '        height: 32px;',
+                '        padding: 0;',
+                '        border-radius: 50%;',
+                '        border: 1px solid rgba(127, 127, 127, 0.4);',
+                '        background: transparent;',
+                '        color: inherit;',
+                '        cursor: pointer;',
+                '      }',
+                '      .qm-mute svg {',
+                '        width: 18px;',
+                '        height: 18px;',
+                '        fill: currentColor;',
+                '      }',
+                '      .qm-mute-on {',
+                '        color: #ff9f1c;',
+                '        border-color: #ff9f1c;',
+                '      }',
+                '      .qm-mute-on + .qm-slider {',
+                '        opacity: 0.4;',
+                '      }',
+                '      .qm-slider {',
+                '',
+            ].join('\n'),
+            'mute: quick menu style',
+        );
+    }
+    if (name === 'components/room-panel.ts') {
+        code = imports + code;
+        // a <div> instead of the <label>: a button inside would take the label's clicks
+        code = replaceRequired(
+            code,
+            [
+                '        ? html`<label class="fp3d-rp-slider"',
+                '            ><span>${this.t("volume")}</span>',
+                '            <input',
+                '              type="range"',
+                '              min="0"',
+                '              max="100"',
+                '              .value=${String(Math.round(a.volume_level * 100))}',
+                '              @change=${(e: Event) => this.call("media_player", "volume_set", { entity_id: id, volume_level: Number((e.target as HTMLInputElement).value) / 100 })}',
+                '          /></label>`',
+            ].join('\n'),
+            [
+                '        ? html`<div class="fp3d-rp-slider"',
+                '            ><span class="fp3d-rp-vol">${fp3dCanMute(st)',
+                `              ? html\`<button class="fp3d-btn fp3d-rp-small fp3d-mute \${fp3dIsMuted(st) ? "fp3d-mute-on" : ""}" aria-label=\${this.t(fp3dIsMuted(st) ? "media_unmute" : "media_mute")} title=\${this.t(fp3dIsMuted(st) ? "media_unmute" : "media_mute")} ?disabled=\${na} @click=\${() => { const c = fp3dMuteCall(st); if (c) { this.call("media_player", c.service, { entity_id: id, ...c.data }); this.requestUpdate(); } }}>${icon.replace('MUTED', 'fp3dIsMuted(st)')}</button>\``,
+                '              : nothing}${this.t("volume")}</span>',
+                '            <input',
+                '              type="range"',
+                '              min="0"',
+                '              max="100"',
+                '              aria-label=${this.t("volume")}',
+                '              .value=${String(Math.round(a.volume_level * 100))}',
+                '              @change=${(e: Event) => this.call("media_player", "volume_set", { entity_id: id, volume_level: Number((e.target as HTMLInputElement).value) / 100 })}',
+                '          /></div>`',
+            ].join('\n'),
+            'mute: room panel',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-rp-slider input {\n',
+            [
+                '      .fp3d-rp-vol {',
+                '        display: inline-flex;',
+                '        align-items: center;',
+                '        gap: 6px;',
+                '      }',
+                '      .fp3d-rp-vol .fp3d-mute {',
+                '        display: inline-flex;',
+                '        align-items: center;',
+                '        justify-content: center;',
+                '        padding: 4px 6px;',
+                '      }',
+                '      .fp3d-mute svg {',
+                '        width: 16px;',
+                '        height: 16px;',
+                '        fill: currentColor;',
+                '      }',
+                '      .fp3d-mute-on {',
+                '        color: #ff9f1c;',
+                '        border-color: #ff9f1c;',
+                '      }',
+                '      .fp3d-rp-slider:has(.fp3d-mute-on) input {',
+                '        opacity: 0.4;',
+                '      }',
+                '      .fp3d-rp-slider input {',
+                '',
+            ].join('\n'),
+            'mute: room panel style',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  volume: "Lautstärke",',
+            '  volume: "Lautstärke",\n  media_mute: "Stumm schalten",\n  media_unmute: "Ton wieder an",',
+            'mute de',
+        );
+        code = replaceRequired(
+            code,
+            '  volume: "Volume",',
+            '  volume: "Volume",\n  media_mute: "Mute",\n  media_unmute: "Unmute",',
+            'mute en',
+        );
+    }
+    return code;
+}
+
+/**
  * "Zeigen" beside a placed device in the editor's list of a room: the device is chosen, the plan moves it into the
  * middle (zoomed in enough to see it), and rings run out from it for a moment. Without it a device just placed is
  * hard to find among the other symbols.
@@ -7236,6 +7460,7 @@ const patches: Plugin = {
         code = assistantVoice(name, code);
         code = deviceRowsFit(name, code);
         code = findDevice(name, code);
+        code = mediaMute(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

@@ -395,6 +395,9 @@ Aufbau und Konventionen: [CLAUDE.md](CLAUDE.md).
   „Entfernen“ wurden in einer schmalen Leiste abgeschnitten)
 - (bluefox) Editor: Neuer Knopf „Im Plan zeigen“ neben einem platzierten Gerät – der Plan rückt das Gerät in die
   Mitte, wählt es aus und lässt Ringe von ihm ausgehen
+- (bluefox) Medienplayer: Ein Lautsprecher-Knopf neben der Lautstärke (Glaskarte, Schnellmenü, Raumfenster) schaltet
+  stumm und wieder an – über den Mute-Datenpunkt des Geräts (Rolle `media.mute`), sonst über die Lautstärke (auf 0 und
+  zurück auf den vorherigen Wert)
 
 ### 0.4.0 (2026-11-15)
 
