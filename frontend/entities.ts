@@ -200,9 +200,31 @@ export function transformed(value: unknown, binding: Binding, write = false): an
         return binding.map[String(value)];
     }
     if (binding?.scale !== undefined || binding?.offset !== undefined) {
-        return Number(value) * (binding.scale ?? 1) + (binding.offset ?? 0);
+        // without the noise of the arithmetic (57 × 0.01 is 0.5700000000000001)
+        return Number((Number(value) * (binding.scale ?? 1) + (binding.offset ?? 0)).toPrecision(12));
     }
     return value;
+}
+/**
+ * Attributes the 3D view takes as whole numbers, as its platform gives them, and shows as they come: a blind's
+ * position of 56.888… % (a datapoint with decimals, or one scaled from 0…255) read "56.888888888 %".
+ */
+const WHOLE = new Set([
+    'current_position',
+    'current_tilt_position',
+    'brightness',
+    'percentage',
+    'battery_level',
+    'color_temp',
+    'color_temp_kelvin',
+    'min_mireds',
+    'max_mireds',
+    'min_color_temp_kelvin',
+    'max_color_temp_kelvin',
+]);
+/** The value of an attribute, rounded if the 3D view takes it as a whole number. */
+export function whole(key: string, value: unknown): unknown {
+    return WHOLE.has(key) && typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : value;
 }
 /** Whether the condition of a mapping holds (the other datapoint has one of the values). */
 function holds(when: Condition, states: Record<string, StateValue>): boolean {
@@ -235,10 +257,12 @@ function entities(
             ...(m.battery ? { iobroker_battery_own: m.battery } : {}),
         };
         for (const [key, binding] of Object.entries(m.attributes || {})) {
-            attributes[key] =
+            attributes[key] = whole(
+                key,
                 binding && typeof binding === 'object' && binding.id
                     ? transformed(states[binding.id]?.val, binding)
-                    : binding;
+                    : binding,
+            );
         }
         let value = transformed(s?.val, m);
         if (typeof value === 'boolean') {

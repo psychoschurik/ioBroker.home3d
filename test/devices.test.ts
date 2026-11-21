@@ -411,3 +411,40 @@ test('the texts of a datapoint’s values in every form ioBroker knows', () => {
     assert.deepEqual(stateTexts(['off', 'on']), { 0: 'off', 1: 'on' });
     assert.equal(stateTexts(undefined), null);
 });
+
+test('positions, brightness and battery come as whole numbers, other values keep their decimals', () => {
+    const awning: Mapping = {
+        entity_id: 'cover.awning',
+        state: 'a.state',
+        attributes: {
+            current_position: { id: 'a.level' },
+            current_tilt_position: { id: 'a.tilt', scale: 100 / 255 },
+        },
+    };
+    const lamp: Mapping = {
+        entity_id: 'light.lamp',
+        state: 'l.on',
+        attributes: { brightness: { id: 'l.level', scale: 2.55 } },
+    };
+    const radio: Mapping = {
+        entity_id: 'media_player.radio',
+        state: 'r.state',
+        attributes: { volume_level: { id: 'r.volume', scale: 0.01 }, latitude: { id: 'r.lat' } },
+    };
+    const states = {
+        'a.state': { val: 'open', ts: 1 },
+        'a.level': { val: 56.888888888, ts: 1 },
+        'a.tilt': { val: 145, ts: 1 },
+        'l.on': { val: true, ts: 1 },
+        'l.level': { val: 57, ts: 1 },
+        'r.state': { val: 'playing', ts: 1 },
+        'r.volume': { val: 57, ts: 1 },
+        'r.lat': { val: 52.520008, ts: 1 },
+    };
+    const all = entities([awning, lamp, radio], states as never, {});
+    assert.equal(all['cover.awning'].attributes.current_position, 57);
+    assert.equal(all['cover.awning'].attributes.current_tilt_position, 57);
+    assert.equal(all['light.lamp'].attributes.brightness, 145);
+    assert.equal(all['media_player.radio'].attributes.volume_level, 0.57);
+    assert.equal(all['media_player.radio'].attributes.latitude, 52.520008);
+});

@@ -180,7 +180,7 @@ export function healthAttributes(
     const out: Record<string, unknown> = { health_device: h.device };
     const battery = Number(val(h.battery));
     if (h.battery && val(h.battery) !== null && val(h.battery) !== undefined && Number.isFinite(battery)) {
-        out.battery_level = Math.min(100, Math.max(0, battery));
+        out.battery_level = Math.round(Math.min(100, Math.max(0, battery)));
     }
     if (bool(val(h.lowbat)) === true) {
         out.battery_low = true;
