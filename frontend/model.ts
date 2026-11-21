@@ -156,6 +156,18 @@ export interface StorageData {
      * UNREACH/online datapoints (sensors that send only every few minutes look offline in between); null: as reported.
      */
     health_stale_min?: number | null;
+    /** Own 3D objects: model ID → its file below `models/` and what it is (missing: none uploaded yet). */
+    models?: Record<string, ModelEntry>;
+}
+/** A model file of an own 3D object (furniture type `model3d`, its field `model` names the ID). */
+export interface ModelEntry {
+    file: string;
+    name: string;
+    ext: 'glb' | 'gltf' | 'obj' | 'stl';
+    bytes: number;
+    tris: number;
+    /** Its natural width (x), depth (z) and height (y) in metres. */
+    size: [number, number, number];
 }
 /** Format of 0.4.0, which kept everything (also the images as data URLs) in the state `home3d.0.storage`. */
 export interface LegacyStorageData {

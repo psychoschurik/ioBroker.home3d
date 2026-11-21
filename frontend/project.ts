@@ -1,8 +1,9 @@
 // Export and import of a project: one floor plan with its pictures and the ioBroker datapoints of its devices.
 // The file is an export file of the 3D frontend (`format: "home3d"`) with an `iobroker` part, so the plan import of
 // the editor still reads its building; our import also takes plain export files of the 3D frontend.
-import type { Building, Mapping, ProtocolRecord } from './model.js';
+import type { Building, Mapping, ModelEntry, ProtocolRecord } from './model.js';
 import { t } from './lang.js';
+import { MODEL_EXTS, modelSize } from './vendor-ext/model-files.js';
 
 export const PROJECT_FORMAT = 'home3d';
 export const PROJECT_VERSION = 1;
@@ -19,8 +20,13 @@ export interface ProjectFile {
         images: Record<string, string>;
         /** The device mappings the building uses, without the cached `_meta`. */
         mappings: Mapping[];
+        /** Own 3D objects: model ID → what it is and its file as a data URL (missing before 0.5.0). */
+        models?: Record<string, ProjectModel>;
     };
 }
+
+/** A model of an own 3D object in a project or backup file. */
+export type ProjectModel = Omit<ModelEntry, 'file'> & { data: string };
 
 export interface Project {
     name: string | null;
@@ -29,6 +35,7 @@ export interface Project {
     building: Building;
     images: Record<string, string>;
     mappings: Mapping[];
+    models: Record<string, ProjectModel>;
 }
 
 const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
@@ -76,23 +83,57 @@ export function plainMapping(m: Mapping): Mapping {
     return structuredClone(rest);
 }
 
-/** The pictures and device mappings a building refers to. */
+/** The pictures, device mappings and models of own 3D objects a building refers to. */
 export function usedBy(
     building: Building,
     images: Record<string, string>,
     mappings: Mapping[],
-): { images: string[]; mappings: Mapping[] } {
+    models: Record<string, unknown> = {},
+): { images: string[]; mappings: Mapping[]; models: string[] } {
     const used = strings(building);
     return {
         images: Object.keys(images).filter(id => used.has(id)),
         mappings: mappings.filter(m => used.has(m.entity_id)).map(plainMapping),
+        models: Object.keys(models).filter(id => used.has(id)),
     };
+}
+
+/** The models of a project or backup file that can be stored: a known file type, a size and the file's data. */
+export function readModels(value: unknown): Record<string, ProjectModel> {
+    const out: Record<string, ProjectModel> = {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return out;
+    }
+    for (const [id, raw] of Object.entries(value)) {
+        const m = raw as Partial<ProjectModel> | null;
+        const size = modelSize(m?.size);
+        if (
+            UNSAFE.has(id) ||
+            !/^[A-Za-z0-9_-]{1,80}$/.test(id) ||
+            !m ||
+            typeof m.data !== 'string' ||
+            !(MODEL_EXTS as readonly string[]).includes(String(m.ext)) ||
+            !size
+        ) {
+            continue;
+        }
+        out[id] = {
+            name: typeof m.name === 'string' && m.name.trim() ? m.name.trim().slice(0, 80) : id,
+            ext: m.ext as ModelEntry['ext'],
+            bytes: typeof m.bytes === 'number' ? m.bytes : 0,
+            tris: typeof m.tris === 'number' ? m.tris : 0,
+            size,
+            data: m.data,
+        };
+    }
+    return out;
 }
 
 export function projectFile(
     plan: { name: string | null; icon: string | null; site: unknown; building: Building },
     images: Record<string, string>,
     mappings: Mapping[],
+    models: Record<string, ProjectModel> = {},
 ): ProjectFile {
     return {
         format: PROJECT_FORMAT,
@@ -104,6 +145,7 @@ export function projectFile(
             plan: { name: plan.name, icon: plan.icon, site: plan.site ?? null },
             images,
             mappings: mappings.map(plainMapping),
+            ...(Object.keys(models).length ? { models } : {}),
         },
     };
 }
@@ -146,6 +188,7 @@ export function readProject(data: unknown): Project {
         building: { ...structuredClone(building), presence: Array.isArray(building.presence) ? building.presence : [] },
         images,
         mappings: Array.isArray(extra.mappings) ? extra.mappings.filter(m => m && typeof m === 'object') : [],
+        models: readModels(extra.models),
     };
 }
 

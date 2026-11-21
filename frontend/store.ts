@@ -9,13 +9,25 @@ import type {
     IoAccess,
     FileAccess,
     Mapping,
+    ModelEntry,
     ProtocolMessage,
     ProtocolRecord,
 } from './model.js';
 import { validateMappings, discover, execute, nameOf, hash } from './entities.js';
 import { mediaBases, mediaCandidates } from './media.js';
-import { freeEntityId, plainMapping, projectFile, readProject, renamed, usedBy } from './project.js';
+import {
+    freeEntityId,
+    plainMapping,
+    projectFile,
+    readModels,
+    readProject,
+    renamed,
+    strings,
+    usedBy,
+    type ProjectModel,
+} from './project.js';
 import { t } from './lang.js';
+import { MODEL_EXTS, MODEL_MAX_BYTES, modelSize, type ModelInfo } from './vendor-ext/model-files.js';
 
 declare const __HOME3D_VERSION__: string | undefined;
 const version = typeof __HOME3D_VERSION__ === 'string' ? __HOME3D_VERSION__ : 'dev';
@@ -45,6 +57,8 @@ const MUTATING = new Set([
     'history/restore',
     'backup/import',
     'project/import',
+    'model/set',
+    'model/prune',
 ]);
 const IMAGE_TYPES: Record<string, string> = {
     'image/png': 'png',
@@ -211,6 +225,7 @@ export class Store {
                 ? { timetravel_instance: d.timetravel_instance }
                 : {}),
             ...(staleMinutes(d.health_stale_min) ? { health_stale_min: staleMinutes(d.health_stale_min) } : {}),
+            ...(d.models && typeof d.models === 'object' && !Array.isArray(d.models) ? { models: d.models } : {}),
         };
     }
     private async persist(): Promise<void> {
@@ -337,6 +352,77 @@ export class Store {
             error('not_found', t('image_missing'));
         }
         return url;
+    }
+    /** The models of own 3D objects that a plan places (also one in the trash: it may come back). */
+    private modelsUsed(): Set<string> {
+        const used = new Set<string>();
+        const models = this.data.models ?? {};
+        for (const p of Object.values(this.data.plans)) {
+            for (const s of strings(p.building)) {
+                if (Object.hasOwn(models, s)) {
+                    used.add(s);
+                }
+            }
+        }
+        return used;
+    }
+    /** Stores a model file; `id` null: a new ID. Returns the ID. */
+    private async writeModel(
+        id: string | null,
+        model: { name?: unknown; ext?: unknown; data?: unknown; size?: unknown; tris?: unknown },
+    ): Promise<string> {
+        const ext = (typeof model.ext === 'string' ? model.ext.toLowerCase() : '') as ModelEntry['ext'];
+        if (!(MODEL_EXTS as readonly string[]).includes(ext) || typeof model.data !== 'string') {
+            error('invalid_model', t('model_type'));
+        }
+        const bytes = base64ToBytes(model.data.replace(/^data:[^,]*,/, ''));
+        if (!bytes.length || bytes.length > MODEL_MAX_BYTES) {
+            error('invalid_model', t('model_big', { mb: MODEL_MAX_BYTES / 1024 / 1024 }));
+        }
+        const key = id ?? `model_${uuid()}`;
+        const file = `models/${fileKey(key)}.${ext}`;
+        await this.files.writeBinary(file, bytes);
+        this.data.models = {
+            ...(this.data.models ?? {}),
+            [key]: {
+                file,
+                name: typeof model.name === 'string' && model.name.trim() ? model.name.trim().slice(0, 80) : key,
+                ext,
+                bytes: bytes.length,
+                tris:
+                    typeof model.tris === 'number' && Number.isInteger(model.tris) && model.tris >= 0 ? model.tris : 0,
+                size: modelSize(model.size) ?? [1, 1, 1],
+            },
+        };
+        return key;
+    }
+    /** The models of a project or backup that are not here yet (an ID is random: the same ID is the same model). */
+    private async importModels(models: Record<string, ProjectModel>): Promise<{ id: string; reason: string }[]> {
+        const failed: { id: string; reason: string }[] = [];
+        for (const [id, m] of Object.entries(models)) {
+            if (Object.hasOwn(this.data.models ?? {}, id)) {
+                continue;
+            }
+            try {
+                await this.writeModel(id, m);
+            } catch (e) {
+                failed.push({ id, reason: (e as Error).message });
+            }
+        }
+        return failed;
+    }
+    /** Models with their files, for a project or backup file. */
+    private async exportModels(ids: string[]): Promise<Record<string, ProjectModel>> {
+        const out: Record<string, ProjectModel> = {};
+        for (const id of ids) {
+            const entry = this.data.models?.[id];
+            const data = entry ? await this.files.readDataUrl(entry.file).catch(() => null) : null;
+            if (entry && data) {
+                const { file, ...rest } = entry;
+                out[id] = { ...rest, data };
+            }
+        }
+        return out;
     }
     /**
      * Mappings from a file (backup, project) that work on this system: the others name datapoints that are missing
@@ -533,6 +619,53 @@ export class Store {
                 return save({});
             case 'image/get':
                 return { data: await this.readImage(m.image_id) };
+            case 'model/list': {
+                const used = this.modelsUsed();
+                const models: ModelInfo[] = Object.entries(this.data.models ?? {}).map(([key, e]) => ({
+                    id: key,
+                    name: e.name,
+                    ext: e.ext,
+                    bytes: e.bytes,
+                    tris: e.tris,
+                    size: e.size,
+                    used: used.has(key),
+                }));
+                return { models: models.sort((a, b) => a.name.localeCompare(b.name)) };
+            }
+            case 'model/get': {
+                const models = this.data.models ?? {};
+                const entry =
+                    typeof m.model_id === 'string' && Object.hasOwn(models, m.model_id)
+                        ? models[m.model_id]
+                        : undefined;
+                const data = entry ? await this.files.readDataUrl(entry.file) : null;
+                if (!entry || !data) {
+                    error('not_found', t('model_missing'));
+                }
+                return { data, ext: entry.ext };
+            }
+            case 'model/set': {
+                const key = await this.writeModel(null, {
+                    name: m.name,
+                    ext: m.ext,
+                    data: m.data,
+                    size: m.size,
+                    tris: m.tris,
+                });
+                return save({ model_id: key, ...this.data.models![key] });
+            }
+            case 'model/prune': {
+                const used = this.modelsUsed();
+                const removed: string[] = [];
+                for (const [key, e] of Object.entries(this.data.models ?? {})) {
+                    if (!used.has(key)) {
+                        await this.files.remove(e.file).catch(() => {});
+                        delete this.data.models![key];
+                        removed.push(key);
+                    }
+                }
+                return save({ removed });
+            }
             case 'history/list':
                 active();
                 return {
@@ -579,6 +712,8 @@ export class Store {
                     images,
                     // the datapoints of the devices (not part of the backup format of the 3D frontend)
                     mappings: this.data.mappings.map(plainMapping),
+                    // the files of own 3D objects
+                    models: await this.exportModels(Object.keys(this.data.models ?? {})),
                 };
             }
             case 'backup/import': {
@@ -613,6 +748,7 @@ export class Store {
                         await this.writeImage(key, url);
                     }
                 }
+                const modelsFailed = await this.importModels(readModels(m.models));
                 // backups without mappings (before 0.5.0) keep the current ones
                 const devices = Array.isArray(m.mappings) ? await this.importable(m.mappings) : null;
                 if (devices) {
@@ -631,12 +767,13 @@ export class Store {
                             reason: t('no_packs'),
                         })),
                         ...(devices?.skipped || []).map(d => ({ id: d.entity_id, reason: d.reason })),
+                        ...modelsFailed,
                     ],
                 });
             }
             case 'project/export': {
                 const target = active();
-                const used = usedBy(target.building, this.data.images, this.data.mappings);
+                const used = usedBy(target.building, this.data.images, this.data.mappings, this.data.models);
                 const images: Record<string, string> = {};
                 for (const key of used.images) {
                     const url = await this.readImage(key).catch(() => '');
@@ -644,7 +781,7 @@ export class Store {
                         images[key] = url;
                     }
                 }
-                return projectFile(target, images, used.mappings);
+                return projectFile(target, images, used.mappings, await this.exportModels(used.models));
             }
             case 'project/import': {
                 const project = readProject(m.project);
@@ -689,6 +826,7 @@ export class Store {
                         brokenImages.push(key);
                     }
                 }
+                const modelsFailed = await this.importModels(project.models);
                 const n = plan(renamed(building, rename), String(m.name || project.name || 'Importierter Grundriss'));
                 n.icon = project.icon;
                 n.site = project.site ?? null;
@@ -707,6 +845,7 @@ export class Store {
                     skipped: [
                         ...devices.skipped.map(d => ({ id: d.entity_id, reason: d.reason })),
                         ...brokenImages.map(id => ({ id, reason: t('image_unreadable') })),
+                        ...modelsFailed,
                     ],
                 });
             }

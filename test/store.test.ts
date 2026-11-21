@@ -384,3 +384,48 @@ test('a full backup keeps the mappings of the devices', async () => {
     await other.call({ type: 'home3d/backup/import', building: empty() });
     assert.equal(other.data.mappings.length, 2);
 });
+test('own 3D objects: a model file is stored, listed, loaded, carried by a project and pruned when unused', async () => {
+    const { store, files } = await fixture();
+    const data = Buffer.from('glTF-bytes').toString('base64');
+    const set = await store.call({ type: 'home3d/model/set', name: ' Sessel ', ext: 'GLB', data, size: [0.8, 0.9, 1.1], tris: 1200 });
+    assert.match(set.model_id, /^model_/);
+    assert.equal(set.file, `models/${set.model_id}.glb`);
+    assert.ok(files.files.has(set.file));
+    let list = (await store.call({ type: 'home3d/model/list' })).models;
+    assert.deepEqual(list, [{ id: set.model_id, name: 'Sessel', ext: 'glb', bytes: 10, tris: 1200, size: [0.8, 0.9, 1.1], used: false }]);
+    const got = await store.call({ type: 'home3d/model/get', model_id: set.model_id });
+    assert.equal(got.ext, 'glb');
+    assert.equal(Buffer.from(got.data.split(',')[1], 'base64').toString(), 'glTF-bytes');
+    await assert.rejects(store.call({ type: 'home3d/model/get', model_id: 'model_x' }), /3D-Modell fehlt/);
+    await assert.rejects(store.call({ type: 'home3d/model/set', name: 'x', ext: 'fbx', data }), /GLB, glTF, OBJ oder STL/);
+    // placed in the plan: used, kept by the pruning, carried by the project
+    const building = empty();
+    building.floors.push({ id: 'eg', rooms: [], furniture: [{ id: 'f1', type: 'model3d', model: set.model_id }] });
+    await store.call({ type: 'home3d/building/save', building });
+    const unused = await store.call({ type: 'home3d/model/set', name: 'Alt', ext: 'stl', data, size: [1, 1, 1], tris: 12 });
+    list = (await store.call({ type: 'home3d/model/list' })).models;
+    assert.deepEqual(
+        list.map((m: { name: string; used: boolean }) => [m.name, m.used]),
+        [
+            ['Alt', false],
+            ['Sessel', true],
+        ],
+    );
+    const project = await store.call({ type: 'home3d/project/export' });
+    assert.deepEqual(Object.keys(project.iobroker.models), [set.model_id]);
+    const other = await fixture();
+    const res = await other.store.call({ type: 'home3d/project/import', project });
+    assert.deepEqual(res.skipped, []);
+    assert.equal(other.store.data.models?.[set.model_id]?.name, 'Sessel');
+    assert.ok(other.files.files.has(set.file));
+    // a full backup carries every model
+    const backup = await store.call({ type: 'home3d/backup/export' });
+    assert.equal(Object.keys(backup.models).length, 2);
+    const pruned = await store.call({ type: 'home3d/model/prune' });
+    assert.deepEqual(pruned.removed, [unused.model_id]);
+    assert.ok(!files.files.has(`models/${unused.model_id}.stl`));
+    assert.ok(files.files.has(set.file));
+    // read-only: no upload
+    store.readOnly = true;
+    await assert.rejects(store.call({ type: 'home3d/model/set', name: 'x', ext: 'glb', data }), /Nur ansehen/);
+});

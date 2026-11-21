@@ -4679,6 +4679,307 @@ function treesMore(name: string, code: string): string {
 }
 
 /**
+ * Own 3D objects (own-models.ts, own-model-form.ts): the furniture type "model3d" shows a model file uploaded in the
+ * editor (GLB with its colours and textures, OBJ and STL in one colour), scaled into its box; a tap opens its entity.
+ * The files lie in the instance's storage (store.ts: `home3d/model/*`).
+ */
+function ownModels(name: string, code: string): string {
+    const models = `${root}/frontend/vendor-ext/own-models.ts`;
+    if (name === 'model.ts') {
+        // at the end of the types (other patches add theirs there too)
+        const start = code.indexOf('export const FURNITURE_TYPES = [');
+        const end = start < 0 ? -1 : code.indexOf('\n] as const;', start);
+        if (end < 0) {
+            throw new Error('Upstream patch no longer matches: own models: furniture types');
+        }
+        code = `${code.slice(0, end)}\n  "model3d",${code.slice(end)}`;
+        code = replaceRequired(
+            code,
+            'export const FURNITURE_SIZE: Record<FurnitureType, [number, number, number]> = {\n',
+            'export const FURNITURE_SIZE: Record<FurnitureType, [number, number, number]> = {\n  // an own 3D object: its box until a model gives its own size\n  model3d: [1, 1, 1],\n',
+            'own models: size',
+        );
+        code = replaceRequired(
+            code,
+            'export const FURNITURE_GROUPS: Record<string, FurnitureType[]> = {\n',
+            'export const FURNITURE_GROUPS: Record<string, FurnitureType[]> = {\n  own: ["model3d"],\n',
+            'own models: shown',
+        );
+        // it may stand for any device: an entity to switch and a tap that opens it
+        code = replaceRequired(
+            code,
+            '  "island",\n  "sink",\n]);',
+            '  "island",\n  "sink",\n  "model3d",\n]);',
+            'own models: electric',
+        );
+        code = replaceRequired(
+            code,
+            '  variant: string | null;\n',
+            '  variant: string | null;\n  /** An own 3D object (type "model3d"): the ID of its model file (`home3d/model/list`). */\n  model?: string | null;\n',
+            'own models: field',
+        );
+    }
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            'const BASIC: Record<string, [Kind, Room[]]> = {\n',
+            'const BASIC: Record<string, [Kind, Room[]]> = {\n  model3d: ["deco", []],\n',
+            'own models: library index',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "tree":\n    case "tree_fruit":',
+            [
+                '    case "model3d": {',
+                '      // an own 3D object from above: its box and a cube',
+                '      const r = Math.min(w, d) * 0.3;',
+                '      const p = [0, 1, 2, 3, 4, 5].map((i) => [Math.cos(Math.PI / 6 + (i * Math.PI) / 3) * r, Math.sin(Math.PI / 6 + (i * Math.PI) / 3) * r]);',
+                '      return [',
+                '        rect(-w / 2, -d / 2, w / 2, d / 2, "fp3d-sym-strong"),',
+                '        ...p.map((a, i) => line(a[0], a[1], p[(i + 1) % 6][0], p[(i + 1) % 6][1])),',
+                '        ...[1, 3, 5].map((i) => line(0, 0, p[i][0], p[i][1])),',
+                '      ];',
+                '    }',
+                '    case "tree":',
+                '    case "tree_fruit":',
+            ].join('\n'),
+            'own models: symbol',
+        );
+    }
+    if (name === 'viewer/furniture.ts') {
+        code = replaceRequired(
+            code,
+            '    case "tree":\n    case "tree_conifer":',
+            '    case "model3d":\n    case "tree":\n    case "tree_conifer":',
+            'own models: drawn apart',
+        );
+    }
+    if (name === 'viewer/preview.ts') {
+        code = `import { modelPreview as fp3dPrevModel } from "${models}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  const fp3dOwn = fp3dOwn0 ?? fp3dBoat;\n',
+            '  const fp3dOwn = fp3dOwn0 ?? fp3dBoat ?? (item.type === "model3d" ? fp3dPrevModel(item.w, item.d, item.h) : null);\n',
+            'own models: library picture',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = `import { modelForm as fp3dModelForm } from "${root}/frontend/vendor-ext/own-model-form.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '      ${f.type === "lamp_pendant"\n',
+            [
+                '      ${f.type === "model3d"',
+                '        ? fp3dModelForm(f, {',
+                '            hass: this.hass as never,',
+                '            admin,',
+                '            t: (k: string) => this.t(k as I18nKey),',
+                '            update: (p: Record<string, unknown>) => this.updateFurniture(p as Partial<Furniture>),',
+                '            redraw: () => this.requestUpdate(),',
+                '          })',
+                '        : nothing}',
+                '      ${f.type === "lamp_pendant"',
+                '',
+            ].join('\n'),
+            'own models: fields',
+        );
+    }
+    if (name === 'viewer/viewer3d.ts') {
+        code = `import { buildModelItem as fp3dBuildModelItem, modelFurniture as fp3dModelFurniture, modelKey as fp3dModelKey, modelsVersion as fp3dModelsVersion, onModelChange as fp3dOnModelChange, setModelReader as fp3dSetModelReader, type ModelSpec as Fp3dModelSpec } from "${models}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  private fp3dTreeSig = "";\n',
+            [
+                '  private fp3dTreeSig = "";',
+                '  /** Own 3D objects, built anew when they, their floor, the look or a loaded model change. */',
+                '  private fp3dModels: Fp3dModelSpec[] = [];',
+                '  private fp3dModelGroup: Group | null = null;',
+                '  private fp3dModelSig = "";',
+                '  private fp3dModelOff: (() => void) | null = null;',
+                '',
+                '  /** Where the model files come from: set here, in the bundle of the viewer, which loads them. */',
+                '  fp3dSetModelReader(fn: Parameters<typeof fp3dSetModelReader>[0]): void {',
+                '    fp3dSetModelReader(fn);',
+                '  }',
+                '',
+                '  fp3dSetModels(list: Fp3dModelSpec[]): void {',
+                '    // a model that finished loading is drawn at once',
+                '    this.fp3dModelOff ??= fp3dOnModelChange(() => this.invalidate());',
+                '    if (JSON.stringify(list) === JSON.stringify(this.fp3dModels)) return;',
+                '    this.fp3dModels = list;',
+                '    this.invalidate();',
+                '  }',
+                '',
+            ].join('\n'),
+            'own models: fields',
+        );
+        code = replaceRequired(
+            code,
+            '    this.fp3dSkyMoving = moving && !this.lowQuality;\n',
+            [
+                '    // own 3D objects: the model in its box (a box while it loads or when its file is missing)',
+                '    const modelParts: { m: Fp3dModelSpec; y: number }[] = [];',
+                '    for (const m of this.fp3dModels) {',
+                '      const fv = this.floorMap.get(m.floor);',
+                '      if (!fv || !fv.group.visible || fv.o < 0.3) continue;',
+                '      modelParts.push({ m, y: fv.group.position.y });',
+                '    }',
+                '    const modelSig = `${light ? "l" : "d"}|${fp3dModelsVersion()}|${modelParts.map((p) => fp3dModelKey(p.m, p.y)).join("|")}`;',
+                '    if (modelSig !== this.fp3dModelSig) {',
+                '      this.fp3dModelSig = modelSig;',
+                '      if (this.fp3dModelGroup) {',
+                '        this.root.remove(this.fp3dModelGroup);',
+                '        this.fp3dModelGroup = null;',
+                '      }',
+                '      if (modelParts.length) {',
+                '        const g = new Group();',
+                '        for (const p of modelParts) {',
+                '          const item = fp3dBuildModelItem(p.m, !!light);',
+                '          item.position.set(p.m.x, p.y + p.m.y, p.m.z);',
+                '          g.add(item);',
+                '        }',
+                '        this.root.add(g);',
+                '        this.fp3dModelGroup = g;',
+                '      }',
+                '    }',
+                '    this.fp3dSkyMoving = moving && !this.lowQuality;',
+                '',
+            ].join('\n'),
+            'own models: every frame',
+        );
+        code = replaceRequired(
+            code,
+            '    if (this.fp3dTreeGroup) fp3dDisposeTrees(this.fp3dTreeGroup);\n',
+            '    if (this.fp3dTreeGroup) fp3dDisposeTrees(this.fp3dTreeGroup);\n    this.fp3dModelOff?.();\n',
+            'own models: dispose',
+        );
+        code = replaceRequired(
+            code,
+            '    // the gear of a boat lies apart (a tank is seen through berths and floors): a tap on it opens its sensor\n',
+            [
+                '    // an own 3D object: its entity, unless something tappable is nearer',
+                '    if (devices && !this.furnish && this.fp3dModelGroup) {',
+                '      const hit = ray.intersectObject(this.fp3dModelGroup, true)[0];',
+                '      const fp3dModelId = hit ? fp3dModelFurniture(hit.object) : null;',
+                '      const fp3dModelEntity = fp3dModelId ? this.pickFurniture.get(fp3dModelId) : undefined;',
+                '      if (hit && fp3dModelEntity) {',
+                '        const nearer = ray',
+                '          .intersectObjects(this.activeFloors().flatMap((f) => [f.lampMesh, f.fridgeMesh].filter((m) => m.visible)), false)',
+                '          .some((h) => h.distance < hit.distance);',
+                '        if (!nearer) return { entity: fp3dModelEntity };',
+                '      }',
+                '    }',
+                '    // the gear of a boat lies apart (a tank is seen through berths and floors): a tap on it opens its sensor',
+                '',
+            ].join('\n'),
+            'own models: tap',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = `import type { ModelExt as Fp3dModelExt } from "${root}/frontend/vendor-ext/model-files.ts";\n${code}`;
+        code = replaceRequired(
+            code,
+            '    v.fp3dSetTrees(\n',
+            [
+                '    // own 3D objects: their files come from the storage of the instance',
+                '    v.fp3dSetModelReader((id) => hass.callWS<{ data: string; ext: Fp3dModelExt }>({ type: "home3d/model/get", model_id: id }));',
+                '    v.fp3dSetModels(',
+                '      b.floors.flatMap((fl) =>',
+                '        fl.furniture',
+                '          .filter((f) => f.type === "model3d")',
+                '          .map((f) => ({',
+                '            id: f.id,',
+                '            floor: fl.id,',
+                '            model: f.model ?? null,',
+                '            x: f.x,',
+                '            z: f.z,',
+                '            angle: ((f.rotation ?? 0) * Math.PI) / 180,',
+                '            w: f.w,',
+                '            d: f.d,',
+                '            h: f.h,',
+                '            mirror: !!f.mirror,',
+                '            // its height above the floor; outside on the ground there',
+                '            y: (f.mount_y ?? 0) + (fl.rooms.some((r) => r.points.length >= 3 && pointInPolygon([f.x, f.z], r.points)) ? 0 : outdoorGround(fl, f.x, f.z)),',
+                '          })),',
+                '      ),',
+                '    );',
+                '    v.fp3dSetTrees(',
+                '',
+            ].join('\n'),
+            'own models to the viewer',
+        );
+    }
+    if (name === 'i18n.ts') {
+        const de: Record<string, string> = {
+            furn_model3d: 'Eigenes 3D-Objekt',
+            model3d_file: '3D-Modell',
+            model3d_none: '– keins –',
+            model3d_missing: 'Datei fehlt',
+            model3d_upload: '3D-Datei hochladen …',
+            model3d_reading: 'Wird gelesen …',
+            model3d_tris: 'Dreiecke',
+            model3d_natural: 'Originalgröße',
+            model3d_prune: 'Unbenutzte Modelle löschen',
+            model3d_prune_hint: 'Löscht die hochgeladenen Modelle, die kein Grundriss mehr verwendet.',
+            model3d_hint:
+                'GLB (glTF 2.0) bringt Farben und Texturen mit, OBJ und STL erscheinen einfarbig. Das Modell füllt die Box aus Breite, Tiefe und Höhe. Höchstens 20 MB.',
+            model3d_many: 'Sehr viele Dreiecke: auf Tablets kann die 3D-Ansicht ruckeln.',
+            model3d_err_big: 'Die Datei ist größer als 20 MB.',
+            model3d_err_tris: 'Das Modell hat mehr als 2 Millionen Dreiecke.',
+            model3d_err_format: 'Die Datei ist kein lesbares 3D-Modell (GLB, glTF, OBJ oder STL).',
+            model3d_err_draco:
+                'Mit Draco komprimierte Modelle kann die Seite nicht lesen: bitte ohne Kompression exportieren.',
+            model3d_err_ktx2:
+                'Texturen im Format KTX2 kann die Seite nicht lesen: bitte mit PNG- oder JPEG-Texturen exportieren.',
+            model3d_err_external:
+                'Die glTF-Datei verweist auf weitere Dateien: bitte als GLB (eine Datei) exportieren.',
+            model3d_err_empty: 'Die Datei enthält keine Flächen.',
+        };
+        const en: Record<string, string> = {
+            furn_model3d: 'Own 3D object',
+            model3d_file: '3D model',
+            model3d_none: '– none –',
+            model3d_missing: 'File missing',
+            model3d_upload: 'Upload a 3D file …',
+            model3d_reading: 'Reading …',
+            model3d_tris: 'triangles',
+            model3d_natural: 'Original size',
+            model3d_prune: 'Delete unused models',
+            model3d_prune_hint: 'Deletes the uploaded models that no floor plan uses any more.',
+            model3d_hint:
+                'GLB (glTF 2.0) brings its colours and textures, OBJ and STL show in one colour. The model fills the box of width, depth and height. At most 20 MB.',
+            model3d_many: 'Very many triangles: the 3D view may stutter on tablets.',
+            model3d_err_big: 'The file is larger than 20 MB.',
+            model3d_err_tris: 'The model has more than 2 million triangles.',
+            model3d_err_format: 'The file is not a readable 3D model (GLB, glTF, OBJ or STL).',
+            model3d_err_draco: 'The page cannot read models compressed with Draco: please export without compression.',
+            model3d_err_ktx2: 'The page cannot read textures in KTX2: please export with PNG or JPEG textures.',
+            model3d_err_external: 'The glTF file refers to further files: please export as GLB (one file).',
+            model3d_err_empty: 'The file contains no faces.',
+        };
+        const lines = (texts: Record<string, string>): string =>
+            Object.entries(texts)
+                .map(([k, v]) => `\n  ${k}: ${JSON.stringify(v)},`)
+                .join('');
+        code = replaceRequired(
+            code,
+            '  furn_nav_light: "Positionslicht",',
+            `  furn_nav_light: "Positionslicht",${lines(de)}`,
+            'own models de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_nav_light: "Navigation light",',
+            `  furn_nav_light: "Navigation light",${lines(en)}`,
+            'own models en',
+        );
+    }
+    return code;
+}
+
+/**
  * Taps on furniture that is drawn apart from the others: the moving parts (doors of a smart fridge, an awning, a
  * motorised curtain or screen) lie in their own mesh, so each keeps its triangles and a tap opens the item's entity;
  * cars, coffee machines and rainwater tanks of the home looks (home-fx.ts) are found by their furniture id.
@@ -8796,6 +9097,7 @@ const patches: Plugin = {
         code = deviceRowsFit(name, code);
         code = findDevice(name, code);
         code = mediaMute(name, code);
+        code = ownModels(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
@@ -8851,8 +9153,8 @@ const patches: Plugin = {
             code = replaceRequired(
                 code,
                 'return hass.callWS({ type: "home3d/backup/import", building, packs,',
-                'return hass.callWS({ type: "home3d/backup/import", building, packs, mappings: (backup as { mappings?: unknown }).mappings,',
-                'backup mappings',
+                'return hass.callWS({ type: "home3d/backup/import", building, packs, mappings: (backup as { mappings?: unknown }).mappings, models: (backup as { models?: unknown }).models,',
+                'backup mappings and models',
             );
         }
         return code;

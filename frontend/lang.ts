@@ -301,6 +301,17 @@ export const TEXTS = {
         ru: 'Только PNG, JPEG, WebP или GIF в виде data-URL.',
     },
     image_missing: { de: 'Bild fehlt.', en: 'Picture missing.', ru: 'Изображение отсутствует.' },
+    model_type: {
+        de: 'Nur 3D-Modelle als GLB, glTF, OBJ oder STL.',
+        en: 'Only 3D models as GLB, glTF, OBJ or STL.',
+        ru: 'Только 3D-модели в формате GLB, glTF, OBJ или STL.',
+    },
+    model_big: {
+        de: 'Das 3D-Modell ist größer als {mb} MB.',
+        en: 'The 3D model is larger than {mb} MB.',
+        ru: '3D-модель больше {mb} МБ.',
+    },
+    model_missing: { de: '3D-Modell fehlt.', en: '3D model missing.', ru: '3D-модель отсутствует.' },
     image_unreadable: { de: 'Bild nicht lesbar.', en: 'Picture not readable.', ru: 'Изображение не читается.' },
     plan_missing: { de: 'Grundriss nicht vorhanden.', en: 'Floor plan not found.', ru: 'План не найден.' },
     bad_instance: {
