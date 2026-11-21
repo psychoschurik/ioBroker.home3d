@@ -2,10 +2,15 @@ The 3D frontend in src-www/src (and the bundles in www/vendor/ built from it) is
 an MIT licensed project by Mastershort (upstream version 3.1.2, commit c11bd614d38a68d3aec251a940e31a1101b7429b).
 Copyright (c) 2026 Mastershort - see LICENSE. This copyright notice must be retained.
 
-Changes for ioBroker: ioBroker theme, local help links, object-tree selector and the connection to ioBroker
-over the socket of the web adapter (frontend/). Not an official Mastershort release. Commercial packs are not included.
+Changes for ioBroker: src-www/src is the upstream source with only its names changed; tasks.ts patches it at build
+time (ioBroker theme, local help links, texts, own styles and furniture), and the code added to it is in
+frontend/vendor-ext/. The page around it (frontend/) connects it to ioBroker over the socket of the web adapter.
+Not an official Mastershort release. Furniture packs and add-ons sold in the upstream shop are not included; the
+modules for pools and devices are written for ioBroker.
 
-Bundled third-party libraries: three.js (MIT, www/licenses/three-MIT.txt), Lit (BSD-3-Clause,
-www/licenses/lit-BSD.txt), fonts Figtree and Bricolage Grotesque (OFL, www/vendor/fonts/). The dialogs of the page
-bundle React, MUI, Emotion, @iobroker/gui-components and @iobroker/socket-client (MIT and others): the build lists
-every bundled package with its license in www/licenses/page-licenses.md.
+Bundled third-party libraries: three.js with its loaders (MIT, www/licenses/three-MIT.txt), the meshoptimizer
+decoder that comes with three.js (MIT, www/licenses/meshoptimizer-MIT.txt), Lit (BSD-3-Clause,
+www/licenses/lit-BSD.txt), icons of @mdi/js (Apache-2.0, www/licenses/mdi-Apache-2.0.txt), fonts Figtree and
+Bricolage Grotesque (OFL, www/vendor/fonts/). The dialogs of the page bundle React, MUI, Emotion,
+@iobroker/gui-components and @iobroker/socket-client (MIT and others): the build lists every package bundled into
+the page with its license in www/licenses/page-licenses.md.

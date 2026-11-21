@@ -61,4 +61,6 @@ the states to switch them, and write permission on files to save floor plans.
 MIT License. The 3D frontend comes from an MIT-licensed project by Mastershort and was adapted for ioBroker, see
 [NOTICE](NOTICE) and [LICENSE](LICENSE).
 
+Copyright (c) 2026 Denis Haev <dogafox@gmail.com>
+
 Copyright (c) 2026 Mastershort
