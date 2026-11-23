@@ -9,6 +9,10 @@ import type {
     ProtocolRecord,
 } from './model.js';
 import { t } from './lang.js';
+import { stateTexts } from './state-texts.js';
+import { deviceClass, kindOf, partKeys, partsOf, severalParts } from './device-kinds.js';
+
+export { stateTexts };
 /** Stable, short hash for entity IDs (FNV-1a, 96 bit). Works without a secure context, unlike crypto.subtle. */
 function hash(text: string): string {
     let out = '';
@@ -21,24 +25,6 @@ function hash(text: string): string {
         out += h.toString(16).padStart(8, '0');
     }
     return out;
-}
-/** The texts of a datapoint's values (common.states as object, "0:auto;1:manual" or a list), at most 20; null without. */
-export function stateTexts(states: unknown): Record<string, string> | null {
-    let out: Record<string, string> = {};
-    if (Array.isArray(states)) {
-        states.forEach((label, i) => (out[String(i)] = String(label)));
-    } else if (typeof states === 'string') {
-        for (const part of states.split(';')) {
-            const at = part.indexOf(':');
-            if (at > 0) {
-                out[part.slice(0, at).trim()] = part.slice(at + 1).trim();
-            }
-        }
-    } else if (states && typeof states === 'object') {
-        out = Object.fromEntries(Object.entries(states as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
-    }
-    const n = Object.keys(out).length;
-    return n && n <= 20 ? out : null;
 }
 const nameOf = (o: { _id?: string; common?: { name?: string | Record<string, string> } } | undefined): string =>
     typeof o?.common?.name === 'object'
@@ -96,9 +82,17 @@ function validateMappings(mappings: Mapping[], objects: Record<string, StateObje
         if (m.battery !== undefined && (typeof m.battery !== 'string' || !/^[^\s*?"'`]{1,300}$/.test(m.battery))) {
             fail(t('bad_battery', { id: m.entity_id }));
         }
-        for (const binding of Object.values(m.attributes || {})) {
-            if (typeof binding === 'object' && binding?.id && !objects[binding.id]) {
-                fail(t('attribute_missing', { id: binding.id }));
+        for (const value of Object.values(m.attributes || {})) {
+            // a list of bindings: one value of several datapoints (the red, green and blue of a light)
+            for (const binding of Array.isArray(value) ? value : [value]) {
+                if (typeof binding === 'object' && binding?.id && !objects[binding.id]) {
+                    fail(t('attribute_missing', { id: binding.id }));
+                }
+            }
+        }
+        if (m.parts !== undefined) {
+            if (!m.parts || typeof m.parts !== 'object' || Object.values(m.parts).some(id => typeof id !== 'string')) {
+                fail(t('bad_parts', { id: m.entity_id }));
             }
         }
         for (const rules of Object.values(m.actions || {})) {
@@ -113,8 +107,16 @@ function validateMappings(mappings: Mapping[], objects: Record<string, StateObje
                 if (r.field === undefined && !Object.hasOwn(r, 'value') && !r.toggle) {
                     fail(t('bad_action'));
                 }
-                if (r.convert !== undefined && r.convert !== 'rgb_hex' && r.convert !== 'rgbw_hex') {
+                if (
+                    r.convert !== undefined &&
+                    r.convert !== 'rgb_hex' &&
+                    r.convert !== 'rgbw_hex' &&
+                    r.convert !== 'mired'
+                ) {
                     fail(t('bad_convert'));
+                }
+                if (r.index !== undefined && !(Number.isInteger(r.index) && r.index >= 0 && r.index < 8)) {
+                    fail(t('bad_action'));
                 }
                 for (const key of ['scale', 'offset'] as const) {
                     if (r[key] !== undefined && !Number.isFinite(r[key])) {
@@ -185,6 +187,59 @@ export function wmoCondition(value: unknown): string {
     }
     return 'exceptional';
 }
+/** Whether a value says on: a number above 0, a colour that is not black, a text that is not "off" (null: none). */
+function onOff(value: unknown): boolean | null {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'number') {
+        return value > 0;
+    }
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const text = value.trim();
+    const rgb = hexToRgb(text);
+    if (rgb) {
+        return rgb.some(c => c > 0);
+    }
+    return !!text && !/^(off|false|0|aus|closed|none)$/i.test(text) && !(Number(text) <= 0);
+}
+/** The words of on and off for a kind of device (a cover is open or closed, a heating heats or is off). */
+const ON_OFF: Record<string, [string, string]> = {
+    cover: ['open', 'closed'],
+    climate: ['heat', 'off'],
+};
+/** [h (0 … 360), s (0 … 100)] → [r, g, b] (full brightness). */
+function hsToRgb(hs: unknown): [number, number, number] | null {
+    if (!Array.isArray(hs) || !Number.isFinite(Number(hs[0]))) {
+        return null;
+    }
+    const h = (((Number(hs[0]) % 360) + 360) % 360) / 60;
+    const s = Math.max(0, Math.min(1, Number(hs[1] ?? 100) / 100));
+    const f = (n: number): number => {
+        const k = (n + h) % 6;
+        return Math.round(255 * (1 - s * Math.max(0, Math.min(k, 4 - k, 1))));
+    };
+    return [f(5), f(3), f(1)];
+}
+/** [r, g, b] → [h (0 … 360), s (0 … 100)]. */
+function rgbToHs(rgb: unknown): [number, number] | null {
+    if (!Array.isArray(rgb) || rgb.length < 3 || rgb.slice(0, 3).some(v => !Number.isFinite(Number(v)))) {
+        return null;
+    }
+    const [r, g, b] = rgb.slice(0, 3).map(v => Math.max(0, Math.min(255, Number(v))) / 255);
+    const max = Math.max(r, g, b);
+    const d = max - Math.min(r, g, b);
+    let h = 0;
+    if (d) {
+        h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    }
+    return [Math.round((((h * 60) % 360) + 360) % 360), Math.round(max ? (d / max) * 100 : 0)];
+}
 /** A value of ioBroker as the device shows it (`write`: a value of the device as ioBroker takes it). */
 export function transformed(value: unknown, binding: Binding, write = false): any {
     if (binding?.convert === 'wmo') {
@@ -192,6 +247,17 @@ export function transformed(value: unknown, binding: Binding, write = false): an
             fail(t('weather_write'));
         }
         return wmoCondition(value);
+    }
+    if (binding?.convert === 'mired') {
+        // mired and Kelvin: the same in both directions
+        const n = Number(value);
+        return n > 0 ? Math.round(1e6 / n) : null;
+    }
+    if (binding?.convert === 'on_off') {
+        if (write) {
+            fail(t('bad_convert'));
+        }
+        return onOff(value);
     }
     if (binding?.convert) {
         return write ? rgbToHex(value, binding.convert === 'rgbw_hex') : hexToRgb(value);
@@ -256,17 +322,38 @@ function entities(
             ...(m.reach_connected ? { iobroker_reach_connected: true } : {}),
             ...(m.battery ? { iobroker_battery_own: m.battery } : {}),
         };
+        const read = (binding: unknown): unknown =>
+            binding && typeof binding === 'object' && (binding as Binding).id
+                ? transformed(states[(binding as Binding).id!]?.val, binding)
+                : binding;
         for (const [key, binding] of Object.entries(m.attributes || {})) {
-            attributes[key] = whole(
-                key,
-                binding && typeof binding === 'object' && binding.id
-                    ? transformed(states[binding.id]?.val, binding)
-                    : binding,
-            );
+            // a list of bindings: one value of several datapoints (the red, green and blue of a light)
+            const value =
+                Array.isArray(binding) && binding.some(b => b && typeof b === 'object' && b.id)
+                    ? binding.map(b => {
+                          const v = read(b);
+                          return typeof v === 'number' ? Math.round(v) : v;
+                      })
+                    : read(binding);
+            attributes[key] = whole(key, value);
+        }
+        const domain = m.entity_id.slice(0, m.entity_id.indexOf('.'));
+        // a light of hue and saturation shows its colour as RGB too
+        if (domain === 'light' && attributes.rgb_color === undefined && attributes.hs_color !== undefined) {
+            const rgb = hsToRgb(attributes.hs_color);
+            if (rgb) {
+                attributes.rgb_color = rgb;
+            }
+        }
+        // the parts of a device of several datapoints, in the order the editor's device form lists them
+        const kind = kindOf(m.entity_id);
+        if (severalParts(kind)) {
+            const parts = partsOf(m, objects);
+            attributes.iobroker_parts = partKeys(kind!).map(k => [k, parts[k] ?? null]);
         }
         let value = transformed(s?.val, m);
         if (typeof value === 'boolean') {
-            value = value ? 'on' : 'off';
+            value = value ? (ON_OFF[domain]?.[0] ?? 'on') : (ON_OFF[domain]?.[1] ?? 'off');
         }
         if (m.when && !holds(m.when, states)) {
             value = m.when.else ?? 'off';
@@ -323,20 +410,9 @@ function discover(
             if (c.unit) {
                 m.attributes.unit_of_measurement = c.unit;
             }
-            const classes = {
-                temperature: 'temperature',
-                humidity: 'humidity',
-                power: 'power',
-                energy: 'energy',
-                motion: 'motion',
-                window: 'window',
-                door: 'door',
-                smoke: 'smoke',
-            };
-            for (const [part, value] of Object.entries(classes)) {
-                if (role.split('.').includes(part)) {
-                    m.attributes.device_class = value;
-                }
+            const cls = deviceClass(role);
+            if (cls) {
+                m.attributes.device_class = cls;
             }
             const room = Object.values(rooms).find(r =>
                 r.common?.members?.some(id => o._id === id || o._id.startsWith(`${id}.`)),
@@ -377,19 +453,46 @@ async function execute(
         if (!rules?.length) {
             fail(t('no_action', { service, name: m.name || id }));
         }
+        const given = domain === 'light' ? lightData(data) : data;
         for (const r of rules) {
-            if (r.field && !Object.hasOwn(data, r.field)) {
+            const has = !!r.field && Object.hasOwn(given, r.field);
+            if (r.field && !has && !Object.hasOwn(r, 'value')) {
                 if (r.optional) {
                     continue;
                 }
                 fail(t('param_missing', { field: String(r.field) }));
             }
+            // a choice its map does not know is for another rule (a TV's app or its input)
+            if (r.optional && r.map && has && !Object.hasOwn(r.map, String(given[r.field!]))) {
+                continue;
+            }
             const o = (await io.getObjects([r.id]))[r.id];
             if (o?.type !== 'state' || o.common?.write !== true) {
                 fail(t('not_writable_short', { id: r.id }));
             }
-            let value = r.toggle ? !(await io.getState(r.id))?.val : r.field ? data[r.field] : r.value;
-            value = transformed(value, r, true);
+            let value: unknown;
+            if (r.toggle) {
+                const now = (await io.getState(r.id))?.val;
+                if (o.common.type === 'number') {
+                    // a dimmer or a fan's speed: off at its min, on at its max
+                    const lo = typeof o.common.min === 'number' ? o.common.min : 0;
+                    value = Number(now) > lo ? lo : typeof o.common.max === 'number' ? o.common.max : 100;
+                } else if (r.convert === 'rgb_hex' || r.convert === 'rgbw_hex') {
+                    // a light switched by its colour: black is off
+                    value = transformed(onOff(now) ? [0, 0, 0] : [255, 255, 255], r, true);
+                } else {
+                    value = transformed(!now, r, true);
+                }
+            } else {
+                let v = has ? given[r.field!] : r.value;
+                if (r.index !== undefined) {
+                    v = Array.isArray(v) ? v[r.index] : undefined;
+                    if (v === undefined) {
+                        fail(t('param_missing', { field: `${r.field}[${r.index}]` }));
+                    }
+                }
+                value = transformed(v, r, true);
+            }
             if (typeof value !== o.common.type) {
                 fail(t('bad_type', { id: r.id, type: String(o.common.type) }));
             }
@@ -409,6 +512,38 @@ async function execute(
         await io.setState(id, value);
     }
     return { written: writes.length };
+}
+/**
+ * What a light is asked for, in every form its rules may read: the brightness in % and 0 … 255, the colour as RGB and
+ * as hue and saturation, the white tone in Kelvin (from mired too).
+ */
+function lightData(data: ProtocolRecord): ProtocolRecord {
+    const out: ProtocolRecord = { ...data };
+    if (out.brightness_pct === undefined && typeof out.brightness === 'number') {
+        out.brightness_pct = Math.round((out.brightness / 255) * 100);
+    }
+    if (out.brightness === undefined && typeof out.brightness_pct === 'number') {
+        out.brightness = Math.round(out.brightness_pct * 2.55);
+    }
+    if (out.rgb_color === undefined && out.hs_color !== undefined) {
+        const rgb = hsToRgb(out.hs_color);
+        if (rgb) {
+            out.rgb_color = rgb;
+        }
+    }
+    if (out.hs_color === undefined && out.rgb_color !== undefined) {
+        const hs = rgbToHs(out.rgb_color);
+        if (hs) {
+            out.hs_color = hs;
+        }
+    }
+    if (out.color_temp_kelvin === undefined) {
+        const k = Number(out.kelvin ?? (Number(out.color_temp) > 0 ? 1e6 / Number(out.color_temp) : NaN));
+        if (Number.isFinite(k) && k > 0) {
+            out.color_temp_kelvin = Math.round(k);
+        }
+    }
+    return out;
 }
 /** The value with every reference to datapoint `from` (state, actions, bindings) pointing to `to`. */
 function retarget<T>(value: T, from: string, to: string): T {

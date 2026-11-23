@@ -17,6 +17,7 @@ export interface StateObject {
         write?: boolean;
         min?: number;
         max?: number;
+        step?: number;
         unit?: string;
         /** The texts of its values (e.g. 0: "pause", 1: "play"). */
         states?: Record<string, string> | string | string[];
@@ -35,12 +36,22 @@ export interface Binding {
      * Colour as text in ioBroker: `rgb_hex` "#rrggbb", `rgbw_hex` "#rrggbbww" (the white channel is written as 00).
      * Read it becomes [r, g, b], written an [r, g, b] becomes the text again. `wmo`: a weather code of the WMO (as the
      * weather adapters give it, e.g. open-meteo) becomes the weather condition of the 3D frontend (read only).
+     * `mired`: a colour temperature in mired (153 … 500) is read and written as Kelvin. `on_off` (read only): a number,
+     * a colour or a text as on or off: a dimmer without a switch is on above 0, a colour unless it is black (for a
+     * cover: open or closed).
      */
-    convert?: 'rgb_hex' | 'rgbw_hex' | 'wmo';
+    convert?: 'rgb_hex' | 'rgbw_hex' | 'wmo' | 'mired' | 'on_off';
 }
+/**
+ * One write of an action: the value of the call's `field` (the element `index` of a list: the red of an RGB colour),
+ * else `value` (with a field: what it writes when the call does not give it), or the opposite of the current value
+ * (`toggle`; a number between its min and max). `optional`: skipped when the call does not give the field, or when the
+ * `map` does not know its value (a TV's source: an app goes to the app, an input to the input).
+ */
 export interface ActionRule extends Binding {
     id: string;
     field?: string;
+    index?: number;
     value?: unknown;
     toggle?: boolean;
     optional?: boolean;
@@ -76,6 +87,12 @@ export interface Mapping extends Binding {
      * Set at one datapoint, it counts for the whole device.
      */
     battery?: string;
+    /**
+     * The datapoints a device of several was built from, by part (a light: switch, brightness, rgb, color_temp …; see
+     * frontend/device-kinds.ts): the editor's device form shows them, each can be chosen by hand, and the mapping is
+     * built from them anew. Missing: found from the mapping's datapoints by their roles.
+     */
+    parts?: Record<string, string>;
     name?: string;
     area_id?: string;
     attributes?: Record<string, any>;

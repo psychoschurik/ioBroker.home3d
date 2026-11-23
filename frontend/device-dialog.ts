@@ -3,6 +3,11 @@ import type { DeviceDialogOptions, Mapping, PickerDetail } from './types.js';
 import type { TreeItem } from './object-tree.js';
 import { ObjectTree } from './object-tree.js';
 import { t } from './lang.js';
+/** The unit of a datapoint as its mapping or entity gives it (`common.unit`), for the value column. */
+function unitOf(attributes: Record<string, unknown> | undefined): string | undefined {
+    const unit = attributes?.unit_of_measurement;
+    return typeof unit === 'string' && unit ? unit : undefined;
+}
 export function setupDeviceDialog({
     callWS,
     refresh,
@@ -41,10 +46,16 @@ export function setupDeviceDialog({
             mode === 'single' ? t('choose_apply') : t('selected_new', { n: selected.size });
     });
     tree.onRows = items => {
-        // a media player is no datapoint of its own: its value column shows its parts; the single choice's
-        // connected datapoints bring their value along
+        // a media player or a light of several datapoints is no datapoint of its own: its value column shows its
+        // parts; the single choice's connected datapoints bring their value along
+        const grouped = new Set(candidates.map(c => c._meta?.path).filter(Boolean));
         const ids = items
-            .filter(i => !i.id.startsWith('media_player.') && (mode !== 'single' || i.value === undefined))
+            .filter(
+                i =>
+                    !i.id.startsWith('media_player.') &&
+                    !grouped.has(i.path) &&
+                    (mode !== 'single' || i.value === undefined),
+            )
             .map(i => i.path)
             .filter(id => !requested.has(id));
         if (!ids.length) {
@@ -109,10 +120,12 @@ export function setupDeviceDialog({
         return candidates.map(c => ({
             id: c.entity_id,
             path: c._meta?.path ?? c.state,
-            label: c._meta?.path ? `🎵 ${c.name || c.state}` : c.name || c.state,
+            label: c._meta?.path ? `${c._meta.role === 'light' ? '💡' : '🎵'} ${c.name || c.state}` : c.name || c.state,
             role: c._meta?.role,
             type: c._meta?.type,
             value: c._meta?.path ? c._meta.value : values.get(c.state),
+            // a light or media player shows its parts, not one value
+            unit: c._meta?.path ? undefined : unitOf(c.attributes),
             room: c.area_id,
             disabled: existing.has(c.entity_id),
         }));
@@ -209,6 +222,7 @@ export function setupDeviceDialog({
                 role: entity?.attributes?.iobroker_role || '',
                 type: entity?.attributes?.iobroker_type || '',
                 value: entity?.state,
+                unit: unitOf(entity?.attributes),
                 room: hass?.entities?.[o.id]?.area_id ?? undefined,
             };
         });
@@ -242,6 +256,7 @@ export function setupDeviceDialog({
                 role: c._meta?.role,
                 type: c._meta?.type,
                 value: values.get(c.state),
+                unit: unitOf(c.attributes),
                 room: c.area_id,
             });
         }

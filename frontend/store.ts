@@ -15,6 +15,7 @@ import type {
 } from './model.js';
 import { validateMappings, discover, execute, nameOf, hash } from './entities.js';
 import { mediaBases, mediaCandidates } from './media.js';
+import { lightBases, lightCandidates } from './device-kinds.js';
 import {
     freeEntityId,
     plainMapping,
@@ -145,9 +146,12 @@ export function mappedIds(mappings: Mapping[]): string[] {
         if (typeof m.when?.id === 'string') {
             ids.add(m.when.id);
         }
-        for (const b of Object.values(m.attributes || {})) {
-            if (b && typeof b === 'object' && typeof b.id === 'string') {
-                ids.add(b.id);
+        for (const value of Object.values(m.attributes || {})) {
+            // a list of bindings: the red, green and blue of a light
+            for (const b of Array.isArray(value) ? value : [value]) {
+                if (b && typeof b === 'object' && typeof b.id === 'string') {
+                    ids.add(b.id);
+                }
             }
         }
         for (const rules of Object.values(m.actions || {})) {
@@ -510,11 +514,21 @@ export class Store {
             case 'iobroker/discover': {
                 const objects = await this.io.stateObjects();
                 const rooms = await this.io.rooms();
-                // media players first, as one device each with all their actions; their devices only for the names
-                const bases = mediaBases(objects).slice(0, 400);
+                // media players and lights first, as one device each with all their parts and actions; their channels
+                // and devices only for the names
+                const players = mediaBases(objects);
+                const bases = [...new Set([...players, ...lightBases(objects)])].slice(0, 800);
                 const devices = bases.length ? await this.io.getObjects(bases) : {};
                 return [
                     ...mediaCandidates(objects, rooms, devices, base => `media_player.${hash(base)}`, nameOf),
+                    ...lightCandidates(
+                        objects,
+                        rooms,
+                        devices,
+                        base => `light.${hash(base)}`,
+                        nameOf,
+                        new Set(players),
+                    ),
                     ...discover(objects, rooms),
                 ];
             }

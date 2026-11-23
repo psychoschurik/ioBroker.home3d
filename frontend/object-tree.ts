@@ -8,6 +8,8 @@ export interface TreeItem {
     type?: string;
     room?: string;
     value?: unknown;
+    /** `common.unit` of the datapoint, shown after a numeric value */
+    unit?: string;
     disabled?: boolean;
 }
 export interface TreeNode {
@@ -21,9 +23,15 @@ export interface TreeRow {
     node: TreeNode;
     depth: number;
 }
-/** Value of a datapoint as text; objects and arrays as JSON */
-function display(value: unknown): string {
-    return value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value);
+/** Value of a datapoint as text; objects and arrays as JSON; a number with its unit ("21.5 °C", "60 %") */
+export function display(value: unknown, unit?: string): string {
+    if (value !== null && typeof value === 'object') {
+        return JSON.stringify(value);
+    }
+    const text = String(value);
+    const numeric =
+        typeof value === 'number' ? Number.isFinite(value) : typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value);
+    return unit && numeric ? `${text} ${unit}` : text;
 }
 export function makeTree(items: TreeItem[]): TreeNode {
     const root: TreeNode = { id: '', label: '', children: new Map(), count: 0 };
@@ -177,7 +185,8 @@ export class ObjectTree {
                     : t('device_channel');
             const value = document.createElement('span');
             value.className = 'object-value';
-            value.textContent = node.item?.value === undefined ? '—' : display(node.item.value).slice(0, 100);
+            value.textContent =
+                node.item?.value === undefined ? '—' : display(node.item.value, node.item.unit).slice(0, 100);
             row.append(first, meta, value);
             tree.append(row);
         }

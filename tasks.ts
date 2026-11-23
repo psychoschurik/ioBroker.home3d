@@ -6264,11 +6264,26 @@ function boatPictures(name: string, code: string): string {
             'boat pictures: freed',
         );
     }
+    if (name === 'viewer/preview.ts') {
+        // the awning: the viewer draws it with its cover (run out as far as that says), here half way out
+        code = replaceRequired(
+            code,
+            'import { pushFurniture, pushPackLamp } from "./furniture.ts";',
+            'import { pushAwning, pushFurniture, pushPackLamp } from "./furniture.ts";',
+            'awning picture: import',
+        );
+        code = replaceRequired(
+            code,
+            '    pushFurniture(buf, lines, new GeoBuffer(), f, 0, true);\n',
+            '    pushFurniture(buf, lines, new GeoBuffer(), f, 0, true);\n    if (item.type === "awning") pushAwning(buf, f, 0, 0.6);\n',
+            'awning picture',
+        );
+    }
     if (name === 'components/library.ts') {
         code = replaceRequired(
             code,
             '|${THUMB_PX}|2`;',
-            '|${THUMB_PX}|${/^(anchor|tank|rudder|propeller|nav_light|hatch)$/.test(entry.type) ? 3 : 2}`;',
+            '|${THUMB_PX}|${/^(anchor|tank|rudder|propeller|nav_light|hatch|awning|robot_mower|sprinkler|wind_vane|parking)$/.test(entry.type) ? 3 : 2}`;',
             'boat pictures: drawn anew',
         );
     }
@@ -8426,6 +8441,69 @@ function deviceDatapoint(name: string, code: string): string {
                 '          },',
                 '        }),',
                 '      );',
+                '    // the kind of the device and its datapoints by part (a light: switch, dimmer, colour, white tone …), each chosen',
+                '    // in the object browser of ioBroker (frontend/datapoint.ts); a new kind gives the device a new ID, which the plan follows',
+                '    const fp3dDomain = pl.entity_id.slice(0, pl.entity_id.indexOf("."));',
+                '    const fp3dKinds = ["light", "switch", "cover", "climate", "fan", "lock", "media_player", "sensor", "binary_sensor"];',
+                '    const fp3dParts = fp3dAttrs.iobroker_parts as [string, string | null][] | undefined;',
+                '    const fp3dPart = (part: string, remove = false) =>',
+                '      window.dispatchEvent(new CustomEvent("iobroker-part", { detail: { entityId: pl.entity_id, part, label: this.t(`part_${part}` as I18nKey), remove } }));',
+                '    const fp3dRekind = (from: string, to: string) => {',
+                '      // every use of the old ID in the plan (its place, furniture, scenes, cards) takes the new one',
+                '      const swap = (o: unknown): void => {',
+                '        if (!o || typeof o !== "object") return;',
+                '        const rec = o as Record<string, unknown>;',
+                '        for (const key of Object.keys(rec)) {',
+                '          if (rec[key] === from) rec[key] = to;',
+                '          else swap(rec[key]);',
+                '        }',
+                '      };',
+                '      this.change((doc) => swap(doc));',
+                '      this._deviceId = to;',
+                '    };',
+                '    const fp3dPartRow = ([k, id]: [string, string | null]) => html`<div class="fp3d-part">',
+                '      <span>${this.t(`part_${k}` as I18nKey)}</span>',
+                '      ${id ? html`<code>${id}</code>` : html`<small class="fp3d-sub">${this.t("part_none" as I18nKey)}</small>`}',
+                '      ${admin',
+                '        ? html`<button class="fp3d-btn" @click=${() => fp3dPart(k)}>${this.t("part_pick" as I18nKey)}</button>',
+                '            ${id ? html`<button class="fp3d-btn" title=${this.t("part_remove" as I18nKey)} aria-label=${this.t("part_remove" as I18nKey)} @click=${() => fp3dPart(k, true)}>×</button>` : nothing}`',
+                '        : nothing}',
+                '    </div>`;',
+                '    // a media player has many parts: those not set fold away',
+                '    const fp3dMany = (fp3dParts?.length ?? 0) > 9;',
+                '    const fp3dKindBlock =',
+                '      fp3dDatapoint && fp3dKinds.includes(fp3dDomain)',
+                '        ? html`<div class="fp3d-form">',
+                '            <label class="fp3d-field fp3d-wide"',
+                '              >${this.t("device_kind" as I18nKey)}',
+                '              <select',
+                '                ?disabled=${!admin}',
+                '                @change=${(e: Event) => {',
+                '                  const kind = (e.target as HTMLSelectElement).value;',
+                '                  const from = pl.entity_id;',
+                '                  window.dispatchEvent(',
+                '                    new CustomEvent("iobroker-kind", { detail: { entityId: from, kind, label: this.t(`kind_${kind}` as I18nKey), done: (to: string) => fp3dRekind(from, to) } }),',
+                '                  );',
+                '                }}',
+                '              >',
+                '                ${fp3dKinds.map((k) => html`<option value=${k} ?selected=${k === fp3dDomain}>${this.t(`kind_${k}` as I18nKey)}</option>`)}',
+                '              </select></label',
+                '            >',
+                '            ${fp3dParts',
+                '              ? html`<div class="fp3d-field fp3d-wide fp3d-parts">',
+                '                  ${this.t("device_parts" as I18nKey)}',
+                '                  ${fp3dParts.filter(([, id]) => id || !fp3dMany).map(fp3dPartRow)}',
+                '                  ${fp3dMany && fp3dParts.some(([, id]) => !id)',
+                '                    ? html`<details>',
+                '                        <summary>${this.t("device_parts_more" as I18nKey, { n: fp3dParts.filter(([, id]) => !id).length })}</summary>',
+                '                        ${fp3dParts.filter(([, id]) => !id).map(fp3dPartRow)}',
+                '                      </details>`',
+                '                    : nothing}',
+                '                </div>',
+                '                <p class="fp3d-sub fp3d-wide">${this.t("device_parts_hint" as I18nKey)}</p>`',
+                '              : nothing}',
+                '          </div>`',
+                '        : nothing;',
                 '    return html`<section>',
                 '      <div class="fp3d-h3row"><h3>${this.t("device")}</h3>',
             ].join('\n'),
@@ -8444,6 +8522,7 @@ function deviceDatapoint(name: string, code: string): string {
                 '              ? html`<button class="fp3d-btn" @click=${() => window.dispatchEvent(new CustomEvent("iobroker-datapoint", { detail: { entityId: pl.entity_id } }))}>${this.t("datapoint_change")}</button>`',
                 '              : nothing}',
                 '          </p>',
+                '          ${fp3dKindBlock}',
                 '          <div class="fp3d-form">',
                 '            <label class="fp3d-field fp3d-wide"',
                 '              >${this.t("device_reach" as I18nKey)}',
@@ -8506,7 +8585,7 @@ function deviceDatapoint(name: string, code: string): string {
         code = replaceRequired(
             code,
             '      .fp3d-dev-title {',
-            '      .fp3d-datapoint {\n        display: flex;\n        flex-wrap: wrap;\n        align-items: center;\n        gap: 6px;\n      }\n      .fp3d-datapoint code {\n        overflow-wrap: anywhere;\n      }\n      .fp3d-dev-title {',
+            '      .fp3d-datapoint {\n        display: flex;\n        flex-wrap: wrap;\n        align-items: center;\n        gap: 6px;\n      }\n      .fp3d-datapoint code {\n        overflow-wrap: anywhere;\n      }\n      .fp3d-parts {\n        gap: 4px;\n      }\n      .fp3d-part {\n        display: flex;\n        flex-wrap: wrap;\n        align-items: center;\n        gap: 6px;\n        padding: 3px 0;\n        border-top: 1px solid var(--fp3d-line, rgba(127, 127, 127, 0.2));\n      }\n      .fp3d-part > span:first-child {\n        flex: 0 0 9.5em;\n      }\n      .fp3d-part code {\n        flex: 1 1 8em;\n        overflow-wrap: anywhere;\n        font-size: 0.85em;\n      }\n      .fp3d-parts summary {\n        cursor: pointer;\n        padding: 4px 0;\n      }\n      .fp3d-dev-title {',
             'datapoint style',
         );
     }
@@ -8514,17 +8593,33 @@ function deviceDatapoint(name: string, code: string): string {
         code = replaceRequired(
             code,
             '  marker_height: "Höhe des Symbols (m)",',
-            '  marker_height: "Höhe des Symbols (m)",\n  datapoint: "Datenpunkt",\n  datapoint_change: "Ändern …",\n  datapoint_add: "+ Datenpunkt aus ioBroker",\n  device_reach: "Nicht erreichbar (Technik)",\n  device_reach_house: "Standard (⚙ Wetter & Warnungen)",\n  device_reach_report: "Wie das Gerät meldet",\n  device_reach_minutes: "Nach … Minuten ohne Update",\n  device_reach_never: "Nie (z. B. 12-V-Gerät, das abgeschaltet wird)",\n  device_reach_min: "Minuten ohne Update",\n  device_reach_connected: "Nur prüfen, solange sein Adapter verbunden ist (z. B. NMEA: Instrumente aus = normal)",\n  device_battery: "Batterie (Technik)",\n  device_battery_detector: "gefunden vom type-detector",\n  device_battery_guess: "vermutet nach Name und Rolle",\n  device_battery_own: "selbst gewählt",\n  device_battery_missing: "keine gefunden",\n  device_battery_none: "keine Batterie",\n  device_battery_pick: "Wählen …",\n  device_battery_no: "Keine Batterie",\n  device_battery_auto: "Automatisch",\n  device_reach_hint: "Gilt für das ganze Gerät, auch seine anderen Datenpunkte. Batteriegeräte schlafen zwischen zwei Meldungen: „Nach … Minuten“ mit etwas mehr als ihrem Sendeabstand. Geräte am Bordnetz, die mit ihm abgeschaltet werden: „Nie“ – dann zählt auch ein getrennter Adapter nicht. Die Batterie sucht zuerst der type-detector, sonst Name und Rolle; findet keiner die richtige, wähle sie hier (eine Zahl: Ladung in %, true/false: Batterie schwach).",',
+            '  marker_height: "Höhe des Symbols (m)",\n  datapoint: "Datenpunkt",\n  datapoint_change: "Ändern …",\n  datapoint_add: "+ Datenpunkt aus ioBroker",\n  device_reach: "Nicht erreichbar (Technik)",\n  device_reach_house: "Standard (⚙ Wetter & Warnungen)",\n  device_reach_report: "Wie das Gerät meldet",\n  device_reach_minutes: "Nach … Minuten ohne Update",\n  device_reach_never: "Nie (z. B. 12-V-Gerät, das abgeschaltet wird)",\n  device_reach_min: "Minuten ohne Update",\n  device_reach_connected: "Nur prüfen, solange sein Adapter verbunden ist (z. B. NMEA: Instrumente aus = normal)",\n  device_battery: "Batterie (Technik)",\n  device_battery_detector: "gefunden vom type-detector",\n  device_battery_guess: "vermutet nach Name und Rolle",\n  device_battery_own: "selbst gewählt",\n  device_battery_missing: "keine gefunden",\n  device_battery_none: "keine Batterie",\n  device_battery_pick: "Wählen …",\n  device_battery_no: "Keine Batterie",\n  device_battery_auto: "Automatisch",\n  device_kind: "Gerätetyp",\n  kind_light: "Licht",\n  kind_switch: "Schalter",\n  kind_cover: "Rollladen, Jalousie, Markise",\n  kind_climate: "Heizung, Klima",\n  kind_fan: "Ventilator, Lüfter",\n  kind_lock: "Schloss",\n  kind_media_player: "Medien (TV, Lautsprecher)",\n  kind_sensor: "Sensor (Messwert)",\n  kind_binary_sensor: "Melder (an/aus)",\n  device_parts: "Datenpunkte des Geräts",\n  device_parts_more: "Weitere Teile ({n})",\n  device_parts_hint: "Jedes Teil ist ein Datenpunkt. „Wählen …“ öffnet die Objekte von ioBroker. Was fehlt, bietet die 3D-Ansicht nicht an: ohne Farbe kein Farbwähler, ohne Farbtemperatur kein Weißton. Ein anderer Gerätetyp sucht die passenden Teile neben dem Datenpunkt.",\n  part_none: "nicht gesetzt",\n  part_pick: "Wählen …",\n  part_remove: "Teil entfernen",\n  part_switch: "Schalter (an/aus)",\n  part_brightness: "Helligkeit (Dimmer)",\n  part_rgb: "Farbe (#RRGGBB)",\n  part_red: "Rot",\n  part_green: "Grün",\n  part_blue: "Blau",\n  part_hue: "Farbton",\n  part_saturation: "Sättigung",\n  part_color_temp: "Farbtemperatur (Weißton)",\n  part_position: "Position (setzen)",\n  part_position_actual: "Position (Ist)",\n  part_open: "Öffnen (Taste)",\n  part_close: "Schließen (Taste)",\n  part_stop: "Stopp (Taste)",\n  part_tilt: "Lamellen (setzen)",\n  part_tilt_actual: "Lamellen (Ist)",\n  part_target: "Solltemperatur",\n  part_current: "Ist-Temperatur",\n  part_humidity: "Luftfeuchte",\n  part_mode: "Modus",\n  part_power: "Ein/Aus",\n  part_boost: "Boost",\n  part_speed: "Stufe, Drehzahl",\n  part_lock: "Schloss (auf/zu)",\n  part_state: "Zustand",\n  part_play: "Wiedergabe (Taste)",\n  part_pause: "Pause (Taste)",\n  part_next: "Weiter (Taste)",\n  part_prev: "Zurück (Taste)",\n  part_volume: "Lautstärke (setzen)",\n  part_volume_actual: "Lautstärke (Ist)",\n  part_volume_up: "Lauter (Taste)",\n  part_volume_down: "Leiser (Taste)",\n  part_mute: "Stumm",\n  part_title: "Titel",\n  part_artist: "Interpret",\n  part_album: "Album",\n  part_cover: "Cover-Bild",\n  part_duration: "Dauer",\n  part_elapsed: "Gespielt",\n  part_app: "App (YouTube …)",\n  part_input: "Eingang (HDMI …)",\n  device_reach_hint: "Gilt für das ganze Gerät, auch seine anderen Datenpunkte. Batteriegeräte schlafen zwischen zwei Meldungen: „Nach … Minuten“ mit etwas mehr als ihrem Sendeabstand. Geräte am Bordnetz, die mit ihm abgeschaltet werden: „Nie“ – dann zählt auch ein getrennter Adapter nicht. Die Batterie sucht zuerst der type-detector, sonst Name und Rolle; findet keiner die richtige, wähle sie hier (eine Zahl: Ladung in %, true/false: Batterie schwach).",',
             'datapoint de',
         );
         code = replaceRequired(
             code,
             '  marker_height: "Marker height (m)",',
-            '  marker_height: "Marker height (m)",\n  datapoint: "Datapoint",\n  datapoint_change: "Change …",\n  datapoint_add: "+ Datapoint from ioBroker",\n  device_reach: "Unreachable (Technik)",\n  device_reach_house: "Default (⚙ Weather & warnings)",\n  device_reach_report: "As the device reports",\n  device_reach_minutes: "After … minutes without an update",\n  device_reach_never: "Never (e.g. a 12 V device that is switched off)",\n  device_reach_min: "Minutes without an update",\n  device_reach_connected: "Check only while its adapter is connected (e.g. NMEA: instruments off = normal)",\n  device_battery: "Battery (Health)",\n  device_battery_detector: "found by the type-detector",\n  device_battery_guess: "guessed by name and role",\n  device_battery_own: "chosen here",\n  device_battery_missing: "none found",\n  device_battery_none: "no battery",\n  device_battery_pick: "Choose …",\n  device_battery_no: "No battery",\n  device_battery_auto: "Automatic",\n  device_reach_hint: "Counts for the whole device, also its other datapoints. Battery devices sleep between their reports: after … minutes with a little more than their interval. Devices on the on-board supply that are switched off with it: never – then a disconnected adapter does not count either.",',
+            '  marker_height: "Marker height (m)",\n  datapoint: "Datapoint",\n  datapoint_change: "Change …",\n  datapoint_add: "+ Datapoint from ioBroker",\n  device_reach: "Unreachable (Technik)",\n  device_reach_house: "Default (⚙ Weather & warnings)",\n  device_reach_report: "As the device reports",\n  device_reach_minutes: "After … minutes without an update",\n  device_reach_never: "Never (e.g. a 12 V device that is switched off)",\n  device_reach_min: "Minutes without an update",\n  device_reach_connected: "Check only while its adapter is connected (e.g. NMEA: instruments off = normal)",\n  device_battery: "Battery (Health)",\n  device_battery_detector: "found by the type-detector",\n  device_battery_guess: "guessed by name and role",\n  device_battery_own: "chosen here",\n  device_battery_missing: "none found",\n  device_battery_none: "no battery",\n  device_battery_pick: "Choose …",\n  device_battery_no: "No battery",\n  device_battery_auto: "Automatic",\n  device_kind: "Device type",\n  kind_light: "Light",\n  kind_switch: "Switch",\n  kind_cover: "Blind, shutter, awning",\n  kind_climate: "Heating, air conditioning",\n  kind_fan: "Fan",\n  kind_lock: "Lock",\n  kind_media_player: "Media (TV, speaker)",\n  kind_sensor: "Sensor (value)",\n  kind_binary_sensor: "Binary sensor (on/off)",\n  device_parts: "Datapoints of the device",\n  device_parts_more: "More parts ({n})",\n  device_parts_hint: "Each part is a datapoint. “Choose …” opens the objects of ioBroker. What is missing the 3D view does not offer: no colour, no colour picker; no colour temperature, no white tone. Another device type looks for its parts beside the datapoint.",\n  part_none: "not set",\n  part_pick: "Choose …",\n  part_remove: "Remove part",\n  part_switch: "Switch (on/off)",\n  part_brightness: "Brightness (dimmer)",\n  part_rgb: "Colour (#RRGGBB)",\n  part_red: "Red",\n  part_green: "Green",\n  part_blue: "Blue",\n  part_hue: "Hue",\n  part_saturation: "Saturation",\n  part_color_temp: "Colour temperature (white tone)",\n  part_position: "Position (set)",\n  part_position_actual: "Position (actual)",\n  part_open: "Open (button)",\n  part_close: "Close (button)",\n  part_stop: "Stop (button)",\n  part_tilt: "Slats (set)",\n  part_tilt_actual: "Slats (actual)",\n  part_target: "Target temperature",\n  part_current: "Current temperature",\n  part_humidity: "Humidity",\n  part_mode: "Mode",\n  part_power: "On/off",\n  part_boost: "Boost",\n  part_speed: "Speed, level",\n  part_lock: "Lock (open/locked)",\n  part_state: "State",\n  part_play: "Play (button)",\n  part_pause: "Pause (button)",\n  part_next: "Next (button)",\n  part_prev: "Previous (button)",\n  part_volume: "Volume (set)",\n  part_volume_actual: "Volume (actual)",\n  part_volume_up: "Louder (button)",\n  part_volume_down: "Quieter (button)",\n  part_mute: "Mute",\n  part_title: "Title",\n  part_artist: "Artist",\n  part_album: "Album",\n  part_cover: "Cover picture",\n  part_duration: "Duration",\n  part_elapsed: "Played",\n  part_app: "App (YouTube …)",\n  part_input: "Input (HDMI …)",\n  device_reach_hint: "Counts for the whole device, also its other datapoints. Battery devices sleep between their reports: after … minutes with a little more than their interval. Devices on the on-board supply that are switched off with it: never – then a disconnected adapter does not count either.",',
             'datapoint en',
         );
     }
     return code;
+}
+
+/**
+ * A long press on a media player opens its quick menu, as on a light: play, volume and its sources (a TV's apps and
+ * inputs: YouTube, Netflix, HDMI 1 …, frontend/media.ts). Upstream the menu can show them but opened the details only.
+ */
+function mediaMenu(name: string, code: string): string {
+    if (name !== 'components/view3d.ts') {
+        return code;
+    }
+    return replaceRequired(
+        code,
+        '    if (kind === "light" || kind === "cover" || kind === "switch" || kind === "fan" || kind === "lock" || kind === "camera") this._menu = { entity: entityId, x, y };\n    else openMoreInfo(this, entityId);',
+        '    if (kind === "light" || kind === "cover" || kind === "switch" || kind === "fan" || kind === "lock" || kind === "camera" || (kind === "media" && hasFeature("sound"))) this._menu = { entity: entityId, x, y };\n    else openMoreInfo(this, entityId);',
+        'quick menu of a media player',
+    );
 }
 
 /**
@@ -9048,6 +9143,7 @@ const patches: Plugin = {
         code = sunArcFloor(name, code);
         code = keepFloor(name, code);
         code = deviceDatapoint(name, code);
+        code = mediaMenu(name, code);
         code = boatHeading(name, code);
         code = gpsPosition(name, code);
         code = kioskMode(name, code);

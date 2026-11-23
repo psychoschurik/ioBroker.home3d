@@ -44,6 +44,17 @@ test("search combines words, role and room and supports every result", async () 
     500,
   );
 });
+test("values show their unit when they are numbers", async () => {
+  const { display } = await import("../frontend/object-tree.js");
+  assert.equal(display(21.5, "°C"), "21.5 °C");
+  assert.equal(display("60", "%"), "60 %");
+  assert.equal(display(-3, "W"), "-3 W");
+  assert.equal(display(true, "%"), "true");
+  assert.equal(display("on", "%"), "on");
+  assert.equal(display("unavailable", "°C"), "unavailable");
+  assert.equal(display(12, undefined), "12");
+  assert.equal(display({ a: 1 }, "x"), '{"a":1}');
+});
 test("discovery exposes object metadata but masks secret previews", () => {
   const obj = (id: string, role: string, type: string): StateObject => ({
     _id: id,

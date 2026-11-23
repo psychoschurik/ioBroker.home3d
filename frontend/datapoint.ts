@@ -1,16 +1,37 @@
 // Datapoints chosen at the device itself: the editor's device form ("Ändern …" beside the ioBroker datapoint) and the
 // device list of a room ("+ Datenpunkt aus ioBroker") open the object browser of ioBroker. A changed datapoint keeps the
-// device (its place in the plan, its use in the energy view); new datapoints become devices placed in the room.
+// device (its place in the plan, its use in the energy view); new datapoints become devices placed in the room. A device
+// of several datapoints (a light, a cover, a heating, a media player …) lists its parts there: each can be chosen or
+// removed, and the device's kind changed (frontend/device-kinds.ts).
 import type { Connection } from '@iobroker/socket-client';
-import { discover, withDatapoint } from './entities.js';
+import { nameOf, withDatapoint } from './entities.js';
+import {
+    buildDevice,
+    guessParts,
+    idsOf,
+    keepParts,
+    kindOf,
+    KINDS,
+    partKeys,
+    partsOf,
+    rebuilt,
+    severalParts,
+    type Kind,
+    type Parts,
+} from './device-kinds.js';
 import type { RoomObject } from './model.js';
 import type { CallWS, Mapping, StateObject } from './types.js';
+import { devicesOf } from './device-add.js';
 import { t } from './lang.js';
 
 interface Access {
     getObjects(ids: string[]): Promise<Record<string, StateObject>>;
+    /** The state objects below an object (a channel's datapoints). */
+    statesUnder(prefix: string): Promise<Record<string, StateObject>>;
     rooms(): Promise<Record<string, RoomObject>>;
 }
+
+const parentOf = (id: string): string => id.slice(0, id.lastIndexOf('.'));
 
 export interface DatapointOptions {
     callWS: CallWS;
@@ -204,6 +225,112 @@ export function setupDatapoints(o: DatapointOptions): void {
         })().catch(fail);
     });
 
+    // the editor's device form: one part of a device of several datapoints chosen in the object browser, or removed
+    window.addEventListener('iobroker-part', ev => {
+        const detail =
+            (ev as CustomEvent<{ entityId?: string; part?: string; label?: string; remove?: boolean }>).detail ?? {};
+        void (async () => {
+            const mappings = strip((await o.callWS({ type: 'iobroker/mappings/get' })) as Mapping[]);
+            const m = mappings.find(x => x.entity_id === detail.entityId);
+            const kind = m ? kindOf(m.entity_id) : null;
+            if (!m || !kind || !detail.part) {
+                throw new Error(t('no_device', { id: String(detail.entityId) }));
+            }
+            const name = m.name || m.entity_id;
+            const label = detail.label || detail.part;
+            const objects = await o.io.getObjects(idsOf(m));
+            const parts: Parts = partsOf(m, objects);
+            if (detail.remove) {
+                delete parts[detail.part];
+                if (!Object.keys(parts).length) {
+                    throw new Error(t('part_last'));
+                }
+            } else {
+                const id = await pickOne(o, parts[detail.part] ?? m.state, t('part_for', { part: label, name }));
+                if (!id) {
+                    return;
+                }
+                const obj = (await o.io.getObjects([id]))[id];
+                if (obj?.type !== 'state') {
+                    throw new Error(t('not_datapoint', { id }));
+                }
+                objects[id] = obj;
+                parts[detail.part] = id;
+            }
+            const next = rebuilt(m, buildDevice(kind, m.entity_id, m.name ?? name, parts, objects));
+            await o.callWS({
+                type: 'iobroker/mappings/set',
+                mappings: mappings.map(x => (x.entity_id === m.entity_id ? next : x)),
+            });
+            await o.refresh();
+            info(
+                detail.remove
+                    ? t('part_removed', { name, part: label })
+                    : t('part_saved', { name, part: label, id: parts[detail.part] }),
+            );
+        })().catch(fail);
+    });
+
+    // the editor's device form: another kind for a device (a switch that is a dimmable light with colours): its parts
+    // under the same names, the others found beside its datapoint; the plan follows the new ID by `done`
+    window.addEventListener('iobroker-kind', ev => {
+        const detail =
+            (ev as CustomEvent<{ entityId?: string; kind?: string; label?: string; done?: (id: string) => void }>)
+                .detail ?? {};
+        void (async () => {
+            const mappings = strip((await o.callWS({ type: 'iobroker/mappings/get' })) as Mapping[]);
+            const m = mappings.find(x => x.entity_id === detail.entityId);
+            const to = detail.kind as Kind;
+            if (!m || !kindOf(m.entity_id) || !KINDS.includes(to)) {
+                throw new Error(t('no_device', { id: String(detail.entityId) }));
+            }
+            const entityId = `${to}.${m.entity_id.slice(m.entity_id.indexOf('.') + 1)}`;
+            if (entityId === m.entity_id) {
+                return;
+            }
+            if (mappings.some(x => x.entity_id === entityId)) {
+                throw new Error(t('kind_taken', { id: entityId }));
+            }
+            const own = await o.io.getObjects(idsOf(m));
+            const siblings = await o.io.statesUnder(parentOf(m.state));
+            const objects = { ...siblings, ...own };
+            let parts: Parts = { state: m.state };
+            if (severalParts(to)) {
+                parts = keepParts(partsOf(m, own), to);
+                if (!Object.values(parts).includes(m.state)) {
+                    // its own datapoint in the part it fits (a switch is the light's switch)
+                    parts = { ...guessParts(to, objects, [m.state]), ...parts };
+                }
+                const used = new Set(Object.values(parts));
+                parts = {
+                    ...guessParts(
+                        to,
+                        objects,
+                        Object.keys(siblings).filter(id => !used.has(id)),
+                    ),
+                    ...parts,
+                };
+                if (!Object.keys(parts).length) {
+                    parts = { [partKeys(to)[0]]: m.state };
+                }
+            }
+            const next = rebuilt(m, buildDevice(to, entityId, m.name ?? nameOf(objects[m.state]), parts, objects));
+            await o.callWS({
+                type: 'iobroker/mappings/set',
+                mappings: mappings.map(x => (x.entity_id === m.entity_id ? next : x)),
+            });
+            detail.done?.(entityId);
+            await o.refresh();
+            info(
+                t('kind_saved', {
+                    name: m.name || m.entity_id,
+                    kind: detail.label || to,
+                    n: new Set(Object.values(next.parts ?? { state: next.state })).size,
+                }),
+            );
+        })().catch(fail);
+    });
+
     // the editor's device list of a room: new devices from datapoints, placed in the room
     window.addEventListener('iobroker-add-devices', ev => {
         const done = (ev as CustomEvent<{ done?: (ids: string[]) => void }>).detail?.done;
@@ -218,16 +345,15 @@ export function setupDatapoints(o: DatapointOptions): void {
                 return;
             }
             const mappings = strip((await o.callWS({ type: 'iobroker/mappings/get' })) as Mapping[]);
-            const found = discover(await o.io.getObjects(ids), await o.io.rooms());
             // a datapoint that is a device already keeps its device and is only placed here
             const known = new Map(mappings.map(m => [m.state, m.entity_id]));
-            const added = found.filter(m => !known.has(m.state)).map(({ _meta, ...m }) => m);
+            const { added, byId } = await devicesOf(o.io, ids, known);
             if (added.length) {
                 await o.callWS({ type: 'iobroker/mappings/set', mappings: [...mappings, ...added] });
                 await o.refresh();
             }
-            const entityIds = ids.map(id => known.get(id) ?? found.find(m => m.state === id)?.entity_id);
-            done?.(entityIds.filter((id): id is string => !!id));
+            const entityIds = ids.map(id => byId.get(id));
+            done?.([...new Set(entityIds.filter((id): id is string => !!id))]);
             const skipped = ids.filter((_, i) => !entityIds[i]);
             info(
                 t('added_devices', { n: added.length }) +

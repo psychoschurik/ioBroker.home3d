@@ -391,6 +391,41 @@ export const TEXTS = {
         en: '"Battery" must be a datapoint or none: {id}',
         ru: '«Батарея» должна быть точкой данных или none: {id}',
     },
+    bad_parts: {
+        de: '„parts“ muss die Datenpunkte nach Teil nennen: {id}',
+        en: '"parts" must name the datapoints by part: {id}',
+        ru: '«parts» должно называть точки данных по частям: {id}',
+    },
+    part_for: {
+        de: '{part} für {name}',
+        en: '{part} for {name}',
+        ru: '{part} для {name}',
+    },
+    part_saved: {
+        de: '{name}: {part} · {id}',
+        en: '{name}: {part} · {id}',
+        ru: '{name}: {part} · {id}',
+    },
+    part_removed: {
+        de: '{name}: {part} entfernt',
+        en: '{name}: {part} removed',
+        ru: '{name}: {part} удалено',
+    },
+    part_last: {
+        de: 'Ein Gerät braucht mindestens einen Datenpunkt.',
+        en: 'A device needs at least one datapoint.',
+        ru: 'Устройству нужна хотя бы одна точка данных.',
+    },
+    kind_taken: {
+        de: 'Das Gerät {id} gibt es schon.',
+        en: 'The device {id} exists already.',
+        ru: 'Устройство {id} уже существует.',
+    },
+    kind_saved: {
+        de: '{name}: jetzt {kind}, {n} Datenpunkte',
+        en: '{name}: now {kind}, {n} datapoints',
+        ru: '{name}: теперь {kind}, точек данных: {n}',
+    },
     attribute_missing: {
         de: 'Attribut-Datenpunkt fehlt: {id}',
         en: 'Attribute datapoint missing: {id}',

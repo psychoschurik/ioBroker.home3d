@@ -2,6 +2,7 @@
 // ioBroker knows them: media.state, button.play/pause/next/prev, level.volume, media.title …) becomes one
 // `media_player` with all its actions, so play/pause, next/previous and the volume work in the 3D view.
 import type { ActionRule, Binding, Mapping, RoomObject, StateObject } from './model.js';
+import { stateTexts } from './state-texts.js';
 
 /** The parts of a media player, named as in the type-detector. */
 export type MediaPart =
@@ -22,10 +23,12 @@ export type MediaPart =
     | 'ALBUM'
     | 'COVER'
     | 'DURATION'
-    | 'ELAPSED';
+    | 'ELAPSED'
+    | 'APP'
+    | 'INPUT';
 
 /** Role, whether it must be writable, the type it must have (missing: any). */
-const PARTS: [MediaPart, RegExp, boolean, string?][] = [
+export const MEDIA_PARTS: [MediaPart, RegExp, boolean, string?][] = [
     ['STATE', /^media\.state(\..*)?$/, false],
     ['PLAY', /^(button|action)\.play(\..*)?$/, true, 'boolean'],
     ['PAUSE', /^(button|action)\.pause(\..*)?$/, true, 'boolean'],
@@ -44,6 +47,9 @@ const PARTS: [MediaPart, RegExp, boolean, string?][] = [
     ['COVER', /^media\.cover(\.big)?$/, false, 'string'],
     ['DURATION', /^media\.duration$/, false, 'number'],
     ['ELAPSED', /^media\.elapsed$/, false, 'number'],
+    // a TV's app (YouTube, Netflix …) and its input (HDMI 1 …), named as in the type-detector's TV_APPS and TV_INPUTS
+    ['APP', /^media\.app$/, false],
+    ['INPUT', /^media\.input$/, false],
 ];
 
 /** The roles only a TV or player has beside its power switch (the "tv" of the type-detector). */
@@ -60,6 +66,7 @@ const FEATURE = {
     PREVIOUS_TRACK: 16,
     NEXT_TRACK: 32,
     TURN_ON: 128,
+    SELECT_SOURCE: 2048,
     TURN_OFF: 256,
     VOLUME_STEP: 1024,
     STOP: 4096,
@@ -123,7 +130,7 @@ export function findMediaPlayers(
         // the nearest first: the state's own channel before the device's other channels
         for (const id of below(base).sort((a, b) => depth(a) - depth(b) || a.localeCompare(b))) {
             const c = objects[id].common ?? {};
-            for (const [name, role, write, type] of PARTS) {
+            for (const [name, role, write, type] of MEDIA_PARTS) {
                 if (out[name] || !role.test(c.role ?? '') || (write && c.write !== true) || (type && c.type !== type)) {
                     continue;
                 }
@@ -162,6 +169,18 @@ export function findMediaPlayers(
         out.set(base, parts);
     }
     return [...out].map(([base, parts]) => ({ base, parts }));
+}
+
+/**
+ * The choices of a TV's app or input: its values with their texts (common.states; a list of texts of a text datapoint:
+ * each text is its own value), at most 60.
+ */
+function choices(states: unknown, type: string | undefined): Record<string, string> | null {
+    if (Array.isArray(states) && type === 'string') {
+        const list = states.map(String).slice(0, 60);
+        return list.length ? Object.fromEntries(list.map(v => [v, v])) : null;
+    }
+    return stateTexts(states, 60);
 }
 
 /** The value a writable state datapoint takes for play (true) or pause (false), by its type. */
@@ -217,7 +236,7 @@ export function mediaPlayerMapping(
             features |= FEATURE.PAUSE;
         }
     }
-    const attributes: Record<string, Binding | number> = {};
+    const attributes: Record<string, Binding | number | string[]> = {};
     const volume = p.VOLUME ?? p.VOLUME_ACTUAL;
     if (volume) {
         const max = objects[volume]?.common.max;
@@ -253,6 +272,38 @@ export function mediaPlayerMapping(
         if (p[part]) {
             attributes[key] = { id: p[part] };
         }
+    }
+    // a TV's app and input: what it shows (the app's logo when it gives no picture), and its choices as sources, which
+    // the quick menu offers as chips (YouTube, HDMI 1 …); a choice writes the app's or the input's datapoint
+    const sources: string[] = [];
+    const select: ActionRule[] = [];
+    for (const part of ['APP', 'INPUT'] as const) {
+        const id = p[part];
+        if (!id) {
+            continue;
+        }
+        const c = objects[id]?.common;
+        const texts = choices(c?.states, c?.type);
+        attributes[part === 'APP' ? 'app_name' : 'source'] = texts ? { id, map: texts } : { id };
+        if (part === 'APP' && !p.INPUT) {
+            attributes.source = attributes.app_name;
+        }
+        if (c?.write === true && texts) {
+            const back: Record<string, unknown> = {};
+            for (const [value, label] of Object.entries(texts)) {
+                if (!sources.includes(label)) {
+                    sources.push(label);
+                    back[label] = c.type === 'number' ? Number(value) : c.type === 'boolean' ? value === 'true' : value;
+                }
+            }
+            // only the choices of this datapoint: an app goes to the app, an input to the input
+            select.push({ id, field: 'source', map: back, optional: true });
+        }
+    }
+    if (select.length) {
+        attributes.source_list = sources;
+        actions.select_source = select;
+        features |= FEATURE.SELECT_SOURCE;
     }
     attributes.supported_features = features;
     const m: Mapping = {
@@ -296,6 +347,7 @@ export function mediaSummary(parts: Partial<Record<MediaPart, string>>): string 
             [parts.POWER, '⏻'],
             [parts.TITLE, '♪'],
             [parts.COVER, '🖼'],
+            [parts.APP || parts.INPUT, '📺'],
         ] as const
     )
         .filter(([id]) => id)
