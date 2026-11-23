@@ -138,6 +138,8 @@ export interface FurnitureLike {
     variant?: string | null;
     /** A boat's gear: the sensor of a hatch, a tank … */
     gear_entity?: string | null;
+    /** A hatch: the datapoint of its opening angle (beside or instead of its contact). */
+    gear_angle_entity?: string | null;
 }
 
 export interface OutdoorLike {
@@ -1109,15 +1111,16 @@ export function homeScene(input: HomeInput): HomeOutput {
 }
 
 /**
- * Furniture with a sensor of its own (the contact of a hatch, the level of a tank): its spot, so that its battery and
- * reachability show at the item and count in its room. Ids in `taken` (placed devices) are left out.
+ * Furniture with a sensor of its own (the contact or angle of a hatch, the level of a tank): its spot, so that its
+ * battery and reachability show at the item and count in its room. Ids in `taken` (placed devices) are left out.
  */
 export function gearMarkers(b: BuildingLike, taken: ReadonlySet<string>): MarkerLike[] {
     const out: MarkerLike[] = [];
     const seen = new Set(taken);
     for (const floor of b.floors) {
         for (const f of floor.furniture) {
-            const id = f.gear_entity;
+            // a hatch may have only the datapoint of its angle
+            const id = f.gear_entity && f.gear_entity !== 'none' ? f.gear_entity : f.gear_angle_entity;
             if (!id || id === 'none' || seen.has(id)) {
                 continue;
             }

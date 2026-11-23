@@ -41,6 +41,32 @@ export function hatchOpen(state: string | null | undefined): number {
     return ['on', 'open', 'opened', 'true', 'offen', 'auf', 'geöffnet'].includes(s) || parseFloat(s) > 0 ? 1 : 0;
 }
 
+/** The most a hatch opens (°). */
+export const HATCH_MAX = 110;
+
+/**
+ * How a hatch stands: from its contact's state (open/shut; null: no contact or no state yet) and the angle a datapoint
+ * gives (° or %, % up to the opening angle `fixed`; null: none). The lid stands at the datapoint's angle, else at
+ * `fixed`. Without a contact the hatch counts as open from 1°. Null: neither is known.
+ */
+export function hatchPose(
+    contact: string | null,
+    angle: { n: number; unit?: string } | null,
+    fixed: number = HATCH_ANGLE,
+): { open: number; angle: number; measured: boolean } | null {
+    const deg =
+        angle && Number.isFinite(angle.n)
+            ? angle.unit?.trim() === '%'
+                ? (Math.min(100, Math.max(0, angle.n)) / 100) * fixed
+                : Math.min(HATCH_MAX, Math.max(0, angle.n))
+            : null;
+    if (contact === null && deg === null) {
+        return null;
+    }
+    const open = contact !== null ? hatchOpen(contact) : deg! >= 1 ? 1 : 0;
+    return { open, angle: deg ?? fixed, measured: deg !== null };
+}
+
 /** A switch's state as on (1) or off (0). */
 export function lightOn(state: string | null | undefined): number {
     const s = String(state ?? '').toLowerCase();

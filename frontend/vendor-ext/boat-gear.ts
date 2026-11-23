@@ -466,7 +466,8 @@ function hatch(g: GearState, s: GearScene, group: Group): void {
     hole.renderOrder = 1;
     // the lid, turned about its hinge at the front edge
     const open = Math.min(1, Math.max(0, g.value ?? 0));
-    const a = (open * Math.min(110, Math.max(5, g.angle ?? 70)) * Math.PI) / 180;
+    // the angle as set, or as a datapoint reports it (then also below 5°)
+    const a = (open * Math.min(110, Math.max(0, g.angle ?? 70)) * Math.PI) / 180;
     const lid = new Group();
     lid.position.set(0, fh, -g.d / 2);
     lid.rotation.x = -a;

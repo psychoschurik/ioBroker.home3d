@@ -1588,13 +1588,15 @@ function boatGear(name: string, code: string): string {
                 '  gear_flag?: string | null;',
                 '  /** A hatch: how far it opens (°, default 70). */',
                 '  gear_angle?: number | null;',
+                '  /** A hatch: the datapoint of its opening angle (° or %, % up to gear_angle), beside or instead of its contact. */',
+                '  gear_angle_entity?: EntityRef;',
             ].join('\n'),
             'gear fields',
         );
     }
     if (name === 'alerts.ts') {
         // an open deck hatch in the rain: the warning of an open window, with the hatch's contact
-        code = `import { hatchOpen as fp3dHatchOpen } from "${kinds}";\n${code}`;
+        code = `import { hatchPose as fp3dHatchPose } from "${kinds}";\n${code}`;
         // a plan without areas (ioBroker): a smoke, gas or water sensor placed in a room warns for that room; the
         // house's rain sensor is no leak, even when it reports as a water sensor
         code = replaceRequired(
@@ -1621,14 +1623,14 @@ function boatGear(name: string, code: string): string {
         code = replaceRequired(
             code,
             '  /** Haushalt Pro: the fridges with door sensors (their doors may not stand open too long). */',
-            '  /** The contacts of the deck hatches (open in the rain: a warning). */\n  hatches?: string[];\n  /** Haushalt Pro: the fridges with door sensors (their doors may not stand open too long). */',
+            '  /** The contacts and angle datapoints of the deck hatches (open in the rain: a warning). */\n  hatches?: string[];\n  /** Haushalt Pro: the fridges with door sensors (their doors may not stand open too long). */',
             'hatches: sources type',
         );
         code = replaceRequired(
             code,
             '  return { rooms, alarms: ids.filter((id) => id.startsWith("alarm_control_panel.")), weather, outage, rain, fridges };',
             [
-                '  const hatches = building.floors.flatMap((fl) => fl.furniture.filter((f) => f.type === "hatch" && !!f.gear_entity && f.gear_entity !== "none").map((f) => f.gear_entity as string));',
+                '  const hatches = building.floors.flatMap((fl) => fl.furniture.filter((f) => f.type === "hatch").flatMap((f) => [f.gear_entity, f.gear_angle_entity].filter((id): id is string => !!id && id !== "none")));',
                 '  return { rooms, alarms: ids.filter((id) => id.startsWith("alarm_control_panel.")), weather, outage, rain, fridges, hatches };',
             ].join('\n'),
             'hatches: sources',
@@ -1649,9 +1651,15 @@ function boatGear(name: string, code: string): string {
                 '        out.push({ kind: "window_rain", entity: link.contact ?? link.tilt ?? link.contact2 ?? o.id, roomId: o.room_id, floorId: floor.id });',
                 '      }',
                 '      for (const f of floor.furniture) {',
-                '        if (f.type !== "hatch" || !f.gear_entity || f.gear_entity === "none" || !fp3dHatchOpen(hass.states[f.gear_entity]?.state)) continue;',
+                '        if (f.type !== "hatch") continue;',
+                '        // open by its contact, or by the angle its datapoint reports',
+                '        const contact = f.gear_entity && f.gear_entity !== "none" ? f.gear_entity : null;',
+                '        const angleId = f.gear_angle_entity && f.gear_angle_entity !== "none" ? f.gear_angle_entity : null;',
+                '        const ang = angleId ? hass.states[angleId] : undefined;',
+                '        const pose = fp3dHatchPose(contact ? (hass.states[contact]?.state ?? null) : null, ang ? { n: parseFloat(ang.state), unit: String(ang.attributes.unit_of_measurement ?? "") } : null, f.gear_angle ?? undefined);',
+                '        if (!pose?.open) continue;',
                 '        const room = floor.rooms.find((r) => r.points.length >= 3 && pointInPolygon([f.x, f.z], r.points));',
-                '        out.push({ kind: "window_rain", entity: f.gear_entity, roomId: room?.id ?? null, floorId: floor.id });',
+                '        out.push({ kind: "window_rain", entity: (contact ?? angleId) as string, roomId: room?.id ?? null, floorId: floor.id });',
                 '      }',
             ].join('\n'),
             'hatches: open in the rain',
@@ -1739,7 +1747,7 @@ function boatGear(name: string, code: string): string {
                 '    const kinds: readonly string[] | null = tank ? FP3D_TANK_KINDS : lamp ? FP3D_LIGHT_KINDS : hatch ? FP3D_HATCH_KINDS : null;',
                 '    const kindKey = tank ? "tank" : lamp ? "light" : "hatch";',
                 '    const kind = f.gear_kind ?? kinds?.[0] ?? null;',
-                '    const pick = (key: "gear_entity" | "gear_liters", label: string, filter: (id: string) => boolean) =>',
+                '    const pick = (key: "gear_entity" | "gear_liters" | "gear_angle_entity", label: string, filter: (id: string) => boolean) =>',
                 '      this.entitySelect(label, f[key] ?? null, undefined, this.entityOptions(filter), (v) => this.updateFurniture({ [key]: v === "none" ? null : v }));',
                 '    return html`<div class="fp3d-form fp3d-links">',
                 '      ${kinds',
@@ -1752,6 +1760,7 @@ function boatGear(name: string, code: string): string {
                 '        : nothing}',
                 '      ${pick("gear_entity", this.t(`gear_entity_${f.type}` as I18nKey), lamp || hatch ? FP3D_SWITCHES : FP3D_SENSORS)}',
                 '      ${hatch ? this.num(this.t("gear_angle" as I18nKey), f.gear_angle ?? FP3D_HATCH_ANGLE, (v) => this.updateFurniture({ gear_angle: Math.round(Math.min(110, Math.max(5, v))) }), 5, 5) : nothing}',
+                '      ${hatch ? pick("gear_angle_entity", this.t("gear_angle_entity" as I18nKey), (id) => ["sensor.", "number.", "input_number."].some((d) => id.startsWith(d))) : nothing}',
                 '      ${tank ? pick("gear_liters", this.t("gear_liters"), FP3D_SENSORS) : nothing}',
                 '      ${lamp',
                 '        ? html`${this.num(this.t("gear_y"), f.gear_y ?? fp3dLightY(kind), (v) => this.updateFurniture({ gear_y: Math.round(Math.min(40, Math.max(0, v)) * 100) / 100 }), 0.1, 0)}',
@@ -1771,7 +1780,7 @@ function boatGear(name: string, code: string): string {
         );
     }
     if (name === 'components/view3d.ts') {
-        code = `import { HATCH_ANGLE as FP3D_HATCH_ANGLE, hatchOpen as fp3dHatchOpen, defaultLightY as fp3dLightY, isGear as fp3dIsGear, lightOn as fp3dLightOn, tankFill as fp3dTankFill, tankWarn as fp3dTankWarn, type GearType as Fp3dGearType } from "${kinds}";\n${code}`;
+        code = `import { HATCH_ANGLE as FP3D_HATCH_ANGLE, hatchPose as fp3dHatchPose, defaultLightY as fp3dLightY, isGear as fp3dIsGear, lightOn as fp3dLightOn, tankFill as fp3dTankFill, tankWarn as fp3dTankWarn, type GearType as Fp3dGearType } from "${kinds}";\n${code}`;
         code = replaceRequired(
             code,
             '    v.fp3dSetAnchors(\n',
@@ -1784,11 +1793,13 @@ function boatGear(name: string, code: string): string {
                 '          .filter((f) => fp3dIsGear(f.type))',
                 '          .map((f) => {',
                 '            const ent = f.gear_entity && f.gear_entity !== "none" ? f.gear_entity : null;',
+                '            let entity = ent;',
                 '            const n = fp3dNum(ent);',
                 '            const kind = f.gear_kind ?? (f.type === "tank" ? "water" : f.type === "nav_light" ? "anchor" : f.type === "hatch" ? "square" : null);',
                 '            let value: number | null = null;',
                 '            let label = "";',
                 '            let warn = false;',
+                '            let hatchAngle: number | null = null;',
                 '            if (f.type === "tank" && n) {',
                 '              value = fp3dTankFill(n.n, n.unit);',
                 '              // the contents in litres, or in kg (a gas bottle on a scale): as its datapoint says',
@@ -1804,12 +1815,20 @@ function boatGear(name: string, code: string): string {
                 '              label = value > 1 ? `${formatNumber(hass, value, 0)} ${fp3dTr("gear_rpm")}` : "";',
                 '            } else if (f.type === "nav_light" && ent && hass.states[ent]) {',
                 '              value = fp3dLightOn(hass.states[ent].state);',
-                '            } else if (f.type === "hatch" && ent && hass.states[ent]) {',
-                '              value = fp3dHatchOpen(hass.states[ent].state);',
-                '              label = value ? fp3dTr("gear_hatch_open") : "";',
+                '            } else if (f.type === "hatch") {',
+                '              // open by its contact; the lid at the angle a datapoint reports (° or %), else at the one set',
+                '              const angleId = f.gear_angle_entity && f.gear_angle_entity !== "none" ? f.gear_angle_entity : null;',
+                '              const pose = fp3dHatchPose(ent ? (hass.states[ent]?.state ?? null) : null, fp3dNum(angleId), f.gear_angle ?? FP3D_HATCH_ANGLE);',
+                '              if (pose) {',
+                '                value = pose.open;',
+                '                hatchAngle = Math.round(pose.angle);',
+                '                label = pose.open ? `${fp3dTr("gear_hatch_open")}${pose.measured ? ` ${formatNumber(hass, pose.angle, 0)}°` : ""}` : "";',
+                '              }',
+                '              // its details: the contact, else the angle',
+                '              entity = ent ?? angleId;',
                 '            }',
                 '            const base = f.type === "nav_light" ? (f.gear_y ?? fp3dLightY(kind)) : f.type === "tank" ? (f.mount_y ?? 0) : 0;',
-                '            return { id: f.id, floor: fl.id, type: f.type as Fp3dGearType, x: f.x, z: f.z, rotation: f.rotation, w: f.w, d: f.d, h: f.h, base, variant: kind, value, label, warn, mast: !!f.gear_mast, angle: f.gear_angle ?? FP3D_HATCH_ANGLE, entity: ent };',
+                '            return { id: f.id, floor: fl.id, type: f.type as Fp3dGearType, x: f.x, z: f.z, rotation: f.rotation, w: f.w, d: f.d, h: f.h, base, variant: kind, value, label, warn, mast: !!f.gear_mast, angle: hatchAngle ?? f.gear_angle ?? FP3D_HATCH_ANGLE, entity };',
                 '          }),',
                 '      ),',
                 '    );',
@@ -1973,8 +1992,9 @@ function boatGear(name: string, code: string): string {
                 '  gear_hatch_round: "Rund",',
                 '  gear_entity_hatch: "Kontakt (offen/zu)",',
                 '  gear_angle: "Öffnungswinkel (°)",',
+                '  gear_angle_entity: "Winkel aus Datenpunkt (optional, ° oder %)",',
                 '  gear_hatch_open: "Luke offen",',
-                '  gear_hint_hatch: "Eine Decksluke mit getöntem Deckel, das Scharnier an der vorderen Kante (ungedreht: im Grundriss oben). Meldet der Kontakt offen, steht der Deckel im Öffnungswinkel auf zwei Gasfedern; regnet es dabei, kommt die Warnung „offen bei Regen“. Breite und Tiefe = Größe der Luke, Höhe = Höhe des Rahmens.",',
+                '  gear_hint_hatch: "Eine Decksluke mit getöntem Deckel, das Scharnier an der vorderen Kante (ungedreht: im Grundriss oben). Meldet der Kontakt offen, steht der Deckel im Öffnungswinkel auf zwei Gasfedern. Liefert ein Datenpunkt den Winkel, steht er so weit offen (in % bis zum Öffnungswinkel); ohne Kontakt gilt die Luke dann ab 1° als offen. Regnet es, solange sie offen ist, kommt die Warnung „offen bei Regen“. Breite und Tiefe = Größe der Luke, Höhe = Höhe des Rahmens.",',
             ].join('\n'),
             'gear de',
         );
@@ -2027,8 +2047,9 @@ function boatGear(name: string, code: string): string {
                 '  gear_hatch_round: "Round",',
                 '  gear_entity_hatch: "Contact (open/shut)",',
                 '  gear_angle: "Opening angle (°)",',
+                '  gear_angle_entity: "Angle from a datapoint (optional, ° or %)",',
                 '  gear_hatch_open: "Hatch open",',
-                '  gear_hint_hatch: "A deck hatch with a smoked lid, hinged at its front edge (unturned: at the top of the plan). While the contact reports open the lid stands at its opening angle on two gas struts; if it rains meanwhile, the warning \\u201copen in the rain\\u201d comes. Width and depth = size of the hatch, height = height of its frame.",',
+                '  gear_hint_hatch: "A deck hatch with a smoked lid, hinged at its front edge (unturned: at the top of the plan). While the contact reports open the lid stands at its opening angle on two gas struts. When a datapoint gives the angle, it stands open that far (in % up to the opening angle); without a contact the hatch then counts as open from 1°. If it rains while it is open, the warning \\u201copen in the rain\\u201d comes. Width and depth = size of the hatch, height = height of its frame.",',
             ].join('\n'),
             'gear en',
         );
@@ -6360,6 +6381,124 @@ function boatPictures(name: string, code: string): string {
  * offered in the library as an item of its own, round in the plan. A library entry with a preset (the oil tank, the
  * gas bottle) gets its own picture: the library keeps the pictures by type otherwise, and the preset's kind is drawn.
  */
+/**
+ * The parking spots in the time travel: the sensors of the cars (furniture `car_*`, drawn by home-fx.ts) are fetched
+ * with the others, so a car stands in its spot as it did then (only the spot's own sensor was fetched); a spot taken
+ * or left is an event on the bar ("Parkplatz belegt/frei"), and a tap on it flies to the spot.
+ */
+function parkingTimeTravel(name: string, code: string): string {
+    const homeData = `${root}/frontend/vendor-ext/home-data.ts`;
+    if (name === 'timetravel/classify.ts') {
+        code = replaceRequired(
+            code,
+            '| "robot" | "washer" | "weather";',
+            '| "robot" | "washer" | "weather" | "car";',
+            'time travel: car role',
+        );
+        return replaceRequired(
+            code,
+            '  for (const id of appliancePower(hass, building, spec).keys()) set(id, "washer");\n',
+            [
+                '  for (const id of appliancePower(hass, building, spec).keys()) set(id, "washer");',
+                "  // a parking spot's or a car's sensor: the spot taken or free (a car came or left)",
+                '  for (const floor of building.floors)',
+                '    for (const f of floor.furniture)',
+                '      if (["parking", "car_sedan", "car_hatchback", "car_van"].includes(f.type) && typeof f.entity === "string") set(f.entity, "car");',
+                '',
+            ].join('\n'),
+            'time travel: cars have a role',
+        );
+    }
+    if (name === 'timetravel/events.ts') {
+        code = `import { carPresent as fp3dCarPresent } from "${homeData}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  | "pv_peak";',
+            '  | "pv_peak"\n  | "car_in"\n  | "car_out";',
+            'time travel: car kinds',
+        );
+        code = replaceRequired(
+            code,
+            '  pv_peak: 8,\n};',
+            '  pv_peak: 8,\n  car_in: 30,\n  car_out: 28,\n};',
+            'time travel: car rank',
+        );
+        code = replaceRequired(
+            code,
+            '  pv_peak: "energy",\n};',
+            '  pv_peak: "energy",\n  car_in: "openings",\n  car_out: "openings",\n};',
+            'time travel: car category',
+        );
+        return replaceRequired(
+            code,
+            '        case "robot":\n',
+            [
+                '        case "car": {',
+                '          // a parking spot taken or left: present and away (unknown is neither)',
+                '          const known = (s: string) => s !== "unknown" && s !== "unavailable";',
+                '          const here = (s: string) => fp3dCarPresent({ state: s, attributes: {} });',
+                '          if (known(c.from) && known(c.to) && here(c.to) !== here(c.from)) add(c.t, here(c.to) ? "car_in" : "car_out", id);',
+                '          break;',
+                '        }',
+                '        case "robot":',
+                '',
+            ].join('\n'),
+            'time travel: car events',
+        );
+    }
+    if (name === 'components/time-bar.ts') {
+        return replaceRequired(
+            code,
+            '  pv_peak: "#ffe27a",\n};',
+            '  pv_peak: "#ffe27a",\n  car_in: "#ff9a5c",\n  car_out: "#ff9a5c",\n};',
+            'time travel: car colour',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = replaceRequired(
+            code,
+            '    const entities = watchedEntities(hass, b, { openings, furniture, heat: true, warnings, weatherEntityId: this.weatherEntityId });',
+            [
+                "    // the home's own looks too: a car's sensor puts it into its spot (or not) as it was then",
+                '    const entities = [...new Set([...watchedEntities(hass, b, { openings, furniture, heat: true, warnings, weatherEntityId: this.weatherEntityId }), ...fp3dHomeWatched(hass, b, (a) => areaEntities(hass, a), false)])];',
+            ].join('\n'),
+            'time travel: the home looks are fetched',
+        );
+        return replaceRequired(
+            code,
+            '    const area = entityAreaId(hass, entity);\n',
+            [
+                "    // a parking spot's or a car's sensor (a spot taken or left): the spot",
+                '    for (const floor of b.floors) {',
+                '      const f = floor.furniture.find((m) => m.entity === entity && ["parking", "car_sedan", "car_hatchback", "car_van"].includes(m.type));',
+                '      if (!f) continue;',
+                '      const room = floor.rooms.find((r) => r.points.length >= 3 && pointInPolygon([f.x, f.z], r.points));',
+                '      this.goTo({ kind: "device", name: f.name || entityName(hass, entity), where: "", floorId: floor.id, roomId: room?.id ?? null, entity, icon: null, x: f.x, z: f.z, y: 1 });',
+                '      return;',
+                '    }',
+                '    const area = entityAreaId(hass, entity);',
+                '',
+            ].join('\n'),
+            'time travel: a car event flies to its spot',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  tt_ev_robot_done: "{name} fertig",\n',
+            '  tt_ev_robot_done: "{name} fertig",\n  tt_ev_car_in: "Parkplatz belegt: {name}",\n  tt_ev_car_out: "Parkplatz frei: {name}",\n',
+            'time travel: car texts de',
+        );
+        return replaceRequired(
+            code,
+            '  tt_ev_robot_done: "{name} done",\n',
+            '  tt_ev_robot_done: "{name} done",\n  tt_ev_car_in: "Parking spot taken: {name}",\n  tt_ev_car_out: "Parking spot free: {name}",\n',
+            'time travel: car texts en',
+        );
+    }
+    return code;
+}
+
 function gasBottle(name: string, code: string): string {
     if (name === 'library-index.ts') {
         code = replaceRequired(
@@ -9375,6 +9514,7 @@ const patches: Plugin = {
         code = oneBar(name, code);
         code = boatPictures(name, code);
         code = gasBottle(name, code);
+        code = parkingTimeTravel(name, code);
         code = fixedDialogHeads(name, code);
         code = noLocate(name, code);
         code = showFromIoBroker(name, code);

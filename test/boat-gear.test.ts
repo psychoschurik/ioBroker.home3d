@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defaultLightY, hatchOpen, isGear, lightOn, tankFill, tankWarn } from '../frontend/vendor-ext/boat-kinds';
+import { defaultLightY, hatchOpen, hatchPose, isGear, lightOn, tankFill, tankWarn } from '../frontend/vendor-ext/boat-kinds';
 import { Box3 } from 'three';
 import { BOTTLE, bottleLevel, bottleProfile, buildGear } from '../frontend/vendor-ext/boat-gear';
 import { boatPicture, disposeBoatPicture } from '../frontend/vendor-ext/boat-picture';
@@ -65,6 +65,25 @@ test('the wake starts at about half a knot and is full at about seven', () => {
     assert.equal(wakeStrength(0.1), 0);
     assert.ok(wakeStrength(1) > 0 && wakeStrength(1) < 0.5);
     assert.equal(wakeStrength(10), 1);
+});
+
+test('a hatch stands at the angle its datapoint reports, open by its contact or from 1 degree', () => {
+    // nothing known
+    assert.equal(hatchPose(null, null), null);
+    // only the contact: the angle set
+    assert.deepEqual(hatchPose('on', null, 60), { open: 1, angle: 60, measured: false });
+    assert.deepEqual(hatchPose('off', null, 60), { open: 0, angle: 60, measured: false });
+    // only the angle: open from 1 degree, at most 110
+    assert.deepEqual(hatchPose(null, { n: 35, unit: '°' }), { open: 1, angle: 35, measured: true });
+    assert.equal(hatchPose(null, { n: 0.4 })!.open, 0);
+    assert.equal(hatchPose(null, { n: 170 })!.angle, 110);
+    // in %: up to the angle set
+    assert.deepEqual(hatchPose(null, { n: 50, unit: '%' }, 80), { open: 1, angle: 40, measured: true });
+    // both: the contact says whether, the datapoint how far
+    assert.deepEqual(hatchPose('off', { n: 30 }), { open: 0, angle: 30, measured: true });
+    assert.deepEqual(hatchPose('open', { n: 30 }), { open: 1, angle: 30, measured: true });
+    // an angle that is no number counts as none
+    assert.deepEqual(hatchPose('on', { n: NaN }, 70), { open: 1, angle: 70, measured: false });
 });
 
 test('a deck hatch opens from its contact and is drawn shut, open with its struts, square or round', () => {
