@@ -1,5 +1,6 @@
 // A boat's gear, drawn by the viewer from its sensors (furniture types added in tasks.ts):
-// - "tank": a glass tank with the liquid at its fill level, in the colour of what it holds; a gas bottle is round;
+// - "tank": a glass tank with the liquid at its fill level, in the colour of what it holds; gas is a bottle with its
+//   valve and collar;
 // - "rudder": the blade under the hull, turned by the rudder angle;
 // - "propeller": a sail drive with a three-bladed propeller that spins with the engine speed;
 // - "nav_light": a navigation light that glows while it is on, stronger at night, with its reflection on the water.
@@ -13,6 +14,7 @@ import {
     EdgesGeometry,
     ExtrudeGeometry,
     Group,
+    LatheGeometry,
     LineBasicMaterial,
     LineSegments,
     Mesh,
@@ -22,6 +24,7 @@ import {
     Shape,
     Sprite,
     SpriteMaterial,
+    Vector2,
     Vector3,
     type BufferGeometry,
     type Object3D,
@@ -177,9 +180,96 @@ function part(group: Object3D, geo: BufferGeometry, color: number): Mesh {
     return m;
 }
 
-/** A glass tank (a round bottle for gas) with the liquid up to its level. */
+/**
+ * Where a gas bottle's parts are, as fractions of its height: the foot ring up to `foot`, the glass body from there,
+ * straight up to `shoulder`, rounded in to the neck at `neck`; the valve above it, the collar from `collar` to the top.
+ */
+export const BOTTLE = { foot: 0.06, shoulder: 0.66, neck: 0.84, valve: 0.92, collar: 0.78 } as const;
+
+/** The outline of a gas bottle's body (radius, height from its foot), turned about its axis. */
+export function bottleProfile(r: number, h: number): Vector2[] {
+    const pts = [
+        new Vector2(0, BOTTLE.foot * h),
+        new Vector2(r * 0.8, BOTTLE.foot * h),
+        new Vector2(r * 0.96, (BOTTLE.foot + 0.015) * h),
+        new Vector2(r, (BOTTLE.foot + 0.04) * h),
+    ];
+    // the shoulder: a quarter ellipse from the body in to the neck
+    const neckR = r * 0.2;
+    for (let i = 0; i <= 8; i++) {
+        const a = (i / 8) * (Math.PI / 2);
+        pts.push(
+            new Vector2(
+                neckR + (r - neckR) * Math.cos(a),
+                (BOTTLE.shoulder + (BOTTLE.neck - BOTTLE.shoulder) * Math.sin(a)) * h,
+            ),
+        );
+    }
+    pts.push(new Vector2(0, BOTTLE.neck * h));
+    return pts;
+}
+
+/** How high the liquid gas stands in a bottle of height h at a fill of 0–1: in the straight part of its body. */
+export function bottleLevel(h: number, fill: number): number {
+    const bottom = (BOTTLE.foot + 0.01) * h;
+    return bottom + (BOTTLE.shoulder * h - bottom) * Math.min(1, Math.max(0, fill));
+}
+
+/** A gas bottle: the glass body with the liquid gas up to its level, the valve, the collar around it and the foot. */
+function bottle(g: GearState, s: GearScene, group: Group, glass: MeshBasicMaterial, edge: LineBasicMaterial): void {
+    const r = Math.min(g.w, g.d) / 2;
+    const h = g.h;
+    const level = Math.min(1, Math.max(0, g.value ?? 0));
+    const body = new LatheGeometry(bottleProfile(r, h), 28);
+    const shell = new Mesh(body, glass);
+    shell.renderOrder = 3;
+    group.add(shell);
+    group.add(new LineSegments(new EdgesGeometry(body, 35), edge));
+    if (level > 0.002) {
+        const bottom = (BOTTLE.foot + 0.01) * h;
+        const top = bottleLevel(h, level);
+        const m = part(
+            group,
+            new CylinderGeometry(r * 0.92, r * 0.92, Math.max(0.004, top - bottom), 28).translate(
+                0,
+                (bottom + top) / 2,
+                0,
+            ),
+            TANK_COLORS.gas,
+        );
+        (m.material as MeshBasicMaterial).transparent = true;
+        (m.material as MeshBasicMaterial).opacity = 0.88;
+        m.renderOrder = 2;
+    }
+    const metal = s.light ? 0x8d969e : 0xa9b4bf;
+    // the foot ring and the collar that guards the valve, open on top
+    part(
+        group,
+        new CylinderGeometry(r * 0.86, r * 0.9, BOTTLE.foot * h, 28, 1, true).translate(0, (BOTTLE.foot * h) / 2, 0),
+        metal,
+    );
+    const collarH = (1 - BOTTLE.collar) * h;
+    part(
+        group,
+        new CylinderGeometry(r * 0.6, r * 0.62, collarH, 28, 1, true).translate(0, BOTTLE.collar * h + collarH / 2, 0),
+        metal,
+    );
+    // the valve: brass body and its hand wheel
+    const valveH = (BOTTLE.valve - BOTTLE.neck) * h;
+    part(
+        group,
+        new CylinderGeometry(r * 0.1, r * 0.12, valveH, 12).translate(0, BOTTLE.neck * h + valveH / 2, 0),
+        0xc9a24a,
+    );
+    part(
+        group,
+        new CylinderGeometry(r * 0.28, r * 0.28, Math.max(0.01, h * 0.025), 16).translate(0, BOTTLE.valve * h, 0),
+        s.light ? 0x3d4248 : 0x5b6670,
+    );
+}
+
+/** A glass tank with the liquid up to its level; gas as a bottle. */
 function tank(g: GearState, s: GearScene, group: Group): void {
-    const gas = g.variant === 'gas';
     const level = Math.min(1, Math.max(0, g.value ?? 0));
     const glass = new MeshBasicMaterial({
         color: s.light ? 0xd6ecff : 0x9fd8ff,
@@ -188,9 +278,11 @@ function tank(g: GearState, s: GearScene, group: Group): void {
         depthWrite: false,
     });
     const edge = new LineBasicMaterial({ color: s.light ? 0x5b7a90 : 0x8fd3ff, transparent: true, opacity: 0.85 });
-    const body: BufferGeometry = gas
-        ? new CylinderGeometry(Math.min(g.w, g.d) / 2, Math.min(g.w, g.d) / 2, g.h, 24).translate(0, g.h / 2, 0)
-        : new BoxGeometry(g.w, g.h, g.d).translate(0, g.h / 2, 0);
+    if (g.variant === 'gas') {
+        bottle(g, s, group, glass, edge);
+        return;
+    }
+    const body: BufferGeometry = new BoxGeometry(g.w, g.h, g.d).translate(0, g.h / 2, 0);
     const shell = new Mesh(body, glass);
     shell.renderOrder = 3;
     group.add(shell);
@@ -198,12 +290,9 @@ function tank(g: GearState, s: GearScene, group: Group): void {
     if (level > 0.002) {
         const inset = 0.025;
         const fill = Math.max(0.004, (g.h - inset * 2) * level);
-        const liquid = gas
-            ? new CylinderGeometry(Math.min(g.w, g.d) / 2 - inset, Math.min(g.w, g.d) / 2 - inset, fill, 24)
-            : new BoxGeometry(g.w - inset * 2, fill, g.d - inset * 2);
         const m = part(
             group,
-            liquid.translate(0, inset + fill / 2, 0),
+            new BoxGeometry(g.w - inset * 2, fill, g.d - inset * 2).translate(0, inset + fill / 2, 0),
             TANK_COLORS[g.variant ?? 'water'] ?? TANK_COLORS.water,
         );
         (m.material as MeshBasicMaterial).transparent = true;

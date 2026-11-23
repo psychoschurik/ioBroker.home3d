@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { defaultLightY, hatchOpen, isGear, lightOn, tankFill, tankWarn } from '../frontend/vendor-ext/boat-kinds';
 import { Box3 } from 'three';
-import { buildGear } from '../frontend/vendor-ext/boat-gear';
+import { BOTTLE, bottleLevel, bottleProfile, buildGear } from '../frontend/vendor-ext/boat-gear';
 import { boatPicture, disposeBoatPicture } from '../frontend/vendor-ext/boat-picture';
 import { wakeStrength } from '../frontend/vendor-ext/sea';
 
@@ -15,6 +15,38 @@ test('a tank reads its fill in % or as a fraction and warns when a supply runs o
     assert.equal(tankWarn('fuel', 0.45), false);
     assert.equal(tankWarn('black', 0.9), true);
     assert.equal(tankWarn('grey', 0.1), false);
+});
+
+test('a gas bottle: a round body with shoulder and neck, its valve and collar, the gas up to its fill', () => {
+    const r = 0.15;
+    const h = 0.59;
+    const profile = bottleProfile(r, h);
+    // from the axis at the foot out to the body and back in to the axis at the neck
+    assert.equal(profile[0].x, 0);
+    assert.equal(profile.at(-1)!.x, 0);
+    assert.ok(Math.abs(Math.max(...profile.map(p => p.x)) - r) < 1e-9);
+    assert.ok(Math.abs(profile.at(-1)!.y - BOTTLE.neck * h) < 1e-9);
+    assert.ok(bottleLevel(h, 0) < bottleLevel(h, 0.5) && bottleLevel(h, 0.5) < bottleLevel(h, 1));
+    assert.ok(Math.abs(bottleLevel(h, 1) - BOTTLE.shoulder * h) < 1e-9);
+    assert.equal(bottleLevel(h, 2), bottleLevel(h, 1));
+    const scene = { floorY: 0, waterY: null, light: false, night: 0 };
+    const base = { id: 'g', floor: 'f', type: 'tank' as const, x: 0, z: 0, rotation: 0, w: 0.3, d: 0.3, h, base: 0, label: '', warn: false, mast: false };
+    const full = buildGear({ ...base, variant: 'gas', value: 0.7 }, scene);
+    const empty = buildGear({ ...base, variant: 'gas', value: 0 }, scene);
+    const meshes = (g: ReturnType<typeof buildGear>): number => {
+        let n = 0;
+        g.traverse(o => {
+            n += (o as unknown as { isMesh?: boolean }).isMesh ? 1 : 0;
+        });
+        return n;
+    };
+    // glass, foot ring, collar, valve, hand wheel; with gas the liquid too
+    assert.equal(meshes(empty), 5);
+    assert.equal(meshes(full), 6);
+    const box = new Box3().setFromObject(full);
+    // the collar guards the valve up to the bottle's height
+    assert.ok(Math.abs(box.max.y - h) < 0.001, `top ${box.max.y}`);
+    assert.ok(box.max.x <= 0.15 + 1e-6);
 });
 
 test('navigation lights: on from a switch, the anchor light at the masthead unless set', () => {

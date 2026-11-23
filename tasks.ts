@@ -1728,8 +1728,10 @@ function boatGear(name: string, code: string): string {
                 '            let warn = false;',
                 '            if (f.type === "tank" && n) {',
                 '              value = fp3dTankFill(n.n, n.unit);',
-                '              const liters = fp3dVal(f.gear_liters);',
-                '              label = `${fp3dTr(`gear_tank_${kind}`)} ${Math.round(value * 100)} %${liters !== null ? ` · ${formatNumber(hass, liters, 0)} l` : ""}`;',
+                '              // the contents in litres, or in kg (a gas bottle on a scale): as its datapoint says',
+                '              const amount = f.gear_liters && f.gear_liters !== "none" ? fp3dNum(f.gear_liters) : null;',
+                '              const unit = amount?.unit.trim() || "l";',
+                '              label = `${fp3dTr(`gear_tank_${kind}`)} ${Math.round(value * 100)} %${amount ? ` · ${formatNumber(hass, amount.n, unit === "kg" && amount.n < 100 ? 1 : 0)} ${unit}` : ""}`;',
                 '              warn = fp3dTankWarn(kind, value);',
                 '            } else if (f.type === "rudder" && n) {',
                 '              value = n.n;',
@@ -1891,7 +1893,7 @@ function boatGear(name: string, code: string): string {
                 '  gear_entity_rudder: "Ruderlage (°)",',
                 '  gear_entity_propeller: "Motordrehzahl (U/min)",',
                 '  gear_entity_nav_light: "Schalter",',
-                '  gear_liters: "Inhalt in Litern (optional)",',
+                '  gear_liters: "Inhalt in Litern oder kg (optional)",',
                 '  gear_y: "Höhe über der Etage (m)",',
                 '  gear_mast: "Mast bis zur Etage zeichnen",',
                 '  gear_hint_tank: "Ein Glaskasten mit der Flüssigkeit bis zum Füllstand, in der Farbe des Inhalts (Gas als Flasche). Darüber stehen Inhalt, Füllstand und Liter, gelb, wenn ein Vorrat unter 15 % fällt oder Grau- oder Schwarzwasser über 85 % steigt.",',
@@ -1945,7 +1947,7 @@ function boatGear(name: string, code: string): string {
                 '  gear_entity_rudder: "Rudder angle (°)",',
                 '  gear_entity_propeller: "Engine speed (rpm)",',
                 '  gear_entity_nav_light: "Switch",',
-                '  gear_liters: "Contents in litres (optional)",',
+                '  gear_liters: "Contents in litres or kg (optional)",',
                 '  gear_y: "Height above the floor (m)",',
                 '  gear_mast: "Draw a mast down to the floor",',
                 '  gear_hint_tank: "A glass box with the liquid up to the fill level, in the colour of its contents (gas as a bottle). Above it: contents, fill level and litres, in yellow when a supply falls below 15 % or grey or black water rises above 85 %.",',
@@ -6291,6 +6293,128 @@ function boatPictures(name: string, code: string): string {
 }
 
 /**
+ * A gas bottle: the boat's tank holding gas (frontend/vendor-ext/boat-gear.ts draws it with its valve and collar),
+ * offered in the library as an item of its own, round in the plan. A library entry with a preset (the oil tank, the
+ * gas bottle) gets its own picture: the library keeps the pictures by type otherwise, and the preset's kind is drawn.
+ */
+function gasBottle(name: string, code: string): string {
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '      preset: { gear_kind: "oil", w: 0.72, d: 1.6, h: 1.55 },\n    });\n  }\n',
+            [
+                '      preset: { gear_kind: "oil", w: 0.72, d: 1.6, h: 1.55 },',
+                '    });',
+                '    // a gas bottle (11 kg of propane): beside the tank, a card of its own',
+                '    const gas = src.basicName("tank_gas");',
+                '    out.push({',
+                '      ...tank,',
+                '      key: "tank#gas",',
+                '      label: gas,',
+                '      search: `${gas} ${src.basicNameEn("tank_gas")} gasflasche gas flasche propan butan lpg grill camping ${src.kindName(tank.kind)} ${KIND_WORDS[tank.kind]}`,',
+                '      family: "tank_gas",',
+                '      rooms: [...new Set([...tank.rooms, "garden", "kitchen"])],',
+                '      size: [0.3, 0.3, 0.59],',
+                '      preset: { gear_kind: "gas", w: 0.3, d: 0.3, h: 0.59 },',
+                '    });',
+                '  }',
+                '',
+            ].join('\n'),
+            'gas bottle: library entry',
+        );
+    }
+    if (name === 'components/library.ts') {
+        // the picture of an entry with a preset is its own (key), else the type's
+        code = replaceRequired(
+            code,
+            '      if (!entry || this._thumbs.has(entry.type)) continue;',
+            '      if (!entry || this._thumbs.has(fp3dPic(entry))) continue;',
+            'gas bottle: picture key (seen)',
+        );
+        code = replaceRequired(
+            code,
+            '    if (this._thumbs.has(entry.type) || this.wanted.has(entry.type)) return;\n    this.wanted.add(entry.type);',
+            '    if (this._thumbs.has(fp3dPic(entry)) || this.wanted.has(fp3dPic(entry))) return;\n    this.wanted.add(fp3dPic(entry));',
+            'gas bottle: picture key (wanted)',
+        );
+        code = replaceRequired(
+            code,
+            '      const key = `${entry.type}|${entry.packRelease}|',
+            '      const key = `${fp3dPic(entry)}|${entry.packRelease}|',
+            'gas bottle: picture key (cache)',
+        );
+        code = replaceRequired(
+            code,
+            '            next.set(entry.type, url);\n            this._thumbs = next;\n          } else this.wanted.delete(entry.type);\n        })\n        .catch(() => this.wanted.delete(entry.type))',
+            '            next.set(fp3dPic(entry), url);\n            this._thumbs = next;\n          } else this.wanted.delete(fp3dPic(entry));\n        })\n        .catch(() => this.wanted.delete(fp3dPic(entry)))',
+            'gas bottle: picture key (drawn)',
+        );
+        code = replaceRequired(
+            code,
+            '    const pic = this._thumbs.get(shown.type) ?? this._thumbs.get(first.type);',
+            '    const pic = this._thumbs.get(fp3dPic(shown)) ?? this._thumbs.get(fp3dPic(first));',
+            'gas bottle: picture key (card)',
+        );
+        code = replaceRequired(
+            code,
+            'class=${(this._thumbs.has(shown.type) ? shown : first).mirror',
+            'class=${(this._thumbs.has(fp3dPic(shown)) ? shown : first).mirror',
+            'gas bottle: picture key (mirrored)',
+        );
+        code = replaceRequired(
+            code,
+            'const THUMB_PX = 96;\n',
+            "const THUMB_PX = 96;\n/** The key of an entry's picture: an entry with a preset (the oil tank, the gas bottle) has its own. */\nconst fp3dPic = (e: LibraryEntry): string => (e.preset ? e.key : e.type);\n",
+            'gas bottle: picture key',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = replaceRequired(
+            code,
+            'return mod.furniturePreview({ type: entry.type, w, d, h, variant: null, lamp: LAMP_MODEL[entry.type] ?? null }, 96, this.packs ?? []);',
+            'return mod.furniturePreview({ type: entry.type, w, d, h, variant: typeof entry.preset?.gear_kind === "string" ? entry.preset.gear_kind : null, lamp: LAMP_MODEL[entry.type] ?? null }, 96, this.packs ?? []);',
+            'gas bottle: picture of the preset kind',
+        );
+        code = replaceRequired(
+            code,
+            '<g class="fp3d-furn-sym">${furnitureSymbol(f.type, f.w, f.d, f.h)}</g>',
+            '<g class="fp3d-furn-sym">${furnitureSymbol(f.type === "tank" && f.gear_kind === "gas" ? "tank_gas" : f.type, f.w, f.d, f.h)}</g>',
+            'gas bottle: round in the plan',
+        );
+    }
+    if (name === 'components/furniture2d.ts') {
+        code = replaceRequired(
+            code,
+            '    case "tank":\n      // a tank: its outline and the filler cap\n',
+            [
+                '    case "tank_gas":',
+                '      // a gas bottle from above: its body, the collar and the valve',
+                '      return [circle(0, 0, Math.max(0.02, Math.min(w, d) / 2 - 0.01), "fp3d-sym-strong"), circle(0, 0, Math.min(w, d) * 0.3), circle(0, 0, 0.02)];',
+                '    case "tank":',
+                '      // a tank: its outline and the filler cap',
+                '',
+            ].join('\n'),
+            'gas bottle: plan symbol',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  furn_tank_oil: "Öltank",',
+            '  furn_tank_oil: "Öltank",\n  furn_tank_gas: "Gasflasche",',
+            'gas bottle: de',
+        );
+        code = replaceRequired(
+            code,
+            '  furn_tank_oil: "Oil tank",',
+            '  furn_tank_oil: "Oil tank",\n  furn_tank_gas: "Gas bottle",',
+            'gas bottle: en',
+        );
+    }
+    return code;
+}
+
+/**
  * One bar instead of two (frontend/shell.ts): the page's own bar (logo, status, projects, devices, kiosk, help) goes
  * into the slots "start" (instead of the title "3D Home") and "end" (before the version and ⚙) of the panel's header.
  * In the clean view, where the header is gone, a header with only those slots stays, as the page's bar did before.
@@ -9186,6 +9310,7 @@ const patches: Plugin = {
         code = roundCardButtons(name, code);
         code = oneBar(name, code);
         code = boatPictures(name, code);
+        code = gasBottle(name, code);
         code = fixedDialogHeads(name, code);
         code = noLocate(name, code);
         code = showFromIoBroker(name, code);

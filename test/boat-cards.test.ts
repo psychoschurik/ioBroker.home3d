@@ -16,6 +16,8 @@ test('boat cards: the anchor (distance against the radius, chain, depth, scope, 
         'sensor.diesel_l': st('124', 'l'),
         'sensor.water': st('12', '%'),
         'sensor.black': st('0.4'),
+        'sensor.gas': st('70', '%'),
+        'sensor.gas_kg': st('7.7', 'kg'),
     };
     const anchor: BoatItem = { id: 'a', type: 'anchor', name: 'Anker', anchor_chain: 'sensor.chain', anchor_depth: 'sensor.depth', anchor_distance: 'sensor.dist', anchor_radius: 'sensor.rad', anchor_alarm: 'binary_sensor.alarm' };
     const tanks: BoatItem[] = [
@@ -23,6 +25,7 @@ test('boat cards: the anchor (distance against the radius, chain, depth, scope, 
         { id: 't2', type: 'tank', name: 'Wasser', gear_kind: 'water', gear_entity: 'sensor.water' },
         { id: 't3', type: 'tank', gear_kind: 'black', gear_entity: 'sensor.black' },
         { id: 't4', type: 'tank', gear_kind: 'gas', gear_entity: 'none' },
+        { id: 't5', type: 'tank', name: 'Gasflasche', gear_kind: 'gas', gear_entity: 'sensor.gas', gear_liters: 'sensor.gas_kg' },
     ];
     let b = { floors: [{ id: 'dk', furniture: [anchor] }, { id: 'ud', furniture: tanks }] };
     const host = { hass: () => ({ states }), building: () => b, language: () => 'de', updateBuilding: (m: (x: typeof b) => void) => { b = structuredClone(b); m(b); } };
@@ -43,6 +46,7 @@ test('boat cards: the anchor (distance against the radius, chain, depth, scope, 
         ['Diesel', '62 % · 124 l'],
         ['Wasser', '12 %'],
         ['Schwarzwasser', '40 %'],
+        ['Gasflasche', '70 % · 7,7 kg'],
     ]);
     assert.equal(t.live, 'fast leer / fast voll');
     assert.equal(t.rows[1].color, '#ff5d5d');
@@ -58,7 +62,7 @@ test('boat cards: the anchor (distance against the radius, chain, depth, scope, 
     [a] = boatCards(host) as Card[];
     assert.equal(a.live, 'eingeholt');
     assert.equal(a.main, undefined);
-    assert.deepEqual(boatWatched(host).sort(), ['binary_sensor.alarm', 'sensor.black', 'sensor.chain', 'sensor.depth', 'sensor.diesel', 'sensor.diesel_l', 'sensor.dist', 'sensor.rad', 'sensor.water']);
+    assert.deepEqual(boatWatched(host).sort(), ['binary_sensor.alarm', 'sensor.black', 'sensor.chain', 'sensor.depth', 'sensor.diesel', 'sensor.diesel_l', 'sensor.dist', 'sensor.gas', 'sensor.gas_kg', 'sensor.rad', 'sensor.water']);
     // switched off in the form
     const [check] = boatFields(host, anchor) as { label: string; set(v: boolean): void }[];
     assert.equal(check.label, 'Anker: Glaskarte zeigen');

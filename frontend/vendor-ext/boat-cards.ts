@@ -367,11 +367,16 @@ export function tanksCard(host: BoatHost, floorId: string, tanks: BoatItem[]): R
         const fill = tankFill(v, unit);
         const bad = tankWarn(t.gear_kind, fill);
         warn += bad ? 1 : 0;
-        const liters = num(hass, t.gear_liters);
+        // the contents in litres, or in kg (a gas bottle on a scale): as its datapoint says
+        const amount = num(hass, t.gear_liters);
+        const amountUnit =
+            (linked(t.gear_liters) ? str(hass.states[t.gear_liters]?.attributes.unit_of_measurement) : '').trim() ||
+            'l';
+        const digits = amountUnit === 'kg' && amount !== null && amount < 100 ? 1 : 0;
         const kind = t.gear_kind ?? 'water';
         rows.push({
             label: t.name || text(lang, kind),
-            value: `${Math.round(fill * 100)} %${liters !== null ? ` · ${Math.round(liters).toLocaleString(lang)} l` : ''}`,
+            value: `${Math.round(fill * 100)} %${amount !== null ? ` · ${amount.toLocaleString(lang, { maximumFractionDigits: digits })} ${amountUnit}` : ''}`,
             at: fill * 100,
             fill: true,
             color: bad ? RED : kind === 'fuel' || kind === 'oil' ? ORANGE : kind === 'water' ? BLUE : '#a98bff',
