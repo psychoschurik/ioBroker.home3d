@@ -36,7 +36,7 @@ const STYLE = `
 .mi-close{border:0;background:transparent;font-size:22px;padding:4px 10px}.mi-now{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:18px 0 6px}.mi-value{font-size:34px;font-weight:500}.mi-value small{font-size:16px;color:#a9bdce;margin-left:4px}
 .mi [hidden]{display:none!important}.mi-since{color:#8faabd;font-size:12px}.mi-actions{display:flex;gap:8px;margin:10px 0}.mi-ranges{display:flex;gap:6px;margin:16px 0 8px;flex-wrap:wrap}.mi-ranges button{padding:5px 12px;font-size:12px}.mi-ranges button[aria-pressed=true]{background:#288cbd;border-color:#288cbd;color:#fff}
 .mi-chart{position:relative;height:220px;background:#1b2631;border:1px solid #314151;border-radius:6px}.mi-chart svg{display:block;width:100%;height:100%}.mi-chart text{font-size:10px;fill:#8faabd}
-.mi-tip{position:absolute;pointer-events:none;background:#263544;border:1px solid #4a5c6c;border-radius:4px;padding:4px 8px;font-size:12px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
+.mi-tip{position:absolute;pointer-events:none;background:#263544;border:1px solid #4a5c6c;border-radius:4px;padding:4px 8px;font-size:12px;width:max-content;max-width:calc(100% - 4px);box-sizing:border-box;display:none}
 .mi-legend{display:flex;gap:16px;font-size:12px;color:#a9bdce;margin-top:6px}.mi-legend i{display:inline-block;width:12px;height:3px;margin-right:6px;vertical-align:middle}
 .mi-camera{margin:16px 0 4px;background:#000;border-radius:6px;overflow:hidden}.mi-camera img{display:block;width:100%;max-height:70vh;object-fit:contain}
 .mi-empty{display:grid;place-items:center;height:100%;color:#8faabd;font-size:13px;padding:0 20px;text-align:center}.mi-list{margin-top:12px;max-height:180px;overflow:auto;font-size:13px}.mi-list div{display:flex;justify-content:space-between;padding:6px 2px;border-bottom:1px solid #314151}
@@ -413,9 +413,14 @@ export function setupMoreInfo({ callWS, getHass }: Options): void {
             cursor.setAttribute('x2', String(px));
             cursor.setAttribute('visibility', 'visible');
             tip.style.display = 'block';
-            tip.style.left = `${ev.clientX - box.left}px`;
-            tip.style.top = `${ev.clientY - box.top}px`;
             tip.innerHTML = `${dateFmt(t, true)} · ${values.join(' · ')}`;
+            // above the pointer, but inside the chart: at its edge the tip would widen the dialog (a scroll bar)
+            const x = ev.clientX - box.left;
+            const y = ev.clientY - box.top;
+            const w = tip.offsetWidth;
+            const h = tip.offsetHeight;
+            tip.style.left = `${Math.max(2, Math.min(box.width - w - 2, x - w / 2))}px`;
+            tip.style.top = `${y - h - 8 >= 2 ? y - h - 8 : y + 16}px`;
         };
         chart.onpointerleave = () => {
             cursor.setAttribute('visibility', 'hidden');
