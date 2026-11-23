@@ -55,6 +55,7 @@ the states to switch them, and write permission on files to save floor plans.
 ### **WORK IN PROGRESS**
 
 - Initial release
+- (bluefox) Leuchten: „Gerätetyp“ und „Datenpunkte des Geräts“ (Schalter, Dimmer, Farbe, Weißton) jetzt auch direkt bei der Leuchte unter „Licht oder Schalter“, nicht nur beim platzierten Gerät
 
 ## License
 
