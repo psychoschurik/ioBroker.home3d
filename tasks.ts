@@ -197,21 +197,84 @@ function wheelOverLabels(name: string, code: string): string {
     );
 }
 
+/** How much larger than upstream the cameras are drawn: a target the mouse hits easily (the beam starts at the lens). */
+const CAMERA_SCALE = 1.8;
+
 /**
  * A camera's field-of-view wedge starts at its lens, not on the floor under it: from there it falls to the floor it
  * sees, so the beam hangs at the camera instead of lying at another height (a wall camera at 1.8 m, its wedge on the
  * floor). Seen from above it stays the same wedge. Wall camera: the lens 0.1 m in front of the body, 0.055 m above
- * its mount height (pushCameraModel); dome: just under the ceiling.
+ * its mount height (pushCameraModel, both times CAMERA_SCALE); dome: just under the ceiling.
  */
 function cameraBeam(name: string, code: string): string {
     if (name !== 'viewer/viewer3d.ts') {
         return code;
     }
-    return replaceRequired(
+    const k = CAMERA_SCALE;
+    // the wall camera grows from its bracket at the wall (0.06 m behind its point), the dome from the ceiling down
+    const ahead = (-0.06 + (0.1 + 0.06) * k).toFixed(3);
+    code = replaceRequired(
         code,
         'const apex = [d.x, Math.max(groundAt(d.x, d.z), dome ? -Infinity : groundAt(d.x + dir[0] * 0.3, d.z + dir[1] * 0.3)), d.z];',
-        'const apex = dome ? [d.x, H - 0.07, d.z] : [d.x + dir[0] * 0.1, d.y + 0.055, d.z + dir[1] * 0.1];',
+        `const apex = dome ? [d.x, H - ${(0.07 * k).toFixed(3)}, d.z] : [d.x + dir[0] * ${ahead}, d.y + ${(0.055 * k).toFixed(3)}, d.z + dir[1] * ${ahead}];`,
         'camera beam from the lens',
+    );
+    // looking through it: the eye in front of the larger lens (0.15 m ahead of its point was inside the body now)
+    return replaceRequired(
+        code,
+        'target: new Vector3(d.x, y, d.z).addScaledVector(dir, 3.15), radius: 3,',
+        `target: new Vector3(d.x, y, d.z).addScaledVector(dir, ${(3 + 0.17 * k).toFixed(2)}), radius: 3,`,
+        'look through a camera in front of its lens',
+    );
+}
+
+/**
+ * The camera models CAMERA_SCALE times larger: the wall camera from its bracket at the wall into the room and up and
+ * down from its mount height, the dome from the ceiling down. A tap on the model opens the camera.
+ */
+function cameraSize(name: string, code: string): string {
+    if (name !== 'viewer/furniture.ts') {
+        return code;
+    }
+    return replaceRequired(
+        code,
+        [
+            '  if (model === "camera_ceiling") {',
+            '    // dome: a flat base and a half-dome below it',
+            '    b.cyl(0, 0, 0.07, y - 0.03, y, body, bodyTop, 12);',
+            '    b.loft([-0.05, 0.05, -0.05, 0.05], [-0.025, 0.025, -0.025, 0.025], y - 0.1, y - 0.03, lens, body);',
+            '    b.cyl(0, 0, 0.012, y - 0.075, y - 0.06, C.accent, C.accent, 6);',
+            '    return;',
+            '  }',
+            '  // wall camera: bracket at the wall (-z), body pointing into the room (+z), lens in front',
+            '  b.box(-0.02, 0.02, y - 0.02, y + 0.02, -0.06, -0.03, body, bodyTop);',
+            '  b.box(-0.01, 0.01, y - 0.01, y + 0.06, -0.05, -0.03, body, bodyTop);',
+            '  b.loft([-0.035, 0.035, -0.03, 0.09], [-0.04, 0.04, -0.03, 0.09], y + 0.02, y + 0.09, body, bodyTop);',
+            '  b.lyingCyl("z", 0, 0.1, y + 0.03, y + 0.08, 0.03, 0.05, lens, C.accent, 10);',
+            '  b.box(-0.006, 0.006, y + 0.075, y + 0.085, 0.085, 0.09, 0xff3b4f, 0xff3b4f);',
+            '}',
+        ].join('\n'),
+        [
+            `  // drawn ${CAMERA_SCALE} times the first size, an easier target: across (k), up and down from the mount (Y), from the wall (Z)`,
+            `  const k = ${CAMERA_SCALE};`,
+            '  const Y = (v: number) => y + v * k;',
+            '  const Z = (v: number) => -0.06 + (v + 0.06) * k;',
+            '  if (model === "camera_ceiling") {',
+            '    // dome: a flat base and a half-dome below it',
+            '    b.cyl(0, 0, 0.07 * k, Y(-0.03), y, body, bodyTop, 12);',
+            '    b.loft([-0.05 * k, 0.05 * k, -0.05 * k, 0.05 * k], [-0.025 * k, 0.025 * k, -0.025 * k, 0.025 * k], Y(-0.1), Y(-0.03), lens, body);',
+            '    b.cyl(0, 0, 0.012 * k, Y(-0.075), Y(-0.06), C.accent, C.accent, 6);',
+            '    return;',
+            '  }',
+            '  // wall camera: bracket at the wall (-z), body pointing into the room (+z), lens in front',
+            '  b.box(-0.02 * k, 0.02 * k, Y(-0.02), Y(0.02), Z(-0.06), Z(-0.03), body, bodyTop);',
+            '  b.box(-0.01 * k, 0.01 * k, Y(-0.01), Y(0.06), Z(-0.05), Z(-0.03), body, bodyTop);',
+            '  b.loft([-0.035 * k, 0.035 * k, Z(-0.03), Z(0.09)], [-0.04 * k, 0.04 * k, Z(-0.03), Z(0.09)], Y(0.02), Y(0.09), body, bodyTop);',
+            '  b.lyingCyl("z", 0, Z(0.1), Y(0.03), Y(0.08), 0.03 * k, 0.05 * k, lens, C.accent, 10);',
+            '  b.box(-0.006 * k, 0.006 * k, Y(0.075), Y(0.085), Z(0.085), Z(0.09), 0xff3b4f, 0xff3b4f);',
+            '}',
+        ].join('\n'),
+        'larger cameras',
     );
 }
 
@@ -9260,6 +9323,7 @@ const patches: Plugin = {
         code = wheelOverLabels(name, code);
         code = panHint(name, code);
         code = cameraBeam(name, code);
+        code = cameraSize(name, code);
         code = sensorLook(name, code);
         code = editorDevices(name, code);
         code = markerLooks(name, code);
