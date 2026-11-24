@@ -332,6 +332,30 @@ export function setupDatapoints(o: DatapointOptions): void {
     });
 
     // the editor's device list of a room: new devices from datapoints, placed in the room
+    // the editor's picture rules: the datapoint whose value is the picture (a slide show), as a device of the plan
+    window.addEventListener('iobroker-pick-entity', ev => {
+        const detail = (ev as CustomEvent<{ entityId?: string | null; done?: (id: string) => void }>).detail ?? {};
+        void (async () => {
+            const mappings = strip((await o.callWS({ type: 'iobroker/mappings/get' })) as Mapping[]);
+            const current = mappings.find(m => m.entity_id === detail.entityId)?.state ?? null;
+            const id = await pickOne(o, current, t('picture_datapoint'));
+            if (!id) {
+                return;
+            }
+            const known = new Map(mappings.map(m => [m.state, m.entity_id]));
+            const { added, byId } = await devicesOf(o.io, [id], known);
+            const entityId = byId.get(id);
+            if (!entityId) {
+                throw new Error(t('not_datapoint', { id }));
+            }
+            if (added.length) {
+                await o.callWS({ type: 'iobroker/mappings/set', mappings: [...mappings, ...added] });
+                await o.refresh();
+            }
+            detail.done?.(entityId);
+        })().catch(fail);
+    });
+
     window.addEventListener('iobroker-add-devices', ev => {
         const done = (ev as CustomEvent<{ done?: (ids: string[]) => void }>).detail?.done;
         void (async () => {

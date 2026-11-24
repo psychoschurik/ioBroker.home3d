@@ -10,6 +10,7 @@ import { setupMoreInfo } from './more-info.js';
 import { joinBars, placeStatus } from './shell.js';
 import { setupShow } from './show.js';
 import { Assistant, type RunMessage } from './assistant.js';
+import { Albums } from './albums.js';
 import { setupDeviceDialog } from './device-dialog.js';
 import { pickDatapoint, setupDatapoints } from './datapoint.js';
 import { IoBroker, NAMESPACE } from './iobroker.js';
@@ -79,6 +80,20 @@ const assistant = new Assistant(
     () => language,
     id => areas[id]?.name ?? null,
 );
+// the albums of the adapter screensaver: pictures of wall pictures and screens
+const albums = new Albums({
+    instances: async () =>
+        (await io.conn.getAdapterInstances('screensaver').catch(() => []))
+            .filter(o => o?.common?.enabled)
+            .map(o => o._id.replace(/^system\.adapter\./, '')),
+    sendTo: <T>(instance: string, command: string, message: unknown): Promise<T | null> => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        return Promise.race([
+            io.conn.sendTo<T>(instance, command, message),
+            new Promise<null>(resolve => (timer = setTimeout(() => resolve(null), 20_000))),
+        ]).finally(() => clearTimeout(timer));
+    },
+});
 io.conn.registerConnectionHandler(connected => {
     if (!connected) {
         setStatus(t('offline'));
@@ -115,6 +130,13 @@ const callWS: CallWS = msg => {
     if (msg?.type === 'energy/get_prefs') {
         // ioBroker has no energy dashboard: the editor's proposals find nothing, the sensors are chosen by hand
         return Promise.resolve({ energy_sources: [] });
+    }
+    if (msg?.type === 'iobroker/albums/list') {
+        return albums.list();
+    }
+    if (msg?.type === 'iobroker/album/current') {
+        const album = (msg as { album?: unknown }).album;
+        return albums.current(typeof album === 'string' ? album : '');
     }
     if (msg?.type === 'home3d/timetravel/history') {
         return timeTravelHistory(io, store.data.mappings, msg, place(), preferredHistory());

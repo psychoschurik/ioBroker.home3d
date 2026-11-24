@@ -29,6 +29,7 @@ import {
 } from './project.js';
 import { t } from './lang.js';
 import { MODEL_EXTS, MODEL_MAX_BYTES, modelSize, type ModelInfo } from './vendor-ext/model-files.js';
+import { WALL_PICTURE_PACK } from './vendor-ext/wall-picture.js';
 
 declare const __HOME3D_VERSION__: string | undefined;
 const version = typeof __HOME3D_VERSION__ === 'string' ? __HOME3D_VERSION__ : 'dev';
@@ -864,7 +865,8 @@ export class Store {
                 });
             }
             case 'packs/list':
-                return { packs: [] };
+                // no packs to import here; the one built into the page brings the wall pictures
+                return { packs: [WALL_PICTURE_PACK] };
             case 'license/get':
                 return {
                     instance: 'iobroker',

@@ -148,6 +148,11 @@ export const TEXTS = {
     error: { de: 'Fehler · {error}', en: 'Error · {error}', ru: 'Ошибка · {error}' },
     // datapoints chosen in the editor
     datapoint_for: { de: 'Datenpunkt für {name}', en: 'Datapoint for {name}', ru: 'Точка данных для {name}' },
+    picture_datapoint: {
+        de: 'Datenpunkt mit dem Bild (z. B. slideshow.0.picture)',
+        en: 'Datapoint with the picture (e.g. slideshow.0.picture)',
+        ru: 'Точка данных с изображением (например, slideshow.0.picture)',
+    },
     not_datapoint: {
         de: '{id} ist kein Datenpunkt.',
         en: '{id} is no datapoint.',

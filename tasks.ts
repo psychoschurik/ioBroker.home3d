@@ -6499,6 +6499,211 @@ function parkingTimeTravel(name: string, code: string): string {
     return code;
 }
 
+/**
+ * The wall picture (pack `home3d`, frontend/vendor-ext/wall-picture.ts) and pictures from ioBroker: a screen's
+ * picture rule may have no entity ("Immer"); its image may be an album of the adapter screensaver as a slide show
+ * (`album:screensaver.0/<album>`, frontend/albums.ts in the bridge) or the picture an entity's value gives
+ * (`state:<entity>`, chosen in the object browser: `iobroker-pick-entity`, datapoint.ts). A TV with the rule "off"
+ * shows the album while it is off.
+ */
+function wallPicture(name: string, code: string): string {
+    const imports = `import { albumOptions as fp3dAlbumOptions, albumPicture as fp3dAlbumPicture, ALBUM_PICTURE as FP3D_ALBUM, pictureOfState as fp3dPictureOfState, STATE_PICTURE as FP3D_STATE } from "${root}/frontend/vendor-ext/wall-picture.ts";\n`;
+    if (name === 'devices.ts') {
+        code = replaceRequired(
+            code,
+            'export function pictureRuleMatches(hass: HomeAssistant, rule: { entity: string; attribute?: string | null; state: string }): boolean {\n',
+            [
+                'export function pictureRuleMatches(hass: HomeAssistant, rule: { entity: string; attribute?: string | null; state: string }): boolean {',
+                "  // without an entity: always (a wall picture's own picture)",
+                '  if (!rule.entity) return true;',
+                '',
+            ].join('\n'),
+            'wall picture: a rule without an entity',
+        );
+        // a wall picture has a screen for its pictures, but it is no TV: its link is any device, not a media player
+        code = replaceRequired(
+            code,
+            '  return MEDIA_FURNITURE.has(type) || !!packScreen(type);',
+            '  return MEDIA_FURNITURE.has(type) || (!!packScreen(type) && !type.startsWith("pack:home3d:"));',
+            'wall picture: not a TV',
+        );
+        code = replaceRequired(
+            code,
+            '  return isMediaFurniture(type) || type === "desk" || type === "fridge_smart";',
+            '  return isMediaFurniture(type) || type === "desk" || type === "fridge_smart" || type.startsWith("pack:home3d:");',
+            'wall picture: a screen',
+        );
+    }
+    if (name === 'watched.ts') {
+        code = replaceRequired(
+            code,
+            '(m.pictures ?? []).flatMap((r) => [r.entity, ...(r.image.startsWith("camera:") ? [r.image.slice(7)] : [])])',
+            '(m.pictures ?? []).flatMap((r) => [...(r.entity ? [r.entity] : []), ...(r.image.startsWith("camera:") ? [r.image.slice(7)] : []), ...(r.image.startsWith("state:") ? [r.image.slice(6)] : [])])',
+            'wall picture: the datapoint of a picture is watched',
+        );
+    }
+    if (name === 'components/view3d.ts') {
+        code = imports + code;
+        code = replaceRequired(
+            code,
+            '  private pictureUrl(image: string): string | null {\n',
+            [
+                '  private pictureUrl(image: string): string | null {',
+                '    // the picture a datapoint holds (a slide show): it changes with its value',
+                '    if (image.startsWith(FP3D_STATE)) return fp3dPictureOfState(this.hass.states[image.slice(FP3D_STATE.length)]?.state);',
+                '    // an album of the adapter screensaver: a slide show, the next picture draws the view again',
+                '    if (image.startsWith(FP3D_ALBUM)) return fp3dAlbumPicture((m) => this.hass.callWS(m), image.slice(FP3D_ALBUM.length), () => this.syncDevices(true));',
+                '',
+            ].join('\n'),
+            'wall picture: the picture of a datapoint',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = imports + code;
+        code = replaceRequired(
+            code,
+            '!r.image.startsWith("camera:") && !ids.includes(r.image)',
+            '!r.image.startsWith("camera:") && !r.image.startsWith(FP3D_STATE) && !r.image.startsWith(FP3D_ALBUM) && !ids.includes(r.image)',
+            'wall picture: not a stored picture',
+        );
+        code = replaceRequired(
+            code,
+            '    const cameraOf = (r: ScreenPicture) => (r.image.startsWith("camera:") ? r.image.slice(7) : null);\n',
+            [
+                '    const cameraOf = (r: ScreenPicture) => (r.image.startsWith("camera:") ? r.image.slice(7) : null);',
+                '    const fp3dStateOf = (r: ScreenPicture) => (r.image.startsWith(FP3D_STATE) ? r.image.slice(FP3D_STATE.length) : null);',
+                '    const fp3dSources = this.entityOptions((id) => !id.startsWith("camera."));',
+                '    const fp3dStatePic = (r: ScreenPicture) => (fp3dStateOf(r) ? fp3dPictureOfState(this.hass?.states[fp3dStateOf(r)!]?.state) : null);',
+                '    const fp3dAsk = (m: { type: string; [key: string]: unknown }) => (this.hass ? this.hass.callWS(m) : Promise.reject(new Error("no connection")));',
+                '    const fp3dAlbums = fp3dAlbumOptions(fp3dAsk, () => this.requestUpdate());',
+                '    const fp3dAlbumOf = (r: ScreenPicture) => (r.image.startsWith(FP3D_ALBUM) ? r.image.slice(FP3D_ALBUM.length) : null);',
+                '    const fp3dAlbumPic = (r: ScreenPicture) => (fp3dAlbumOf(r) ? fp3dAlbumPicture(fp3dAsk, fp3dAlbumOf(r)!, () => this.requestUpdate()) : null);',
+                '',
+            ].join('\n'),
+            "wall picture: the rule's datapoint",
+        );
+        code = replaceRequired(
+            code,
+            '          <fp3d-entity-picker\n            .options=${entities}\n            .value=${g.entity}\n',
+            '          <fp3d-entity-picker\n            .options=${entities}\n            .fixed=${[{ id: "", label: this.t("picture_always") }]}\n            .value=${g.entity}\n',
+            'wall picture: "always" as the rule\'s entity',
+        );
+        // "always": no state or attribute to compare
+        code = replaceRequired(
+            code,
+            '          <select\n            ?disabled=${!admin}\n            title=${this.t("picture_attribute")}\n',
+            '          ${g.entity ? html`<select\n            ?disabled=${!admin}\n            title=${this.t("picture_attribute")}\n',
+            'wall picture: no attribute without an entity (start)',
+        );
+        code = replaceRequired(
+            code,
+            '          <span class="fp3d-sub fp3d-rule-now">${this.t("picture_current", { value: current(g.entity, g.attribute) || "–" })}</span>',
+            '          <span class="fp3d-sub fp3d-rule-now">${this.t("picture_current", { value: current(g.entity, g.attribute) || "–" })}</span>` : nothing}',
+            'wall picture: no attribute without an entity (end)',
+        );
+        code = replaceRequired(
+            code,
+            '                : nothing}\n              <span class="fp3d-sub">${hit ? this.t("picture_matches") : ""}</span>',
+            [
+                '                : nothing}',
+                '              ${fp3dStatePic(r) ? html`<img class="fp3d-picture-thumb" src=${fp3dStatePic(r)!} alt="" />` : nothing}',
+                '              ${fp3dAlbumPic(r) ? html`<img class="fp3d-picture-thumb" src=${fp3dAlbumPic(r)!} alt="" />` : nothing}',
+                '              ${fp3dAlbums.length || fp3dAlbumOf(r)',
+                '                ? html`<select',
+                '                    class="fp3d-picture-album"',
+                '                    title=${this.t("picture_album")}',
+                '                    ?disabled=${!admin}',
+                '                    @change=${(e: Event) => {',
+                '                      const v = (e.target as HTMLSelectElement).value;',
+                '                      if (v) patchRow(i, { image: `${FP3D_ALBUM}${v}` });',
+                '                      else if (fp3dAlbumOf(r)) patchRow(i, { image: "" });',
+                '                    }}',
+                '                  >',
+                '                    <option value="" ?selected=${!fp3dAlbumOf(r)}>${this.t("picture_album")}</option>',
+                '                    ${fp3dAlbumOf(r) && !fp3dAlbums.some((a) => a.id === fp3dAlbumOf(r)) ? html`<option value=${fp3dAlbumOf(r)!} selected>${fp3dAlbumOf(r)}</option>` : nothing}',
+                '                    ${fp3dAlbums.map((a) => html`<option value=${a.id} ?selected=${a.id === fp3dAlbumOf(r)}>${a.label}</option>`)}',
+                '                  </select>`',
+                '                : nothing}',
+                '              <fp3d-entity-picker',
+                '                class="fp3d-picture-camera"',
+                '                .options=${fp3dSources}',
+                '                .fixed=${[{ id: "none", label: this.t("picture_state_none") }]}',
+                '                .value=${fp3dStateOf(r) ?? "none"}',
+                '                .placeholder=${this.t("picture_state_src")}',
+                '                ?disabled=${!admin}',
+                '                @change=${(e: CustomEvent<{ value: string }>) => {',
+                '                  e.stopPropagation();',
+                '                  if (e.detail.value !== "none") patchRow(i, { image: `${FP3D_STATE}${e.detail.value}` });',
+                '                  else if (fp3dStateOf(r)) patchRow(i, { image: "" });',
+                '                }}',
+                '              ></fp3d-entity-picker>',
+                '              <button',
+                '                class="fp3d-btn"',
+                '                ?disabled=${!admin}',
+                '                title=${this.t("picture_state_pick")}',
+                '                @click=${() =>',
+                '                  window.dispatchEvent(',
+                '                    new CustomEvent("iobroker-pick-entity", { detail: { entityId: fp3dStateOf(r), done: (id: string) => patchRow(i, { image: `${FP3D_STATE}${id}` }) } }),',
+                '                  )}',
+                '              >',
+                '                ioBroker …',
+                '              </button>',
+                '              <span class="fp3d-sub">${hit ? this.t("picture_matches") : ""}</span>',
+            ].join('\n'),
+            'wall picture: a picture from a datapoint',
+        );
+        code = replaceRequired(
+            code,
+            'set([...rules, { entity: entities[0]?.id ?? "", attribute: null, state: "on", image: "" }])',
+            'set([...rules, f.type.startsWith("pack:home3d:") && !rules.length ? { entity: "", attribute: null, state: "*", image: "" } : { entity: entities[0]?.id ?? "", attribute: null, state: "on", image: "" }])',
+            'wall picture: its first rule is "always"',
+        );
+        code = replaceRequired(
+            code,
+            '      <p class="fp3d-sub">${this.t("screen_pictures_hint")}</p>',
+            '      <p class="fp3d-sub">${this.t("screen_pictures_hint")}</p>\n      <p class="fp3d-sub">${this.t("picture_state_hint")}</p>',
+            'wall picture: the hint',
+        );
+        code = replaceRequired(
+            code,
+            '      .fp3d-picture-row.fp3d-rule-hit {',
+            '      .fp3d-picture-row > .fp3d-picture-album {\n        grid-column: 1 / -1;\n        min-width: 0;\n      }\n      .fp3d-picture-row.fp3d-rule-hit {',
+            'wall picture: the album select',
+        );
+    }
+    if (name === 'i18n.ts') {
+        code = replaceRequired(
+            code,
+            '  picture_current: "aktuell: {value}",',
+            [
+                '  picture_current: "aktuell: {value}",',
+                '  picture_always: "Immer (ohne Gerät)",',
+                '  picture_state_src: "oder Bild aus Datenpunkt …",',
+                '  picture_state_none: "Kein Datenpunkt",',
+                '  picture_state_pick: "Datenpunkt in ioBroker wählen",',
+                '  picture_album: "oder Album des Screensavers (Diashow) …",',
+                '  picture_state_hint: "„Immer (ohne Gerät)“ zeigt das Bild ohne Bedingung – ein bestimmtes Bild an der Wand. Ein Album des Adapters Screensaver läuft als Diashow (alle 15 Sekunden ein neues Bild); mit dem Wert „off“ des Fernsehers zeigt ein ausgeschalteter Fernseher die Diashow. Ein Bild aus einem Datenpunkt folgt dessen Wert: eine Bild-URL, ein Pfad in den ioBroker-Dateien oder das Bild selbst als Base64.",',
+            ].join('\n'),
+            'wall picture: de',
+        );
+        code = replaceRequired(
+            code,
+            '  picture_current: "now: {value}",',
+            [
+                '  picture_current: "now: {value}",',
+                '  picture_always: "Always (no device)",',
+                '  picture_state_src: "or a picture from a datapoint …",',
+                '  picture_state_none: "No datapoint",',
+                '  picture_state_pick: "Choose a datapoint in ioBroker",',
+                '  picture_album: "or an album of the screensaver (slide show) …",',
+                '  picture_state_hint: "“Always (no device)” shows the picture without a condition – one picture on the wall. An album of the adapter screensaver runs as a slide show (a new picture every 15 seconds); with the TV’s value “off” a TV that is off shows the slide show. A picture from a datapoint follows its value: a picture URL, a path in the ioBroker files or the picture itself as base64.",',
+            ].join('\n'),
+            'wall picture: en',
+        );
+    }
+    return code;
+}
+
 function gasBottle(name: string, code: string): string {
     if (name === 'library-index.ts') {
         code = replaceRequired(
@@ -9551,6 +9756,7 @@ const patches: Plugin = {
         code = findDevice(name, code);
         code = mediaMute(name, code);
         code = ownModels(name, code);
+        code = wallPicture(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
