@@ -60,7 +60,7 @@ the states to switch them, and write permission on files to save floor plans.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.6.0 (2026-11-25)
 
 - (bluefox) Mehrere Projekte wie in vis-2 (z. B. Haus und Boot), jedes mit eigenen Grundrissen, Bildern, 3D-Modellen, Geräten und Einstellungen: im Editor unter „Projekte“ öffnen, anlegen, umbenennen, duplizieren, löschen, als Datei exportieren und als neues Projekt importieren; geöffnet über `index.html?project=<id>` (auch mit `?kiosk` und `?view=card`); die Dateien jedes Projekts liegen in `home3d.0/<id>/`, die des Standardprojekts in `home3d.0/default/`
 
