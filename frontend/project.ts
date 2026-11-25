@@ -1,6 +1,7 @@
-// Export and import of a project: one floor plan with its pictures and the ioBroker datapoints of its devices.
-// The file is an export file of the 3D frontend (`format: "home3d"`) with an `iobroker` part, so the plan import of
-// the editor still reads its building; our import also takes plain export files of the 3D frontend.
+// Export and import of a floor plan file: one floor plan with its pictures and the ioBroker datapoints of its devices,
+// imported as a new floor plan of the open project (a whole project is a backup file, see projects.ts). The file is an
+// export file of the 3D frontend (`format: "home3d"`) with an `iobroker` part, so the plan import of the editor still
+// reads its building; our import also takes plain export files of the 3D frontend.
 import type { Building, Mapping, ModelEntry, ProtocolRecord } from './model.js';
 import { t } from './lang.js';
 import { MODEL_EXTS, modelSize } from './vendor-ext/model-files.js';
@@ -203,7 +204,7 @@ export function freeEntityId(id: string, taken: Set<string>): string {
     }
 }
 
-/** A file name from a plan name: `home3d-projekt-<name>-<date>.json`. */
+/** A file name from a plan name: `home3d-plan-<name>-<date>.json`. */
 export function projectFileName(name: string | null, date = new Date()): string {
     const slug =
         (name || 'grundriss')
@@ -216,5 +217,5 @@ export function projectFileName(name: string | null, date = new Date()): string 
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-+|-+$/g, '')
             .slice(0, 40) || 'grundriss';
-    return `home3d-projekt-${slug}-${date.toISOString().slice(0, 10)}.json`;
+    return `home3d-plan-${slug}-${date.toISOString().slice(0, 10)}.json`;
 }

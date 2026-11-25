@@ -8,7 +8,7 @@ import { t } from '../lang.js';
 
 export type { ProjectContext };
 
-/** The dialog "Projekte": export and import of floor plans with pictures and devices. */
+/** The dialog "Projekte": the projects (open, create, export, import …) and the floor plan files of the open one. */
 export async function openProjects(ctx: ProjectContext): Promise<void> {
     await show(ctx.language, close => (
         <ProjectsDialog

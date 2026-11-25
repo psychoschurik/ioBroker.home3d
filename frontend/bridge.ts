@@ -8,13 +8,22 @@ import { historyDuringPeriod, historyEnabled, statisticsDuringPeriod, timeTravel
 import { parsePosition, sunState } from './sun.js';
 import { setupMoreInfo } from './more-info.js';
 import { joinBars, placeStatus } from './shell.js';
-import { setupShow } from './show.js';
+import { forgetPlaces, setupShow } from './show.js';
 import { Assistant, type RunMessage } from './assistant.js';
 import { Albums } from './albums.js';
 import { setupDeviceDialog } from './device-dialog.js';
 import { pickDatapoint, setupDatapoints } from './datapoint.js';
 import { IoBroker, NAMESPACE } from './iobroker.js';
 import { Store, mappedIds, DATA_FILE } from './store.js';
+import {
+    DEFAULT_PROJECT,
+    Projects,
+    inFolder,
+    projectFolder,
+    projectFromUrl,
+    projectLabel,
+    projectLink,
+} from './projects.js';
 import { entities } from './entities.js';
 import { findHealth, healthAttributes, healthStateIds, type HealthIds } from './health.js';
 import { lang, setLanguage, t, translatePage } from './lang.js';
@@ -59,11 +68,6 @@ function setStatus(text: string, ok = false): void {
     $('status').textContent = text;
     placeStatus($('status'), ok);
 }
-/** The frame in the page's language; the help in it too (German: help.html). */
-function showLanguage(): void {
-    translatePage();
-    $('help-link').setAttribute('href', lang() === 'de' ? 'help.html' : `help-${lang()}.html`);
-}
 // until the system's language is known: the one of the last visit, else the browser's
 let lastLanguage: string | null = null;
 try {
@@ -72,9 +76,44 @@ try {
     // no storage: the browser's language
 }
 setLanguage(lastLanguage || navigator.language);
-showLanguage();
+// The project of this page (?project=<id>, missing: the default project): its own floor plans, devices and settings
+// in its folder of home3d.0. Another project is another page load.
+// (a bad ID: the default project's folder is never read, start() reports it in the system's language)
+let project = DEFAULT_PROJECT,
+    badProject = false;
+try {
+    project = projectFromUrl(location.search);
+} catch {
+    badProject = true;
+}
+const folder = projectFolder(project);
+// the 3D view keeps a draft and the plan last shown per project (frontend/vendor-ext/project-key.ts)
+document.documentElement.dataset.project = project;
+if (project !== DEFAULT_PROJECT) {
+    $('home-link').setAttribute('href', projectLink(project));
+    $('kiosk-link').setAttribute('href', projectLink(project, { kiosk: '' }));
+}
 const io = new IoBroker();
-const store = new Store(io, io, () => io.legacy());
+// the state of 0.4.0 belongs to the default project
+const store = new Store(io, inFolder(io, folder), project === DEFAULT_PROJECT ? () => io.legacy() : undefined);
+const projects = new Projects(io, io);
+/** The frame in the page's language; the help in it too (German: help.html). */
+function showLanguage(): void {
+    translatePage();
+    $('help-link').setAttribute('href', lang() === 'de' ? 'help.html' : `help-${lang()}.html`);
+    showProject();
+}
+/** The open project's name in the title of the page and on the button "Projekte" (not for the unnamed default one). */
+function showProject(): void {
+    const name = store.data.name ?? null;
+    const named = project !== DEFAULT_PROJECT || !!name;
+    const label = projectLabel({ id: project, name });
+    document.title = named ? `${label} · ioBroker · 3D Home` : 'ioBroker · 3D Home';
+    const button = $('project-open');
+    button.textContent = named ? t('project_button', { name: label }) : t('projects');
+    button.title = named ? t('project_title_named', { name: label }) : t('projects_title');
+}
+showLanguage();
 const assistant = new Assistant(
     io,
     () => language,
@@ -323,6 +362,10 @@ store.onEvent((type, payload) => {
         void follow().catch(e => setStatus(t('error', { error: e.message })));
         return;
     }
+    if (type === 'iobroker/project') {
+        showProject();
+        return;
+    }
     for (const s of subscriptions) {
         if (s.msg.type !== type) {
             continue;
@@ -341,7 +384,10 @@ async function start(): Promise<void> {
     language = await io.language();
     setLanguage(language);
     showLanguage();
-    readOnly = new URLSearchParams(location.search).has('readonly') || !(await io.canWrite(DATA_FILE));
+    if (badProject) {
+        projectFromUrl(location.search);
+    }
+    readOnly = new URLSearchParams(location.search).has('readonly') || !(await io.canWrite(folder, DATA_FILE));
     store.readOnly = readOnly;
     if (readOnly) {
         document.documentElement.classList.add('kiosk', 'read-only');
@@ -349,20 +395,26 @@ async function start(): Promise<void> {
     systemPosition = await io.location();
     historyInstances = await io.historyInstances();
     recorderInstance = await io.recorderInstance();
-    await store.load();
+    if (!readOnly && project === DEFAULT_PROJECT) {
+        // the files of the time before project folders (at the root of home3d.0) become the default project
+        await projects.adoptRoot().catch(e => console.warn('[home3d] default project', e));
+    }
+    // only the default project is created on the first start; another one is made in the dialog "Projekte"
+    await store.load(project === DEFAULT_PROJECT);
+    showProject();
     areas = await store.areas();
     await follow();
     // Changes from other browsers: data.json is written on every save.
     let pending: ReturnType<typeof setTimeout> | undefined;
     await io.conn
-        .subscribeFiles(NAMESPACE, DATA_FILE, () => {
+        .subscribeFiles(NAMESPACE, `${folder}/${DATA_FILE}`, () => {
             clearTimeout(pending);
             pending = setTimeout(() => void store.sync().catch(() => {}), 300);
         })
         .catch(e => console.warn('[home3d] subscribeFiles', e));
     render();
     // home3d.0.show: a voice assistant or a script tells the 3D view what to show
-    setupShow(io, store, () => (element?.localName === 'home3d-panel' ? element : undefined));
+    setupShow(io, store, () => (element?.localName === 'home3d-panel' ? element : undefined), project);
     // the sun moves on
     setInterval(schedule, 60_000);
 }
@@ -386,11 +438,21 @@ setupDeviceDialog({
     socket: io.conn,
     getLanguage: () => language,
 });
-// Projekte: export and import of floor plans with pictures and devices (React, loaded on demand)
+// Projekte: the projects (open, create, export, import …) and the floor plan files (React, loaded on demand)
 $('project-open').onclick = async () => {
     try {
         const { openProjects } = await import('./react/index.js');
-        await openProjects({ callWS, socket: io.conn, language, namespace: NAMESPACE });
+        await openProjects({
+            callWS,
+            socket: io.conn,
+            language,
+            namespace: NAMESPACE,
+            project,
+            projects,
+            // a new page load: the editor saves as it goes (and keeps a draft per project)
+            open: id => location.assign(projectLink(id)),
+            forget: id => forgetPlaces(io, id),
+        });
     } catch (e) {
         setStatus(t('error', { error: (e as Error).message }));
     }

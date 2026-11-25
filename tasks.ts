@@ -6500,6 +6500,56 @@ function parkingTimeTravel(name: string, code: string): string {
 }
 
 /**
+ * Several projects (frontend/projects.ts): what this browser keeps of a floor plan is kept per project, since plan IDs
+ * (`main`) repeat in every project: the unsaved edits (draft) and the plan last shown. The default project keeps the keys
+ * it always had (frontend/vendor-ext/project-key.ts). The editor's "Kiosk ↗" opens the plan in the open project.
+ */
+function projectKeys(name: string, code: string): string {
+    const imports = `import { openProject as fp3dOpenProject, projectKey as fp3dProjectKey, projectParam as fp3dProjectParam } from "${root}/frontend/vendor-ext/project-key.ts";\n`;
+    if (name === 'components/editor.ts') {
+        // patched by kioskMode before
+        code = replaceRequired(
+            code,
+            'window.open(`index.html?kiosk${this.planId',
+            'window.open(`index.html?kiosk${fp3dProjectParam()}${this.planId',
+            'projects: kiosk of the plan',
+        );
+        code = imports + code;
+    }
+    if (name === 'building-controller.ts') {
+        code = replaceRequired(
+            code,
+            'export const draftKey = (plan: string) => (plan === MAIN_PLAN ? DRAFT_KEY : `${DRAFT_KEY}.${plan}`);',
+            'export const draftKey = (plan: string) => fp3dProjectKey(plan === MAIN_PLAN ? DRAFT_KEY : `${DRAFT_KEY}.${plan}`);',
+            'projects: draft key',
+        );
+        code = replaceRequired(
+            code,
+            '(plan === MAIN_PLAN ? localStorage.getItem(LEGACY_DRAFT_KEY) : null)',
+            '(plan === MAIN_PLAN && fp3dOpenProject() === "default" ? localStorage.getItem(LEGACY_DRAFT_KEY) : null)',
+            'projects: legacy draft only in the default project',
+        );
+        code = imports + code;
+    }
+    if (name === 'panel.ts') {
+        code = replaceRequired(
+            code,
+            '.get("plan") ?? prefs.get("plan"));',
+            '.get("plan") ?? prefs.get(fp3dProjectKey("plan")));',
+            'projects: plan last shown',
+        );
+        code = replaceRequired(
+            code,
+            '    prefs.set("plan", plan);',
+            '    prefs.set(fp3dProjectKey("plan"), plan);',
+            'projects: plan shown',
+        );
+        code = imports + code;
+    }
+    return code;
+}
+
+/**
  * The wall picture (pack `home3d`, frontend/vendor-ext/wall-picture.ts) and pictures from ioBroker: a screen's
  * picture rule may have no entity ("Immer"); its image may be an album of the adapter screensaver as a slide show
  * (`album:screensaver.0/<album>`, frontend/albums.ts in the bridge) or the picture an entity's value gives
@@ -9757,6 +9807,7 @@ const patches: Plugin = {
         code = mediaMute(name, code);
         code = ownModels(name, code);
         code = wallPicture(name, code);
+        code = projectKeys(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(

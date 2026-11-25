@@ -33,5 +33,5 @@ test('readProject takes project files, export files of the 3D frontend and bare 
 });
 test('free entity IDs and file names', () => {
     assert.equal(freeEntityId('light.a', new Set(['light.a', 'light.a_2'])), 'light.a_3');
-    assert.equal(projectFileName('Haus 2 Süd', new Date('2026-11-16T10:00:00Z')), 'home3d-projekt-haus-2-sued-2026-11-16.json');
+    assert.equal(projectFileName('Haus 2 Süd', new Date('2026-11-16T10:00:00Z')), 'home3d-plan-haus-2-sued-2026-11-16.json');
 });

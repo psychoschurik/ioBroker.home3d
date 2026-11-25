@@ -188,17 +188,57 @@ export class IoBroker implements IoAccess, FileAccess {
         return this.conn.getHistory(id, options);
     }
     /**
-     * Whether this user may change the project: write `data.json` of home3d.0, as the server evaluates the file's
-     * rights for the user. Not listed (no file yet): the server decides on the first save. Refused: read-only.
+     * Whether this user may change the project: write its `data.json` in `folder` of home3d.0 ('' for the main
+     * project), as the server evaluates the file's rights for the user. Not listed (no file yet): the server decides on
+     * the first save. Refused: read-only.
      */
-    async canWrite(file: string): Promise<boolean> {
+    async canWrite(folder: string, file: string): Promise<boolean> {
         try {
-            const entry = (await this.conn.readDir(NAMESPACE, '')).find(e => e.file === file);
+            const entry = (await this.conn.readDir(NAMESPACE, folder)).find(e => e.file === file);
             return entry?.acl?.write !== false;
         } catch (e) {
             // no folder yet: written on the first save; no right to list the files: read-only
             return notFound(e);
         }
+    }
+    // Folders of home3d.0, for the projects (projects.ts)
+    async list(folder: string): Promise<{ file: string; isDir: boolean }[]> {
+        try {
+            return (await this.conn.readDir(NAMESPACE, folder)).map(e => ({ file: e.file, isDir: !!e.isDir }));
+        } catch (e) {
+            if (notFound(e)) {
+                return [];
+            }
+            throw e;
+        }
+    }
+    removeFolder(folder: string): Promise<void> {
+        if (!folder) {
+            return Promise.reject(new Error('The root of the files stays.'));
+        }
+        return this.conn.deleteFolder(NAMESPACE, folder);
+    }
+    /** A copy of a file; JSON as text, since the server sends it encoded (file-text.ts). */
+    async copy(from: string, to: string): Promise<void> {
+        const r = await this.conn.readFile(NAMESPACE, from, true);
+        if (!r?.file) {
+            return;
+        }
+        if (/json/i.test(r.mimeType || '')) {
+            await this.writeText(to, fileText(r.file, r.mimeType));
+            return;
+        }
+        const raw = atob(r.file);
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) {
+            bytes[i] = raw.charCodeAt(i);
+        }
+        await this.writeBinary(to, bytes);
+    }
+    /** Copy and delete: a rename of the server may not create the target folder. */
+    async move(from: string, to: string): Promise<void> {
+        await this.copy(from, to);
+        await this.remove(from);
     }
     // Files of home3d.0
     async readText(name: string): Promise<string | null> {

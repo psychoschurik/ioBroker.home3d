@@ -169,6 +169,17 @@ function connect(): unknown {
             save();
             cb?.(null);
         },
+        // a project with everything in it (dialog "Projekte")
+        deleteFolder: (namespace: string, name: string, cb?: Callback) => {
+            const prefix = `${fileKey(namespace, name.replace(/^\/+|\/+$/g, ''))}/`;
+            for (const key of Object.keys(files)) {
+                if (key.startsWith(prefix)) {
+                    delete files[key];
+                }
+            }
+            save();
+            cb?.(null);
+        },
         fileExists: (namespace: string, name: string, cb: Callback) => cb(null, fileKey(namespace, name) in files),
         // the file browser of @iobroker/gui-components (dialog "Projekte")
         readDir: (namespace: string, path: string, cb: Callback) => {

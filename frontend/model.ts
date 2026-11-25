@@ -159,6 +159,8 @@ export interface Plan {
 /** Content of `data.json`. Snapshots are in `history/<plan>.json`, images in `images/`. */
 export interface StorageData {
     version: 2;
+    /** The project's name (null: none of its own; the default project then shows as "Standardprojekt"). */
+    name?: string | null;
     plans: Record<string, Plan>;
     /** image ID → file name below `images/` */
     images: Record<string, string>;

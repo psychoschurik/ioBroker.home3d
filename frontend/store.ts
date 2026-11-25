@@ -42,7 +42,12 @@ export function staleMinutes(v: unknown): number | null {
     const n = typeof v === 'string' && v.trim() ? Number(v) : v;
     return typeof n === 'number' && Number.isFinite(n) && n >= 1 && n <= 10080 ? Math.round(n) : null;
 }
+/** A project's name as it is stored: trimmed, at most 80 characters; null for none. */
+export function projectName(v: unknown): string | null {
+    return typeof v === 'string' && v.trim() ? v.trim().slice(0, 80) : null;
+}
 const MUTATING = new Set([
+    'iobroker/project/name',
     'iobroker/mappings/set',
     'iobroker/position/set',
     'iobroker/timetravel/set',
@@ -221,6 +226,7 @@ export class Store {
         }
         return {
             version: 2,
+            ...(projectName(d.name) ? { name: projectName(d.name) } : {}),
             plans: d.plans,
             images: d.images || {},
             mappings: Array.isArray(d.mappings) ? d.mappings : [],
@@ -236,13 +242,19 @@ export class Store {
     private async persist(): Promise<void> {
         await this.files.writeText(DATA_FILE, JSON.stringify(this.data));
     }
-    /** Loads `data.json`; on the first start it takes over the storage state of 0.4.0, if there is one. */
-    load(): Promise<void> {
+    /**
+     * Loads `data.json`; on the first start it takes over the storage state of 0.4.0, if there is one. `create` false:
+     * a missing file is an error (a project that is not there, e.g. a link to a deleted one), nothing is written.
+     */
+    load(create = true): Promise<void> {
         return this.serialize(async () => {
             const stored = await this.read();
             if (stored) {
                 this.data = stored;
                 return;
+            }
+            if (!create) {
+                error('not_found', t('project_missing'));
             }
             if (this.readOnly) {
                 // nothing to show yet, and nothing may be written
@@ -301,6 +313,9 @@ export class Store {
         }
         if (JSON.stringify(before.mappings) !== JSON.stringify(next.mappings)) {
             this.emit('iobroker/mappings', next.mappings);
+        }
+        if ((before.name ?? null) !== (next.name ?? null)) {
+            this.emit('iobroker/project', { name: next.name ?? null });
         }
     }
     list(): PlanList {
@@ -510,6 +525,10 @@ export class Store {
         };
         const plansChanged = (): void => this.emit('home3d/plans/subscribe', this.list());
         switch (type) {
+            case 'iobroker/project/name':
+                this.data.name = projectName(m.name);
+                this.emit('iobroker/project', { name: this.data.name });
+                return save({ name: this.data.name });
             case 'iobroker/mappings/get':
                 return this.data.mappings;
             case 'iobroker/discover': {
@@ -729,6 +748,13 @@ export class Store {
                     mappings: this.data.mappings.map(plainMapping),
                     // the files of own 3D objects
                     models: await this.exportModels(Object.keys(this.data.models ?? {})),
+                    // the project: its name and the house settings of ioBroker (taken over when imported as a project)
+                    name: this.data.name ?? null,
+                    settings: {
+                        position_id: this.data.position_id ?? null,
+                        timetravel_instance: this.data.timetravel_instance ?? null,
+                        health_stale_min: this.data.health_stale_min ?? null,
+                    },
                 };
             }
             case 'backup/import': {
@@ -764,6 +790,17 @@ export class Store {
                     }
                 }
                 const modelsFailed = await this.importModels(readModels(m.models));
+                // the house settings, only when asked (a project's import; the editor's restore keeps the current ones)
+                const settings = m.settings;
+                if (settings && typeof settings === 'object' && !Array.isArray(settings)) {
+                    const s = settings as ProtocolRecord;
+                    this.data.position_id = typeof s.position_id === 'string' && s.position_id ? s.position_id : null;
+                    this.data.timetravel_instance =
+                        typeof s.timetravel_instance === 'string' && INSTANCE.test(s.timetravel_instance)
+                            ? s.timetravel_instance
+                            : null;
+                    this.data.health_stale_min = staleMinutes(s.health_stale_min);
+                }
                 // backups without mappings (before 0.5.0) keep the current ones
                 const devices = Array.isArray(m.mappings) ? await this.importable(m.mappings) : null;
                 if (devices) {

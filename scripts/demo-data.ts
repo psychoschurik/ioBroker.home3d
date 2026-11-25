@@ -96,7 +96,8 @@ export async function demoData(file?: string): Promise<string> {
             'home3d.0': { type: 'meta', common: { name: '3D Home', type: 'meta.user' }, native: {} },
         },
         states: Object.fromEntries(Object.entries(house.values).map(([id, val]) => [id, { val }])),
-        files: { 'home3d.0/data.json': Buffer.from(JSON.stringify(data)).toString('base64') },
+        // the default project (frontend/projects.ts)
+        files: { 'home3d.0/default/data.json': Buffer.from(JSON.stringify(data)).toString('base64') },
     });
 }
 
