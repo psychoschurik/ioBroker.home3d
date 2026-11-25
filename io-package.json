@@ -1,148 +1,161 @@
 {
-    "common": {
-        "name": "home3d",
-        "version": "0.4.0",
-        "titleLang": {
-            "en": "3D Home",
-            "de": "3D Home",
-            "ru": "3D Home",
-            "pt": "3D Home",
-            "nl": "3D Home",
-            "fr": "3D Home",
-            "it": "3D Home",
-            "es": "3D Home",
-            "pl": "3D Home",
-            "uk": "3D Home",
-            "zh-cn": "3D Home"
+  "common": {
+    "name": "home3d",
+    "version": "0.5.0",
+    "titleLang": {
+      "en": "3D Home",
+      "de": "3D Home",
+      "ru": "3D Home",
+      "pt": "3D Home",
+      "nl": "3D Home",
+      "fr": "3D Home",
+      "it": "3D Home",
+      "es": "3D Home",
+      "pl": "3D Home",
+      "uk": "3D Home",
+      "zh-cn": "3D Home"
+    },
+    "desc": {
+      "en": "3D floor plan editor and live visualization, runs on the web adapter",
+      "de": "3D-Grundrisseditor und Live-Visualisierung, läuft im web-Adapter"
+    },
+    "news": {
+      "0.5.0": {
+        "en": "Leuchten: „Gerätetyp“ und „Datenpunkte des Geräts“ (Schalter, Dimmer, Farbe, Weißton) jetzt auch direkt bei der Leuchte unter „Licht oder Schalter“, nicht nur beim platzierten Gerät\nVerlaufsdiagramm im Detail-Dialog: Der Tooltip bleibt am Rand innerhalb des Diagramms, es erscheint keine Scrollleiste mehr\nNeues Möbel „Wandbild“ (Holzrahmen oder digitaler Bilderrahmen) unter Deko: ein bestimmtes Bild („Immer (ohne Gerät)“) oder ein Album des Adapters Screensaver als Diashow; Bildschirme (auch der Fernseher, Regel „off“) zeigen ebenfalls ein Album oder ein Bild aus einem Datenpunkt (URL, Pfad oder Base64)",
+        "de": "Leuchten: „Gerätetyp“ und „Datenpunkte des Geräts“ (Schalter, Dimmer, Farbe, Weißton) jetzt auch direkt bei der Leuchte unter „Licht oder Schalter“, nicht nur beim platzierten Gerät\nVerlaufsdiagramm im Detail-Dialog: The tooltip remains on rand within the diagram, it appears no scrollbar more\nNew Furniture „Wandbild“ (Holzrahmen oder digitaler Bilderrahmen) unter Deko: ein bestimmtes Bild („Immer (ohne Gerät)“) oder ein Album des Adapters Screensaver als Diashow; Screens (also the TV, rule „off“) zeigen ein Album oder ein Bild aus einem Datenpunkt (URL, Pfad oder Base64)",
+        "ru": "Leuchten: «Тип устройства» и «точка данных устройства» (коммутатор, диммер, цвет, белый цвет) jetzt auch также непосредственно в поле «Light or Schalter», nicht nur beim platzierten Gerät\nДиаграмма запуска в диалоговом окне «Подробности»: всплывающая подсказка находится в верхней части диаграмм, список прокрутки больше не отображается\nНовая мебель «Wandbild» (деревянная рамка или цифровая фоторамка) под демкой: лучшее изображение («Immer (без устройства)») или альбом адаптеров, заставка в виде диашоу; экран экрана (например, телевизор, правило «выключен»), отображение альбома или альбома или альбома Изображение из точки данных (URL-адрес, путь или Base64)",
+        "pt": "Leuchten: “Gerätetyp” und “Datenpunkte des Geräts” (Schalter, Dimmer, Farbe, Weißton) jetzt auch direkt bei der Leuchte unter “Licht oder Schalter”, nicht nur beim platzierten Gerät\nVerlaufsdiagramm im Detail-Dialog: Der Tooltip bleibt am Rand innerhalb des Diagramms, es erscheint keine Scrollleiste mehr\nNeues Möbel “Wandbild” oder ein Album des Adapters Screensaver als Diashow: ein bestimmtes Bild (“Immer (ohne Gerät)”) oder ein Album des Adapters Screensaver als Diashow; Bildschirme (auch der Television, Regel “off”) zeigen ebenzeigen cai em um álbum ou foto em um ponto de dados (URL, Pfad ou Base64)",
+        "nl": "Leuchten: „Gerätetyp” en „Datenpunkte des Geräts” (Schalter, Dimmer, Farbe, Weißton) jetzt auch direkt bei der Leuchte unter „Licht oder Schalter”, nicht nur beim platzierten Gerät\nVerlaufsdiagram im Detail-Dialog: De tooltip staat in de Rand innerhalb des Diagramms, es erscheint keine Scrollleiste meer\nNieuw model „Wandbild” (Holzrahmen oder digitaler Bilderrahmen) unter Deko: ein bestimmtes Bild („Immer (ohne Gerät)”) oder ein Album des Adapters Screensaver als Diashow; Bildschirme (auch der Fernseher, Regel „off”) zeigen ebenfalls ein Album oder ein Bild aus een datapunt (URL, Pfad of Base64)",
+        "fr": "Leuchten : « Gerätetyp » und « Datenpunkte des Geräts » (Schalter, Dimmer, Farbe, Weißton) jetzt auch direkt bei der Leuchte unter « Licht oder Schalter », nicht nur beim platzierten Gerät\nVerlaufsdiagramm im Detail-Dialog : Der Tooltip bleibt am Rand innerhalb des Diagramms, es erscheint keine Scrollleiste mehr\nNeues Möbel « Wandbild » (Holzrahmen oder digitaler Bilderrahmen) unter Deko : ein bestimmtes Bild (« Immer (ohne Gerät) ») oder ein Album des Adapters Screensaver als Diashow ; Bildschirme (auch der Fernseher, Regel « off ») zeigen ebenfalls ein Album oder une image d'un point de données (URL, Pfad ou Base64)",
+        "it": "Luci: «Tipo di dispositivo» e «Punto dati del dispositivo» (interruttore, dimmer, colore, bianco) ora anche direttamente sotto «Luce o interruttore», non solo su un dispositivo\nDiagramma di percorso in Detail-Dialog: Il tooltip rimane al centro del diagramma, non c'è più barra di scorrimento\nNuovo mobile «Wandbild» (cornice in legno o cornice digitale) su Deko: un'immagine fissa («Immer (senza dispositivo)») o un album degli adattatori salvaschermo come Diashow; schermo (auch der Fernseher, regola «off») mostra un Un album o un'immagine da un data point (URL, Pfad o Base64)",
+        "es": "Leuchten: «Gerätetyp» und «Datenpunkte des Geräts» (Schalter, Dimmer, Farbe, Weißton) jetzt auch direkt bei der Leuchte unter «Licht oder Schalter», nicht nur beim platzierten Gerät\nVerlaufsdiagramm im Detail-Dialog: Der Tooltip bleibt am Rand innerhalb des Diagramms, es erscheint keine Scrollleiste mehr\nNeues Möbel «Wandbild» (Holzrahmen oder Digitaler Bilderrahmen) unter Deko: ein bestimmtes Bild («Immer (ohne Gerät)») oder ein Album des Adapters Screensaver als Diashow; Bildschirme (auch der Fernseher, Regel «off») zeigen ebenfalls ein Album oder una imagen de un punto de datos (URL, Pfad o Base64)",
+        "pl": "Oświetlenie: „Typ urządzenia” i „Punkty danych urządzeń” (przełącznik, ściemniacz, kolor, biel) są teraz również bezpośrednio przy świeceniu pod „Oświetleniem lub przełącznikiem”, nie tylko przy urządzeniach płaskich\nWykres zwrotny w oknie dialogowym szczegółów: Podpowiedź narzędziowa mieści się w wewnętrznej części wykresów, nie zamienia listy przewijania więcej\nNowe meble „Obraz ścienny” (drewniane lub cyfrowe ramy obrazów) pod Deko: najlepszy obraz („Immer (bez urządzenia)”) lub album wygaszacza ekranu adaptera jako Diashow; Ekran obrazu (oprócz telewizora, reguła „wyłączona”) wyświetla dowolny album lub obraz z pliku Punkt (URL, Pfad lub Base64)",
+        "uk": "Світло: «Тип пристрою» та «Точки даних пристрою» (перемикач, диммер, колір, білий тон) тепер також безпосередньо біля світла в розділі «Світло або перемикач», а не лише на встановленому пристрої\nДіаграма відображення в діалоговому вікні подробиць: Підказка розташована на краю всередині діаграми, більше не відображає рядка прокрутки\nНові меблі «Настінний малюнок» (дерев'яні рамки або цифрові рамки зображень) під Деко: невизначене зображення («Завжди (без пристрою)») або альбом адаптерів Скрінзаставки як діашоу; екран (також телевізор, правило «вимкнено») відображає альбом або зображення з точки даних (URL, Pfad) База64)",
+        "zh-cn": "Leuchten：“Gerätetyp” 和 “Datenpunkte des Geräts”（开关、调光器、Farbe、Weiston）现在也可以直接在 Leuchte 旁边的 “Light or der Schalter” 下播放，只有 beim platzierten Gerät\n详情对话框中的 VerlaufsDiagramm：工具提示显示在 Rand 的图表内部，因此不会显示滚动列表更多\nDeko 下的新家具 “Wandbild”（Holzrahmen 或数字 Bilderrahmen）：一张 bestimmtes Bild（“Immer（ohne Gerät）”）或一张适配器屏幕保护程序的相册 Dishow；Bildschirme（也是 Fernseher，Regel “关闭”）显示相册或专辑中的内容来自某个数据点（网址、路径或 Base64）的图片"
+      },
+      "0.3.0": {
+        "en": "Standalone 3d-home adapter with ioBroker object selection, 3D editor and local visualization.",
+        "de": "Eigenständiger Adapter 3d-home mit ioBroker-Objektauswahl, 3D-Editor und lokaler Visualisierung."
+      },
+      "0.4.0": {
+        "en": "TypeScript adapter, browser integration, scripts and tests with checked build outputs.",
+        "de": "Adapter, Browser-Anbindung, Skripte und Tests auf TypeScript umgestellt."
+      }
+    },
+    "authors": [
+      "ioBroker.home3d contributors"
+    ],
+    "licenseInformation": {
+      "type": "free",
+      "license": "MIT"
+    },
+    "platform": "Javascript/Node.js",
+    "icon": "home3d.svg",
+    "extIcon": "https://raw.githubusercontent.com/psychoschurik/ioBroker.home3d/main/admin/home3d.svg",
+    "readme": "https://github.com/psychoschurik/ioBroker.home3d/blob/main/README.md",
+    "keywords": [
+      "3d",
+      "floorplan",
+      "visualization",
+      "web"
+    ],
+    "type": "visualization",
+    "mode": "once",
+    "onlyWWW": true,
+    "noConfig": true,
+    "singleton": true,
+    "nogit": true,
+    "enabled": true,
+    "compact": true,
+    "connectionType": "local",
+    "dataSource": "push",
+    "tier": 3,
+    "adminUI": {
+      "config": "none"
+    },
+    "localLinks": {
+      "_default": {
+        "link": "%web_protocol%://%web_bind%:%web_port%/home3d/index.html",
+        "name": {
+          "en": "3D Home",
+          "de": "3D Home"
+        }
+      },
+      "kiosk": {
+        "link": "%web_protocol%://%web_bind%:%web_port%/home3d/index.html?kiosk",
+        "name": {
+          "en": "Kiosk",
+          "de": "Kiosk"
+        }
+      }
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=6.0.11"
+      },
+      {
+        "web": ">=7.0.0"
+      }
+    ]
+  },
+  "native": {},
+  "objects": [],
+  "instanceObjects": [
+    {
+      "_id": "",
+      "type": "meta",
+      "common": {
+        "name": {
+          "en": "Floor plans, images and device mappings",
+          "de": "Grundrisse, Bilder und Gerätezuordnungen"
+        },
+        "type": "meta.user"
+      },
+      "native": {}
+    },
+    {
+      "_id": "show",
+      "type": "state",
+      "common": {
+        "name": {
+          "en": "Show in the 3D view",
+          "de": "In der 3D-Ansicht zeigen",
+          "ru": "Показать в 3D-виде"
         },
         "desc": {
-            "en": "3D floor plan editor and live visualization, runs on the web adapter",
-            "de": "3D-Grundrisseditor und Live-Visualisierung, läuft im web-Adapter"
+          "en": "Write a place or a device in words and every open 3D view (not one in the editor) flies there: a floor (\"Deck\"), a room (as named in the plan or in the ioBroker rooms), a device or piece of furniture (\"Diesel\"), or \"house\" for the whole house. The names it knows are in home3d.0.places. A 3D view that shows it confirms with ack=true and the name of what it shows; when the value stays ack=false, no 3D view is open or nothing has that name.",
+          "de": "Einen Ort oder ein Gerät in Worten schreiben, jede offene 3D-Ansicht (nicht im Editor) fliegt dorthin: eine Etage („Deck“), ein Raum (wie im Grundriss oder in den ioBroker-Räumen benannt), ein Gerät oder Möbelstück („Diesel“) oder „Haus“ für das ganze Haus. Die bekannten Namen stehen in home3d.0.places. Eine 3D-Ansicht, die es zeigt, bestätigt mit ack=true und dem Namen des Gezeigten; bleibt der Wert ack=false, ist keine 3D-Ansicht offen oder nichts heißt so.",
+          "ru": "Записать место или устройство словами, и каждый открытый 3D-вид (не в редакторе) перелетит туда: этаж («Deck»), комната (как названа в плане или в комнатах ioBroker), устройство или предмет мебели («Diesel») или «дом» для всего дома. Известные имена — в home3d.0.places. 3D-вид, который это показал, подтверждает ack=true и именем показанного; если значение остаётся ack=false, ни один 3D-вид не открыт или такого имени нет."
         },
-        "news": {
-            "0.3.0": {
-                "en": "Standalone 3d-home adapter with ioBroker object selection, 3D editor and local visualization.",
-                "de": "Eigenständiger Adapter 3d-home mit ioBroker-Objektauswahl, 3D-Editor und lokaler Visualisierung."
-            },
-            "0.4.0": {
-                "en": "TypeScript adapter, browser integration, scripts and tests with checked build outputs.",
-                "de": "Adapter, Browser-Anbindung, Skripte und Tests auf TypeScript umgestellt."
-            }
-        },
-        "authors": [
-            "ioBroker.home3d contributors"
-        ],
-        "licenseInformation": {
-            "type": "free",
-            "license": "MIT"
-        },
-        "platform": "Javascript/Node.js",
-        "icon": "home3d.svg",
-        "extIcon": "https://raw.githubusercontent.com/psychoschurik/ioBroker.home3d/main/admin/home3d.svg",
-        "readme": "https://github.com/psychoschurik/ioBroker.home3d/blob/main/README.md",
-        "keywords": [
-            "3d",
-            "floorplan",
-            "visualization",
-            "web"
-        ],
-        "type": "visualization",
-        "mode": "once",
-        "onlyWWW": true,
-        "noConfig": true,
-        "singleton": true,
-        "nogit": true,
-        "enabled": true,
-        "compact": true,
-        "connectionType": "local",
-        "dataSource": "push",
-        "tier": 3,
-        "adminUI": {
-            "config": "none"
-        },
-        "localLinks": {
-            "_default": {
-                "link": "%web_protocol%://%web_bind%:%web_port%/home3d/index.html",
-                "name": {
-                    "en": "3D Home",
-                    "de": "3D Home"
-                }
-            },
-            "kiosk": {
-                "link": "%web_protocol%://%web_bind%:%web_port%/home3d/index.html?kiosk",
-                "name": {
-                    "en": "Kiosk",
-                    "de": "Kiosk"
-                }
-            }
-        },
-        "dependencies": [
-            {
-                "js-controller": ">=6.0.11"
-            },
-            {
-                "web": ">=7.0.0"
-            }
-        ]
+        "type": "string",
+        "role": "text",
+        "read": true,
+        "write": true,
+        "def": ""
+      },
+      "native": {}
     },
-    "native": {},
-    "objects": [],
-    "instanceObjects": [
-        {
-            "_id": "",
-            "type": "meta",
-            "common": {
-                "name": {
-                    "en": "Floor plans, images and device mappings",
-                    "de": "Grundrisse, Bilder und Gerätezuordnungen"
-                },
-                "type": "meta.user"
-            },
-            "native": {}
+    {
+      "_id": "places",
+      "type": "state",
+      "common": {
+        "name": {
+          "en": "Places of the 3D view",
+          "de": "Orte der 3D-Ansicht",
+          "ru": "Места 3D-вида"
         },
-        {
-            "_id": "show",
-            "type": "state",
-            "common": {
-                "name": {
-                    "en": "Show in the 3D view",
-                    "de": "In der 3D-Ansicht zeigen",
-                    "ru": "Показать в 3D-виде"
-                },
-                "desc": {
-                    "en": "Write a place or a device in words and every open 3D view (not one in the editor) flies there: a floor (\"Deck\"), a room (as named in the plan or in the ioBroker rooms), a device or piece of furniture (\"Diesel\"), or \"house\" for the whole house. The names it knows are in home3d.0.places. A 3D view that shows it confirms with ack=true and the name of what it shows; when the value stays ack=false, no 3D view is open or nothing has that name.",
-                    "de": "Einen Ort oder ein Gerät in Worten schreiben, jede offene 3D-Ansicht (nicht im Editor) fliegt dorthin: eine Etage („Deck“), ein Raum (wie im Grundriss oder in den ioBroker-Räumen benannt), ein Gerät oder Möbelstück („Diesel“) oder „Haus“ für das ganze Haus. Die bekannten Namen stehen in home3d.0.places. Eine 3D-Ansicht, die es zeigt, bestätigt mit ack=true und dem Namen des Gezeigten; bleibt der Wert ack=false, ist keine 3D-Ansicht offen oder nichts heißt so.",
-                    "ru": "Записать место или устройство словами, и каждый открытый 3D-вид (не в редакторе) перелетит туда: этаж («Deck»), комната (как названа в плане или в комнатах ioBroker), устройство или предмет мебели («Diesel») или «дом» для всего дома. Известные имена — в home3d.0.places. 3D-вид, который это показал, подтверждает ack=true и именем показанного; если значение остаётся ack=false, ни один 3D-вид не открыт или такого имени нет."
-                },
-                "type": "string",
-                "role": "text",
-                "read": true,
-                "write": true,
-                "def": ""
-            },
-            "native": {}
+        "desc": {
+          "en": "What home3d.0.show understands, as JSON written by an open 3D view: {\"floors\": {floor: [rooms]}, \"devices\": [{\"name\", \"room\"}]}.",
+          "de": "Was home3d.0.show versteht, als JSON, geschrieben von einer offenen 3D-Ansicht: {\"floors\": {Etage: [Räume]}, \"devices\": [{\"name\", \"room\"}]}.",
+          "ru": "Что понимает home3d.0.show, в виде JSON, записанного открытым 3D-видом: {\"floors\": {этаж: [комнаты]}, \"devices\": [{\"name\", \"room\"}]}."
         },
-        {
-            "_id": "places",
-            "type": "state",
-            "common": {
-                "name": {
-                    "en": "Places of the 3D view",
-                    "de": "Orte der 3D-Ansicht",
-                    "ru": "Места 3D-вида"
-                },
-                "desc": {
-                    "en": "What home3d.0.show understands, as JSON written by an open 3D view: {\"floors\": {floor: [rooms]}, \"devices\": [{\"name\", \"room\"}]}.",
-                    "de": "Was home3d.0.show versteht, als JSON, geschrieben von einer offenen 3D-Ansicht: {\"floors\": {Etage: [Räume]}, \"devices\": [{\"name\", \"room\"}]}.",
-                    "ru": "Что понимает home3d.0.show, в виде JSON, записанного открытым 3D-видом: {\"floors\": {этаж: [комнаты]}, \"devices\": [{\"name\", \"room\"}]}."
-                },
-                "type": "string",
-                "role": "json",
-                "read": true,
-                "write": false,
-                "def": ""
-            },
-            "native": {}
-        }
-    ]
+        "type": "string",
+        "role": "json",
+        "read": true,
+        "write": false,
+        "def": ""
+      },
+      "native": {}
+    }
+  ]
 }

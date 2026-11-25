@@ -51,8 +51,7 @@ the states to switch them, and write permission on files to save floor plans.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-
-### **WORK IN PROGRESS**
+### 0.5.0 (2026-11-25)
 
 - (bluefox) Leuchten: „Gerätetyp“ und „Datenpunkte des Geräts“ (Schalter, Dimmer, Farbe, Weißton) jetzt auch direkt bei der Leuchte unter „Licht oder Schalter“, nicht nur beim platzierten Gerät
 - (bluefox) Verlaufsdiagramm im Detail-Dialog: Der Tooltip bleibt am Rand innerhalb des Diagramms, es erscheint keine Scrollleiste mehr
