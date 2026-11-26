@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "home3d",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "titleLang": {
       "en": "3D Home",
       "de": "3D Home",
@@ -20,6 +20,19 @@
       "de": "3D-Grundrisseditor und Live-Visualisierung, läuft im web-Adapter"
     },
     "news": {
+      "0.7.0": {
+        "en": "Laden an der Wallbox: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (mit Lichtpunkten auf dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist",
+        "de": "An der Wallbox laden: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (Licht mit Punkten auf dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist",
+        "ru": "Загружено на Wallbox: припаркованный автомобиль на расстоянии до 5 м под настенным ящиком подвешивает свой кабель, поэтому Wallbox ein angestecktes Auto meldet (статус и производительность, как на карте); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (mit Lightpunkten auf dem Kabel und ⚡ über dem Dach), желтый, соланж просто предусмотрен",
+        "pt": "Laden an der Wallbox: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (mit Lichtpunkten aut f dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist",
+        "nl": "Laden an der Wallbox: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (mit Lichtpunkten auf dem Kabel und ⚡ über dem Dem Ach), gelb, solange es nur angesteckt ist",
+        "fr": "Laden an der Wallbox : Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte) ; der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (mit Lichtpunkten auf dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist",
+        "it": "Carica nella Wallbox: un'auto parcheggiata fino a 5 m dopo una Wallbox è attaccata al cavo, quindi la Wallbox è segnata automaticamente (stato e potenza come sulla sua mappa); l'anello di ricarica si illumina di verde e pulsa al carico (con punti luce il cavo e ⚡ sul tetto), giallo, solange è solo incluso",
+        "es": "Laden an der Wallbox: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert bei Laden (mit Lichtpunkten auf dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist",
+        "pl": "Ładowanie do skrzynki ściennej: Parkowany samochód do 5 m pod skrzynką ścienną jest umieszczony w kablu, włącz ściankę automatyczną wiadomość (stan i moc jak na mapie); pierścień na kluczu ładowania świeci się na zielono i pulsuje przy ładowaniu (z punktami świetlnymi na kablu dachowej i ⚡ nad nim), żółty, solange jest tylko zaniepokojony",
+        "uk": "Завантаження в настінну коробку: Припаркований автомобіль до 5 м від настінного блоку, підвішений до кабелю, лише настінна коробка повідомляє встановлений автомобіль (стан та потужність, як на карті); кільце на роз'ємі зарядки світить зеленим і пульсуючим під час завантаження (із світловими точками на кабелі та ⚡ через провід), жовтий але це лише застережено",
+        "zh-cn": "Laden an der Wallbox：在墙箱挂在电缆上时，可以在 5 米内自动停车，solange die Wallbox 会自动报警（状态和性能与您的地图相同）；拉登时的 Ring am Ladeanschluss 会发出绿色和脉动（在 Kabel 上使用 Lichtpunkten on the Kabel 和 ⚡ upber dem Dach)、gelb、solange es nur ange is nur angesteckt ist"
+      },
       "0.6.0": {
         "en": "Mehrere Projekte wie in vis-2 (z. B. Haus und Boot), jedes mit eigenen Grundrissen, Bildern, 3D-Modellen, Geräten und Einstellungen: im Editor unter „Projekte“ öffnen, anlegen, umbenennen, duplizieren, löschen, als Datei exportieren und als neues Projekt importieren; geöffnet über `index.html?project=<id>` (auch mit `?kiosk` und `?view=card`); die Dateien jedes Projekts liegen in `home3d.0/<id>/`, die des Standardprojekts in `home3d.0/default/`",
         "de": "Multiple projects as in vis-2 (z. B. House and Boot), jedes mit eigenen Grundrissen, Bildern, 3D-Modellen, Geräten und Einstellungen: im Editor unter „Projekte“, anlegen, umbenennen, duplizieren, löschen, als Datei exportieren und als neues Projekt importieren; geöffnet über `index.html? project = <id>`(auch mit`? Kiosk und `? <id>view=card`); die Dateien jedes Projekts liegen in `home3d.0/ /`, die des Standardprojekts in `home3d.0/default/`",
