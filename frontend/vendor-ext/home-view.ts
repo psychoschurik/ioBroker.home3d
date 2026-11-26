@@ -2,6 +2,8 @@
 // devices are synced (tasks.ts patches view3d.ts to call it) and drawn by home-fx.ts. No three.js here; the plan's
 // types are described by their shape, so this file needs nothing of the 3D frontend.
 import { isCarKind } from './cars';
+import { carCharges, wallboxOutlet, type WallboxSpot } from './car-charge';
+import { deviceKind, deviceLink, mainEntity, wallboxPhase } from './device-cards';
 import { brewing } from './kitchen';
 import { RAIN_LOW, rainTankCapacity, rainTankFill, rainTankKind } from './rain-tank';
 import { mailBase, mailShape } from './mail-flag';
@@ -140,6 +142,11 @@ export interface FurnitureLike {
     gear_entity?: string | null;
     /** A hatch: the datapoint of its opening angle (beside or instead of its contact). */
     gear_angle_entity?: string | null;
+    /** A wallbox: its power and status sensors, the datapoints linked at its card. */
+    power?: string | null;
+    status?: string | null;
+    device_links?: Partial<Record<string, string>> | null;
+    name?: string;
 }
 
 export interface OutdoorLike {
@@ -237,6 +244,16 @@ export function homeWatched(
     add(s.price_forecast);
     add(s.water_flow);
     add(b.energy?.water);
+    // a wallbox's status and power hang a car on its cable
+    const cars = b.floors.some(f => f.furniture.some(x => isCarKind(x.type)));
+    for (const f of b.floors) {
+        for (const x of f.furniture) {
+            if (cars && deviceKind(x.type) === 'wallbox') {
+                add(mainEntity(hass, x));
+                add(deviceLink(hass, x, 'power'));
+            }
+        }
+    }
     for (const f of b.floors) {
         for (const x of f.furniture) {
             if (x.type === 'robot_mower' || x.type === 'sprinkler') {
@@ -475,6 +492,8 @@ export function homeScene(input: HomeInput): HomeOutput {
     const mowers: MowerState[] = [];
     const badges: BadgeState[] = [];
     const cars: CarState[] = [];
+    const boxes: WallboxSpot[] = [];
+    const hasCars = b.floors.some(f => f.furniture.some(x => isCarKind(x.type)));
     const alerts: HomeAlert[] = [];
     const air = b.settings.home_air !== false;
     const mould = (b.settings.mould ?? b.settings.home_air) !== false;
@@ -739,6 +758,18 @@ export function homeScene(input: HomeInput): HomeOutput {
         const dry = new Map<string, number>();
         const mown = new Set<string>();
         for (const f of floor.furniture) {
+            if (hasCars && deviceKind(f.type) === 'wallbox') {
+                // where its cable leaves and what it says (as its card does): a car within reach hangs on it
+                const main = mainEntity(hass, f);
+                const power = deviceLink(hass, f, 'power');
+                const watts = power ? num(hass.states[power]?.state) : null;
+                boxes.push({
+                    id: f.id,
+                    floor: floor.id,
+                    at: wallboxOutlet(f),
+                    phase: wallboxPhase(main ? hass.states[main] : undefined, main, watts),
+                });
+            }
             if (f.type === 'sprinkler') {
                 const lawn = lawnOf([f.x, f.z]);
                 sprinklers.push({
@@ -1063,6 +1094,14 @@ export function homeScene(input: HomeInput): HomeOutput {
                 quiet: true,
             });
         }
+    }
+    // the parked cars on the cables of the wallboxes within reach
+    const charges = carCharges(
+        cars.filter(c => c.present),
+        boxes,
+    );
+    for (const c of cars) {
+        c.charge = charges.get(c.id) ?? null;
     }
     // the price glow round the house
     const price = priceInfo(input);

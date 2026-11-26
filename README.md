@@ -60,6 +60,10 @@ the states to switch them, and write permission on files to save floor plans.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- (bluefox) Laden an der Wallbox: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (mit Lichtpunkten auf dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist
+
 ### 0.6.0 (2026-11-25)
 
 - (bluefox) Mehrere Projekte wie in vis-2 (z. B. Haus und Boot), jedes mit eigenen Grundrissen, Bildern, 3D-Modellen, Geräten und Einstellungen: im Editor unter „Projekte“ öffnen, anlegen, umbenennen, duplizieren, löschen, als Datei exportieren und als neues Projekt importieren; geöffnet über `index.html?project=<id>` (auch mit `?kiosk` und `?view=card`); die Dateien jedes Projekts liegen in `home3d.0/<id>/`, die des Standardprojekts in `home3d.0/default/`

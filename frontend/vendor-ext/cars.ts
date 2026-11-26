@@ -253,6 +253,61 @@ function plateTexture(text: string): CanvasTexture | null {
     return t;
 }
 
+/** The measures a car's body is built on (local, the front at -z): wheel radius, axles, arches, shoulder line. */
+function carFrame(
+    kind: CarKind,
+    d: number,
+    h: number,
+): {
+    van: boolean;
+    sedan: boolean;
+    bevel: number;
+    /** The wheels' radius. */
+    r: number;
+    /** The body's bottom above the road. */
+    clear: number;
+    /** The front and the rear axle (z). */
+    zA: number;
+    zB: number;
+    /** The wheel arches' radius. */
+    ar: number;
+    /** The shoulder line, where the windows begin. */
+    belt: number;
+} {
+    const van = kind === 'car_van';
+    const sedan = kind === 'car_sedan';
+    const bevel = van ? 0.05 : 0.04;
+    const r = Math.min(0.37, h * (van ? 0.16 : 0.225));
+    return {
+        van,
+        sedan,
+        bevel,
+        r,
+        clear: r * 0.42 + bevel,
+        zA: -d / 2 + d * (van ? 0.16 : sedan ? 0.2 : 0.19),
+        zB: d / 2 - d * (van ? 0.2 : sedan ? 0.22 : 0.17),
+        ar: r * 1.1 + bevel,
+        belt: van ? h * 0.5 : h * (sedan ? 0.56 : 0.57),
+    };
+}
+
+/**
+ * Where a car's charging port is (local, the front at -z): on the flank of side `sx` (+1: local +x), above the front
+ * wheel (`front`) or the rear one, between the wheel arch and the shoulder line.
+ */
+export function chargePort(
+    kind: CarKind,
+    w: number,
+    d: number,
+    h: number,
+    sx: 1 | -1,
+    front: boolean,
+): [number, number, number] {
+    const { r, ar, belt, zA, zB } = carFrame(kind, d, h);
+    const arch = r + ar;
+    return [sx * (w / 2 + 0.004), Math.max(arch + 0.02, (arch + belt) / 2), front ? zA : zB];
+}
+
 export function buildCar(
     kind: CarKind,
     w: number,
@@ -268,21 +323,13 @@ export function buildCar(
     } catch {
         paint = new Color(CAR_COLORS[kind]);
     }
-    const van = kind === 'car_van';
-    const sedan = kind === 'car_sedan';
     const glass = new Color(0x1f2b36);
     const trim = 0x16191d;
     const body = new Parts();
 
-    const bevel = van ? 0.05 : 0.04;
-    const r = Math.min(0.37, h * (van ? 0.16 : 0.225));
-    const clear = r * 0.42 + bevel;
+    const { van, sedan, bevel, r, clear, zA, zB, ar, belt } = carFrame(kind, d, h);
     const front = -d / 2 + bevel;
     const rear = d / 2 - bevel;
-    const zA = -d / 2 + d * (van ? 0.16 : sedan ? 0.2 : 0.19);
-    const zB = d / 2 - d * (van ? 0.2 : sedan ? 0.22 : 0.17);
-    const ar = r * 1.1 + bevel;
-    const belt = van ? h * 0.5 : h * (sedan ? 0.56 : 0.57);
     const top = h - bevel;
 
     // the bottom edge with the wheel arches cut out of it

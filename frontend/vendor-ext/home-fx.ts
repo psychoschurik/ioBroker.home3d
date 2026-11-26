@@ -32,6 +32,7 @@ import {
 import { labelSprite, shade } from './anchor';
 import { buildDock, buildMower } from './mower-model';
 import { buildBay, buildCar, type CarKind, WHEEL } from './cars';
+import { buildCable, type CableParts, type CarCharge, PLUGGED_PHASES, portColor, portPulse } from './car-charge';
 import { lanes, pathLength, pointAt, pointIn, type Corner, type MowerPhase, type Rgb, type Vec2 } from './home-data';
 import { buildCoffeeMachine } from './kitchen';
 import { buildRainTank, type RainTankKind } from './rain-tank';
@@ -184,6 +185,8 @@ export interface CarState {
     present: boolean;
     /** It has a presence datapoint: its place is marked while it is away. */
     sensed: boolean;
+    /** The cable of the wallbox within reach (car-charge.ts), shown while it says a car is plugged in. */
+    charge?: CarCharge | null;
 }
 
 /** Smoke in a room whose smoke detector went off: it fills the room from the ceiling down. */
@@ -640,7 +643,13 @@ export class HomeFx {
     private mowerMeshes = new Map<string, Group>();
     private runs = new Map<string, MowerRun>();
     private paints = new Map<string, LawnPaint>();
-    private carMeshes = new Map<string, { car: Group; bay: Group | null }>();
+    /** Each car, its marked place, its wallbox's cable and the flash over its roof while it charges. */
+    private carMeshes = new Map<
+        string,
+        { car: Group; bay: Group | null; cable: CableParts | null; flash: Sprite | null }
+    >();
+    /** The colour each car's port ring shows now. */
+    private portShown = new Map<string, number>();
     /** Smoke: its particles and where each one stands in the room (x, z). */
     private smokeParts = new Map<string, { p: Particles; base: Float32Array }>();
     /** Stale air: its particles and where each one stands in the room (x, z). */
@@ -764,6 +773,7 @@ export class HomeFx {
                 c.color,
                 c.plate ?? null,
                 c.sensed,
+                c.charge ? [c.charge.box, c.charge.path[0], c.charge.port] : null,
             ]),
             (s.smokes ?? []).map(x => [x.id, x.floor, x.points, x.top]),
             (s.hazes ?? []).map(x => [x.id, x.floor, x.points, x.top, x.label]),
@@ -1132,7 +1142,18 @@ export class HomeFx {
                 bay.rotation.y = -c.angle;
                 g.add(bay);
             }
-            this.carMeshes.set(c.id, { car, bay });
+            let cable: CableParts | null = null;
+            let flash: Sprite | null = null;
+            if (c.charge) {
+                cable = buildCable(c.charge, this.light);
+                g.add(cable.group);
+                // seen from every side, where the port may face away
+                flash = labelSprite('⚡', this.light, null, 0.026);
+                flash.position.set(c.x, c.y + c.h + 0.35, c.z);
+                flash.visible = false;
+                g.add(flash);
+            }
+            this.carMeshes.set(c.id, { car, bay, cable, flash });
             // a car seen for the first time stands where it is (no drive on opening the page)
             if (!this.carIn.has(c.id)) {
                 this.carIn.set(c.id, c.present ? 1 : 0);
@@ -1206,6 +1227,7 @@ export class HomeFx {
         this.floodMeshes.clear();
         this.mowerMeshes.clear();
         this.carMeshes.clear();
+        this.portShown.clear();
         this.smokeParts.clear();
         this.hazeParts.clear();
         this.steamParts.clear();
@@ -1457,6 +1479,9 @@ export class HomeFx {
             if (this.car(c, dt, calm)) {
                 moving = true;
             }
+            if (this.cable(c, t, calm) && shown(c.floor)) {
+                moving = true;
+            }
         }
         for (const mo of s.mowers) {
             const mesh = this.mowerMeshes.get(mo.id);
@@ -1683,6 +1708,43 @@ export class HomeFx {
             m.bay.visible = k < 0.999;
         }
         return k !== target;
+    }
+
+    /**
+     * A car's cable while it is parked and its wallbox says it is plugged in; the ring round the port in the wallbox's
+     * colour, breathing and with lights running along the cable while it charges (calm: lit). Whether it moves.
+     */
+    private cable(c: CarState, t: number, calm: boolean): boolean {
+        const m = this.carMeshes.get(c.id);
+        const e = m?.cable;
+        if (!m || !e || !c.charge) {
+            return false;
+        }
+        const parked = (this.carIn.get(c.id) ?? 0) >= 0.999;
+        const on = parked && PLUGGED_PHASES.has(c.charge.phase);
+        e.group.visible = on;
+        const charging = on && c.charge.phase === 'charging';
+        const color = portColor(c.charge.phase);
+        const mat = e.ring.material as MeshBasicMaterial;
+        if (this.portShown.get(c.id) !== color) {
+            this.portShown.set(c.id, color);
+            mat.color.setHex(color);
+        }
+        mat.opacity = charging && !calm ? portPulse(t) : 1;
+        if (m.flash) {
+            m.flash.visible = charging;
+            m.flash.material.opacity = calm ? 1 : 0.55 + 0.45 * portPulse(t);
+        }
+        e.pulses.forEach((p, k) => {
+            p.visible = charging && !calm;
+            if (p.visible) {
+                // from the wallbox to the car, one after the other
+                const u = (t * 0.45 + k / e.pulses.length) % 1;
+                p.position.copy(e.curve.getPointAt(u));
+                (p.material as MeshBasicMaterial).opacity = Math.sin(u * Math.PI);
+            }
+        });
+        return charging && !calm;
     }
 
     /** Drives a mower: its lanes while it mows, home when it returns; paints the stripes behind it. */
