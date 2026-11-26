@@ -60,6 +60,10 @@ the states to switch them, and write permission on files to save floor plans.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- (bluefox) Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss bleibt ein 30 cm breiter Streifen zum Anfassen, in der 3D-Ansicht daneben fasst man das Feld an seinen Modulen
+
 ### 0.7.1 (2026-11-26)
 
 - (bluefox) Das Laden an der Wallbox aus 0.7.0 kommt mit dieser Version auf npm: 0.7.0 wurde wegen einer fehlerhaften package-lock.json nicht veröffentlicht

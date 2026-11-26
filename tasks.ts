@@ -572,6 +572,88 @@ function editorDevices(name: string, code: string): string {
     );
 }
 
+/**
+ * Frames on flat ground and flat roofs up to upright (90°, upstream ends at 45°), with what a steep module needs
+ * (frontend/vendor-ext/steep-frames.ts): posts behind it, glass details lifted along its own normal, a strip to grab
+ * in the plan, grabbed on its modules in the 3D pane.
+ */
+function steepFrames(name: string, code: string): string {
+    const steep = `${root}/frontend/vendor-ext/steep-frames.ts`;
+    if (name === 'solar.ts') {
+        code = `import { FRAME_TILT_MAX as fp3dFrameTiltMax, framePosts as fp3dFramePosts } from "${steep}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '  if (face.flat) return Math.min(45, Math.max(0, f.tilt ?? 15)) * DEG;',
+            '  if (face.flat) return Math.min(fp3dFrameTiltMax, Math.max(0, f.tilt ?? 15)) * DEG;',
+            'steep frames: tilt',
+        );
+        return replaceRequired(
+            code,
+            'posts: [u0 + 0.05, u1 - 0.05].flatMap((u) => [[at(u, sl, 0), at(u, sl, lo)], [at(u, sh, 0), at(u, sh, hi)]] as [V3, V3][]),',
+            'posts: fp3dFramePosts(at, [u0 + 0.05, u1 - 0.05], sl, sh, lo, hi, t, !!f.flip),',
+            'steep frames: posts',
+        );
+    }
+    if (name === 'components/editor.ts') {
+        code = `import { framePlan as fp3dFramePlan, rayOnModules as fp3dRayOnModules } from "${steep}";\n${code}`;
+        code = replaceRequired(
+            code,
+            '(v) => set({ tilt: Math.max(0, Math.min(45, Math.round(v))) })',
+            '(v) => set({ tilt: Math.max(0, Math.min(90, Math.round(v))) })',
+            'steep frames: editor field',
+        );
+        code = replaceRequired(
+            code,
+            '            : m.corners.map((p) => [p[0], p[2]] as Vec2);',
+            '            : face.flat\n              ? fp3dFramePlan(m.corners, face.es, !!f.flip)\n              : m.corners.map((p) => [p[0], p[2]] as Vec2);',
+            'steep frames: plan',
+        );
+        return replaceRequired(
+            code,
+            [
+                '      const hit = rayOnFace(face, ray.o, ray.d);',
+                '      if (!hit || !onField(face, field, hit.u, hit.s) || (best && best.t <= hit.t)) return;',
+                '      best = { id, win, t: hit.t, du: hit.u - field.u, ds: hit.s - field.v };',
+            ].join('\n'),
+            [
+                '      const hit = rayOnFace(face, ray.o, ray.d);',
+                '      if (!hit) return;',
+                '      // a steep frame is met on its modules, the ray goes on to the ground behind them',
+                '      const t = onField(face, field, hit.u, hit.s) ? hit.t : !win && face.flat ? fp3dRayOnModules(fieldModules(face, field), ray.o, ray.d) : null;',
+                '      if (t === null || (best && best.t <= t)) return;',
+                '      best = { id, win, t, du: hit.u - field.u, ds: hit.s - field.v };',
+            ].join('\n'),
+            'steep frames: grab in 3D',
+        );
+    }
+    if (name === 'viewer/roof.ts') {
+        code = `import { moduleNormal as fp3dModuleNormal } from "${steep}";\n${code}`;
+        return replaceRequired(
+            code,
+            '    const up = (p: number[], k = 0.004) => [p[0] + face.n[0] * k, p[1] + face.n[1] * k, p[2] + face.n[2] * k];',
+            '    const fn = fp3dModuleNormal(face, field);\n    const up = (p: number[], k = 0.004) => [p[0] + fn[0] * k, p[1] + fn[1] * k, p[2] + fn[2] * k];',
+            'steep frames: frame lines',
+        );
+    }
+    if (name === 'viewer/solar-live.ts') {
+        code = `import { moduleNormal as fp3dModuleNormal } from "${steep}";\n${code}`;
+        return replaceRequired(
+            code,
+            [
+                '    for (const m of fieldModules(face, field)) {',
+                '      const [a, c, d, e] = m.corners.map((q) => [q[0] + face.n[0] * 0.006, q[1] + face.n[1] * 0.006 - dy, q[2] + face.n[2] * 0.006]);',
+            ].join('\n'),
+            [
+                '    const fn = fp3dModuleNormal(face, field);',
+                '    for (const m of fieldModules(face, field)) {',
+                '      const [a, c, d, e] = m.corners.map((q) => [q[0] + fn[0] * 0.006, q[1] + fn[1] * 0.006 - dy, q[2] + fn[2] * 0.006]);',
+            ].join('\n'),
+            'steep frames: live glow',
+        );
+    }
+    return code;
+}
+
 /** The power of every solar field written on its modules (frontend/vendor-ext/solar-text.ts). */
 function solarText(name: string, code: string): string {
     if (name === 'components/view3d.ts') {
@@ -585,7 +667,7 @@ function solarText(name: string, code: string): string {
     if (name !== 'viewer/viewer3d.ts') {
         return code;
     }
-    code = `import { buildSolarText, writeSolarText } from "${root}/frontend/vendor-ext/solar-text.ts";\nimport { fieldModules as fp3dFieldModules } from "../solar.ts";\n${code}`;
+    code = `import { buildSolarText, writeSolarText } from "${root}/frontend/vendor-ext/solar-text.ts";\nimport { fieldModules as fp3dFieldModules } from "../solar.ts";\nimport { moduleNormal as fp3dModuleNormal } from "${root}/frontend/vendor-ext/steep-frames.ts";\n${code}`;
     code = replaceRequired(
         code,
         '  private solarLevels = new Map<string, number>();',
@@ -613,7 +695,7 @@ function solarText(name: string, code: string): string {
         'solar watts setter',
     );
     const fields =
-        '.map(({ face, field }) => ({ id: field.id, corners: fp3dFieldModules(face, field).map((m) => m.corners), n: face.n }))';
+        '.map(({ face, field }) => ({ id: field.id, corners: fp3dFieldModules(face, field).map((m) => m.corners), n: fp3dModuleNormal(face, field) }))';
     code = replaceRequired(
         code,
         '      const solarMesh = solarLive ? new Mesh(solarLive.geometry, materials.solarLive) : null;',
@@ -9808,6 +9890,7 @@ const patches: Plugin = {
         code = ownModels(name, code);
         code = wallPicture(name, code);
         code = projectKeys(name, code);
+        code = steepFrames(name, code);
         if (name === 'viewer/viewer3d.ts') {
             // a pin made after the selection (e.g. when the 3D view beside the editor opens) is marked too
             code = replaceRequired(
