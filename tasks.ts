@@ -3277,17 +3277,19 @@ import { activityColor as fp3dActivityColor, MeterFlow as Fp3dMeterFlow, priceTo
 
 /**
  * Furniture of the house the 3D frontend did not have (frontend/vendor-ext/house-items.ts): a spiral stair (it cuts a
- * round opening into the floor above), a wood stove, a chimney and a sauna cabin. And a tank for heating oil: the
+ * round opening into the floor above), a wood stove, a chimney and a sauna cabin; a corner bathtub
+ * (frontend/vendor-ext/corner-tub.ts). And a tank for heating oil: the
  * boat's tank with the kind "oil", offered in the library's section "Heizung" (a library entry may preset fields of
  * the item it places).
  */
 function houseItems(name: string, code: string): string {
     const items = `${root}/frontend/vendor-ext/house-items.ts`;
+    const tub = `${root}/frontend/vendor-ext/corner-tub.ts`;
     if (name === 'model.ts') {
         code = replaceRequired(
             code,
             '  "water_heater",\n',
-            '  "water_heater",\n  "stairs_spiral",\n  "fireplace",\n  "chimney",\n  "sauna",\n  "railing",\n  "stairs_outdoor",\n  "light_well",\n',
+            '  "water_heater",\n  "stairs_spiral",\n  "fireplace",\n  "chimney",\n  "sauna",\n  "bathtub_corner",\n  "railing",\n  "stairs_outdoor",\n  "light_well",\n',
             'house items: types',
         );
         code = replaceRequired(
@@ -3295,6 +3297,12 @@ function houseItems(name: string, code: string): string {
             '"stairs", "stairs_u", "robot_vacuum"]',
             '"stairs", "stairs_u", "stairs_spiral", "railing", "fireplace", "chimney", "sauna", "robot_vacuum"]',
             'house items: library group',
+        );
+        code = replaceRequired(
+            code,
+            '  bath: ["bathtub", "shower",',
+            '  bath: ["bathtub", "bathtub_corner", "shower",',
+            'house items: corner bathtub in the bath',
         );
         code = replaceRequired(
             code,
@@ -3312,6 +3320,8 @@ function houseItems(name: string, code: string): string {
                 '  fireplace: [0.6, 0.5, 2.4],',
                 '  chimney: [0.5, 0.5, 3],',
                 '  sauna: [2, 1.8, 2.05],',
+                '  // a corner bathtub, its back and left side against the walls',
+                '  bathtub_corner: [1.4, 1.4, 0.58],',
                 '  // a railing (its length, thickness, height), steps of stone outside, a light well in front of a cellar window',
                 '  railing: [1.2, 0.05, 1],',
                 '  stairs_outdoor: [1.4, 1.6, 0.8],',
@@ -3349,6 +3359,7 @@ function houseItems(name: string, code: string): string {
                 '  fireplace: ["heating", ["living"]],',
                 '  chimney: ["architecture", []],',
                 '  sauna: ["bath", ["bath", "hobby"]],',
+                '  bathtub_corner: ["bath", ["bath"]],',
             ].join('\n'),
             'house items: index',
         );
@@ -3444,7 +3455,7 @@ function houseItems(name: string, code: string): string {
         );
     }
     if (name === 'viewer/furniture.ts') {
-        code = `import { chimney as fp3dChimney, HOUSE_NATURAL as FP3D_HOUSE_NATURAL, HOUSE_NEON as FP3D_HOUSE_NEON, lightWell as fp3dLightWell, outdoorSteps as fp3dOutdoorSteps, railing as fp3dRailing, sauna as fp3dSauna, spiralStairs as fp3dSpiralStairs, woodStove as fp3dWoodStove } from "${items}";\n${code}`;
+        code = `import { chimney as fp3dChimney, HOUSE_NATURAL as FP3D_HOUSE_NATURAL, HOUSE_NEON as FP3D_HOUSE_NEON, lightWell as fp3dLightWell, outdoorSteps as fp3dOutdoorSteps, railing as fp3dRailing, sauna as fp3dSauna, spiralStairs as fp3dSpiralStairs, woodStove as fp3dWoodStove } from "${items}";\nimport { cornerBathtub as fp3dCornerBathtub } from "${tub}";\n${code}`;
         code = replaceRequired(
             code,
             'const EDGE_GLOW = shade(0x37e0ff, 0.45);',
@@ -3455,11 +3466,12 @@ function houseItems(name: string, code: string): string {
             code,
             '  /** Vertical cylinder with `n` sides. */\n',
             [
-                '  /** An upright prism over a polygon in local coordinates (the treads of a spiral stair). */',
-                '  prism(pts: Vec2[], y0: number, y1: number, side: number, top = side, edges: Color | null = null): void {',
+                '  /** An upright prism over a polygon in local coordinates (the treads of a spiral stair), `holes` left open in it. */',
+                '  prism(pts: Vec2[], y0: number, y1: number, side: number, top = side, edges: Color | null = null, holes: Vec2[][] = []): void {',
                 '    if (y1 - y0 < 1e-4 || pts.length < 3) return;',
                 '    const poly = pts.map(([x, z]) => this.tf(x, z));',
-                '    pushPrism(this.buf, ccw(poly), y0, y1, side, top, { aoFrom: 0, bottom: y0 > 0.05 });',
+                '    const open = holes.map((h) => h.map(([x, z]) => this.tf(x, z)));',
+                '    pushPrism(this.buf, ccw(poly), y0, y1, side, top, { aoFrom: 0, bottom: y0 > 0.05, holes: open });',
                 '    if (edges) this.outline(poly, y0, y1, edges);',
                 '  }',
                 '',
@@ -3487,6 +3499,9 @@ function houseItems(name: string, code: string): string {
                 '    case "sauna":',
                 '      fp3dSauna(b, C, FP3D_HC, FP3D_EDGES, w, d, h);',
                 '      break;',
+                '    case "bathtub_corner":',
+                '      fp3dCornerBathtub(b, C, FP3D_EDGES, w, d, h);',
+                '      break;',
                 '    case "railing":',
                 '      fp3dRailing(b, C, FP3D_EDGES, w, d, h);',
                 '      break;',
@@ -3508,6 +3523,7 @@ function houseItems(name: string, code: string): string {
             'house items: symbol height argument',
         );
         code = `import { houseSymbol as fp3dHouseSymbol } from "${items}";
+import { cornerTubSymbol as fp3dCornerTubSymbol } from "${tub}";
 ${code}`;
         code = replaceRequired(
             code,
@@ -3552,6 +3568,9 @@ ${code}`;
                 '        line(dx0, d / 2, dx0 + doorW, d / 2, "fp3d-sym-fill"),',
                 '      ];',
                 '    }',
+                '    case "bathtub_corner":',
+                '      // the tub, its rounded basin and the tap on the deck in the corner',
+                '      return fp3dCornerTubSymbol(w, d, { rect, line });',
                 '    case "railing":',
                 '    case "stairs_outdoor":',
                 '    case "light_well":',
@@ -3572,6 +3591,7 @@ ${code}`;
                 '  furn_fireplace: "Kaminofen",',
                 '  furn_chimney: "Schornstein",',
                 '  furn_sauna: "Sauna",',
+                '  furn_bathtub_corner: "Eckbadewanne",',
                 '  furn_tank_oil: "Öltank",',
                 '  gear_tank_oil: "Heizöl",',
                 '  furn_railing: "Geländer",',
@@ -3589,6 +3609,7 @@ ${code}`;
                 '  furn_fireplace: "Wood stove",',
                 '  furn_chimney: "Chimney",',
                 '  furn_sauna: "Sauna",',
+                '  furn_bathtub_corner: "Corner bathtub",',
                 '  furn_tank_oil: "Oil tank",',
                 '  gear_tank_oil: "Heating oil",',
                 '  furn_railing: "Railing",',

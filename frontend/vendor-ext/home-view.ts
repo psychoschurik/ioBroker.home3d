@@ -13,6 +13,7 @@ import { ebikeCharging, ebikeLevel } from './ebike';
 import { storeHeating, storeLayers, storeTemp } from './heat-store';
 import { ventBase, ventFlow, ventRate } from './air-vent';
 import { serverKind, serverLoad } from './server';
+import { cornerTub } from './corner-tub';
 import type {
     AirState,
     CarState,
@@ -111,6 +112,8 @@ export interface FurnitureLike {
     d: number;
     h: number;
     rotation: number;
+    /** Placed mirrored: its local x runs the other way. */
+    mirror?: boolean | null;
     entity?: string | null;
     heat_sensor?: string | null;
     moisture?: string | null;
@@ -210,7 +213,7 @@ export interface HomeAlert {
 export type Translate = (key: string, vars?: Record<string, string>) => string;
 
 /** Types that show running water (with a sensor of their own, or the house's water meter). */
-export const WATER_TYPES = new Set(['shower', 'bathtub', 'washbasin', 'sink']);
+export const WATER_TYPES = new Set(['shower', 'bathtub', 'bathtub_corner', 'washbasin', 'sink']);
 
 /** The furniture types this adds. */
 export const HOME_TYPES = ['robot_mower', 'sprinkler'] as const;
@@ -698,9 +701,13 @@ export function homeScene(input: HomeInput): HomeOutput {
                 continue;
             }
             const r = rad(f.rotation ?? 0);
-            // the tap at one end of a bathtub, at the back of a basin (local -z); turned with the item (clockwise)
-            const lx = f.type === 'bathtub' ? -f.w * 0.4 : 0;
-            const lz = f.type === 'bathtub' ? 0 : -f.d * 0.28;
+            // the tap at one end of a bathtub, at the spout in a corner bathtub's corner, at the back of a basin
+            // (local -z); turned with the item (clockwise)
+            let [lx, lz] = f.type === 'bathtub' ? [-f.w * 0.4, 0] : [0, -f.d * 0.28];
+            if (f.type === 'bathtub_corner') {
+                const [sx, sz] = cornerTub(f.w, f.d).spout;
+                [lx, lz] = [f.mirror ? -sx : sx, sz];
+            }
             const wx = f.x + lx * Math.cos(r) - lz * Math.sin(r);
             const wz = f.z + lx * Math.sin(r) + lz * Math.cos(r);
             const base = f.mount_y ?? 0;
@@ -721,7 +728,7 @@ export function homeScene(input: HomeInput): HomeOutput {
                     x: wx,
                     y: base + f.h + 0.14,
                     z: wz,
-                    drop: f.type === 'bathtub' ? 0.45 : 0.3,
+                    drop: f.type === 'bathtub' || f.type === 'bathtub_corner' ? 0.45 : 0.3,
                     spread: 0.015,
                 });
             }

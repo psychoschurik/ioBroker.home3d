@@ -41,7 +41,8 @@ export interface ItemDraw {
         edges?: Color | null,
     ): void;
     seg(xa: number, ya: number, za: number, xb: number, yb: number, zb: number, color?: Color): void;
-    prism(pts: P[], y0: number, y1: number, side: number, top?: number, edges?: Color | null): void;
+    /** An upright prism over a polygon; `holes` are left open in it (the basin in a corner bathtub's rim). */
+    prism(pts: P[], y0: number, y1: number, side: number, top?: number, edges?: Color | null, holes?: P[][]): void;
 }
 
 /** The furniture colours these items borrow. */

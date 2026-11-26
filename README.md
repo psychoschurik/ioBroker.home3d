@@ -60,6 +60,10 @@ the states to switch them, and write permission on files to save floor plans.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- (bluefox) Neues Möbel „Eckbadewanne“ (Bad): für die Raumecke, mit schräger Front, abgerundeter Mulde und der Armatur auf der Ablage in der Ecke; auch im Grundriss und mit fließendem Wasser
+
 ### 0.7.2 (2026-11-26)
 
 - (bluefox) Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss bleibt ein 30 cm breiter Streifen zum Anfassen, in der 3D-Ansicht daneben fasst man das Feld an seinen Modulen
