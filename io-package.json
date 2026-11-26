@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "home3d",
-    "version": "0.7.1",
+    "version": "0.7.2",
     "titleLang": {
       "en": "3D Home",
       "de": "3D Home",
@@ -20,6 +20,19 @@
       "de": "3D-Grundrisseditor und Live-Visualisierung, läuft im web-Adapter"
     },
     "news": {
+      "0.7.2": {
+        "en": "Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss bleibt ein 30 cm breiter Streifen zum Anfassen, in der 3D-Ansicht daneben fasst man das Feld an seinen Modulen",
+        "de": "Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufstellen (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss bleibt ein 30 cm breiter Streifen zum Anfassen, in der 3D-Ansicht daneben fasst man das Feld an seine Module",
+        "ru": "Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (бишер 45°), а также senkrechter Solarzaun: die hinteren Stützen stehen dan hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, in Grundriss bleibt win 30 см breiter Streifen zum Anfassen, в 3D-просмотре данных быстрее всего, чем в полевых и сейновых модулях",
+        "pt": "Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss eibt em 30 cm de largura, em 3D, abra o campo em seus módulos",
+        "nl": "Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leugen liegen auf dem Glas, im Grundriss bleibt ein 30 cm breiter Streifen zum Anchten Fassen, in de 3D-weergave daneben fast man das Feld an seinen Modulen",
+        "fr": "Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (bisher 45°), z. B. als senkrechter Solarzaun : die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss bleibt ein 30 cm breiter Streifen zum Anfassen, in der 3D-Ansicht daneben fasst man das Feld an seinen Modulen",
+        "it": "Solarfelder auf dem Boden und auf Flachdächern lassen bis 90° (bisher 45°), z. B. come zona solare posteriore: i supporti posteriori e poi dietro i moduli, la potenza e le luci poggiano sul vetro, im Grundriss beibt ein Strisce larghe 30 cm, inserire velocemente il campo nei suoi moduli in vista 3D",
+        "es": "Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss bleibt ein 30 cm Breiter Streifen zum Anfassen, in der 3D Ansicht daneben fastst man das Feld an seinen modulen",
+        "pl": "Słoneczniki na górze i na płaszczyźnie powierzchniowej znajdują się do 90° w górę (bisher 45°), z B. jako czujnik słoneczny: wewnętrzne podparcia są zgodne z modułami, wydajnością i światłami unoszącymi się na szkle, w promieniu 30 cm If to the Enfassen, na podglądzie 3D, podążaj za polem w swoich modułach",
+        "uk": "Сонячні поля на підлозі та на плоских покриттях піднімаються до 90° (приблизно 45°), з.Б. як прямий сонячний замок: задні стовпчики потім стоять за модулями, потужністю та світлом, що лежать на склі, в грюндрісі лежать смуги шириною 30 см Крім того, у 3D-перегляді подається поле в його модулі",
+        "zh-cn": "Solarfelder auf dem Boden 和 Flachdächern 上升到 90°（大约 45°），z. B. as senkrechter Solarzaun：冬天支撑着玻璃上的模块、功率和灯光在玻璃上移动，在 Grundriss 的宽度为 30 厘米以内 Streifen zum Anfassen，在 3D 全景视图中，Fastst das Field and seinen man seinen man sien man sien man sien man"
+      },
       "0.7.1": {
         "en": "Das Laden an der Wallbox aus 0.7.0 kommt mit dieser Version auf npm: 0.7.0 wurde wegen einer fehlerhaften package-lock.json nicht veröffentlicht",
         "de": "The load to the Wallbox from 0.7.0 is with this version on npm: 0.7.0 wurde wegen eines fehlerhaften package-lock.json nicht veröffentlicht",
