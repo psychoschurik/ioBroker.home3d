@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "home3d",
-    "version": "0.7.0",
+    "version": "0.7.1",
     "titleLang": {
       "en": "3D Home",
       "de": "3D Home",
@@ -20,6 +20,19 @@
       "de": "3D-Grundrisseditor und Live-Visualisierung, läuft im web-Adapter"
     },
     "news": {
+      "0.7.1": {
+        "en": "Das Laden an der Wallbox aus 0.7.0 kommt mit dieser Version auf npm: 0.7.0 wurde wegen einer fehlerhaften package-lock.json nicht veröffentlicht",
+        "de": "The load to the Wallbox from 0.7.0 is with this version on npm: 0.7.0 wurde wegen eines fehlerhaften package-lock.json nicht veröffentlicht",
+        "ru": "Загрузка на Wallbox из версии 0.7.0 поставляется с этой версией на npm: 0.7.0 не была обнаружена ошибка, из-за которой package-lock.json не был обнаружен",
+        "pt": "O carregamento na Wallbox da 0.7.0 vem com esta versão do npm: 0.7.0 wurde wegen einer fehlerhaften package-lock.json nicht veröfentlicht",
+        "nl": "Das Laden an der Wallbox aus 0.7.0 komt met deze versie auf npm: 0.7.0 wurde wegen einer fehlerhaften package-lock.json nicht veröffentlicht",
+        "fr": "Das Laden an der Wallbox aus 0.7.0 kommt mit dieser Version auf npm : 0.7.0 wurde wegen einer fehlerhaften package-lock.json nicht veröffentlicht",
+        "it": "Il caricamento nella Wallbox da 0.7.0 viene fornito con questa versione su npm: 0.7.0 è un package-lock.json difettoso non pubblicato",
+        "es": "Das Laden an der Wallbox aus 0.7.0 kommt mit dieser Version auf npm: 0.7.0 wurde wegen einer fehlerhaften package-lock.json no veröffentlicht",
+        "pl": "Ładowanie do Wallbox z 0.7.0 jest dostarczane z tą wersją na npm: 0.7.0 jako uszkodzony package-lock.json nie został opublikowany",
+        "uk": "Завантаження у Wallbox з 0.7.0 з цією версією на npm: 0.7.0 було виявлено через помилку пакету-lock.json",
+        "zh-cn": "0.7.0 版本的 Laden on der Wallbox 将在 npm 上发布这个版本：0.7.0 wurde wehlerhaften package-lock.json 未发布该版本"
+      },
       "0.7.0": {
         "en": "Laden an der Wallbox: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (mit Lichtpunkten auf dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist",
         "de": "An der Wallbox laden: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (Licht mit Punkten auf dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist",

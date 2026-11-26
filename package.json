@@ -1,6 +1,6 @@
 {
   "name": "iobroker.home3d",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "3D floor plan editor and live visualization for ioBroker, served by the web adapter",
   "author": "ioBroker.home3d contributors",
   "license": "MIT",
