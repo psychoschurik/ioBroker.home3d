@@ -60,6 +60,10 @@ the states to switch them, and write permission on files to save floor plans.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- (bluefox) Das Laden an der Wallbox aus 0.7.0 kommt mit dieser Version auf npm: 0.7.0 wurde wegen einer fehlerhaften package-lock.json nicht veröffentlicht
+
 ### 0.7.0 (2026-11-26)
 
 - (bluefox) Laden an der Wallbox: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (mit Lichtpunkten auf dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist
