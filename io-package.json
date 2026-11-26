@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "home3d",
-    "version": "0.7.2",
+    "version": "0.8.0",
     "titleLang": {
       "en": "3D Home",
       "de": "3D Home",
@@ -20,6 +20,19 @@
       "de": "3D-Grundrisseditor und Live-Visualisierung, läuft im web-Adapter"
     },
     "news": {
+      "0.8.0": {
+        "en": "Neues Möbel „Eckbadewanne“ (Bad): für die Raumecke, mit schräger Front, abgerundeter Mulde und der Armatur auf der Ablage in der Ecke; auch im Grundriss und mit fließendem Wasser",
+        "de": "New Furniture „Eckbadewanne“ (Bad): für die Raumecke, mit schräger Front, abgerundeter Mulde und der Armatur auf der Ablage in der Ecke; auch im Grundriss und mit fließendem Wasser",
+        "ru": "Новая мебель «Eckbadewanne» (Бад): für die Raumecke, mit Schräger Front, abgerundeter Mulde und der Armatur auf der Ablage in der Ecke; auch im Grundriss und mit fließendem Wasser",
+        "pt": "Neues Möbel “Eckbadewanne”: für die Raumecke, mit schräger Front, abgerundeter Mulde und der Armatur auf der Ablage in der Ecke; auch im Grundriss und mit fließendem Wasser",
+        "nl": "Neues Möbel „Eckbadewanne” (Bad): für die Raumecke, mit schräger Front, abgerundeter Mulde und der Armatur auf der Alage in der Ecke; auch im Grundriss und mit fließendem Wasser",
+        "fr": "Neues Möbel « Eckbadewanne » (Bad) : für die Raumecke, mit schräger Front, abgerundeter Mulde und der Armatur auf der Ablage in der Ecke ; auch im Grundriss und mit fließendem Wasser",
+        "it": "Neues Möbel «Eckbadewanne» (Bad): für die Raumecke, mit Schräger Front, abderundeter Mulde und der Armatur auf der Ablage in der Ecke; auch im Grundriss und mit Fließendem Wasser",
+        "es": "Neues Möbel «Eckbadewanne» (Malo): für die Raumecke, mit Schräger Front, abgerundeter Mulde und der Armatur auf der Ablage in der Ecke; auch im Grundriss und mit Fließendem Wasser",
+        "pl": "Nowe meble „Eckbadewanne” (Łazienka): dla okręgów, z przednim przodem, abgerundetami Mulde i armatury na blokadzie w Ecke; również w gruncie i z płócienną wodą",
+        "uk": "Нові меблі «Eckbadewanne» (ванна): для кімнати, з ширшим фронтом, розгорнуті мулда та арматура на виході; також у грунті та з підвішеною водою",
+        "zh-cn": "新款家具 “Eckbadewanne”（Bad）：为罗梅克而战，带有 schräger Fronter、abgerundeter Mulde 和 der Armatur auf der Auf der Auf der Ecke 中的 Ablage；同样在 Grundriss 和 mit fliezendem Wasser"
+      },
       "0.7.2": {
         "en": "Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss bleibt ein 30 cm breiter Streifen zum Anfassen, in der 3D-Ansicht daneben fasst man das Feld an seinen Modulen",
         "de": "Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufstellen (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss bleibt ein 30 cm breiter Streifen zum Anfassen, in der 3D-Ansicht daneben fasst man das Feld an seine Module",
@@ -88,10 +101,6 @@
       "0.3.0": {
         "en": "Standalone 3d-home adapter with ioBroker object selection, 3D editor and local visualization.",
         "de": "Eigenständiger Adapter 3d-home mit ioBroker-Objektauswahl, 3D-Editor und lokaler Visualisierung."
-      },
-      "0.4.0": {
-        "en": "TypeScript adapter, browser integration, scripts and tests with checked build outputs.",
-        "de": "Adapter, Browser-Anbindung, Skripte und Tests auf TypeScript umgestellt."
       }
     },
     "authors": [
