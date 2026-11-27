@@ -44,7 +44,8 @@
       }
     },
     "authors": [
-      "ioBroker.home3d contributors"
+      "psychoschurik <289390473+psychoschurik@users.noreply.github.com>",
+      "Denis Haev <dogafox@gmail.com>"
     ],
     "licenseInformation": {
       "type": "free",

@@ -70,4 +70,4 @@ MIT License. The 3D frontend comes from an MIT-licensed project by Mastershort a
 [NOTICE](NOTICE) and [LICENSE](LICENSE).
 
 Copyright (c) 2026 Denis Haev <dogafox@gmail.com>  
-Copyright (c) 2026 Mastershort
+Copyright (c) 2026 Mastershort <4759859+Mastershort@users.noreply.github.com>
