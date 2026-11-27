@@ -2,7 +2,7 @@
   "name": "iobroker.home3d",
   "version": "0.9.0",
   "description": "3D floor plan editor and live visualization for ioBroker, served by the web adapter",
-  "author": "psychoschurik <289390473+psychoschurik@users.noreply.github.com>",
+  "author": "psychoschurik <psychoschurik@gmail.com>",
   "contributors": [
     "Denis Haev <dogafox@gmail.com>"
   ],
