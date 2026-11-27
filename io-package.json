@@ -28,21 +28,7 @@
       "uk": "3D-редактор планування та візуалізація в реальному часі, працює в адаптері web",
       "zh-cn": "3D 平面图编辑器和实时可视化，运行于 web 适配器中"
     },
-    "news": {
-      "0.8.0": {
-        "en": "Initial release",
-        "de": "Erstveröffentlichung",
-        "ru": "Первый выпуск",
-        "pt": "Lançamento inicial",
-        "nl": "Eerste release",
-        "fr": "Version initiale",
-        "it": "Prima versione",
-        "es": "Versión inicial",
-        "pl": "Pierwsze wydanie",
-        "uk": "Перший випуск",
-        "zh-cn": "首次发布"
-      }
-    },
+    "news": {},
     "authors": [
       "ioBroker.home3d contributors"
     ],

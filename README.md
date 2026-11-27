@@ -60,7 +60,7 @@ the states to switch them, and write permission on files to save floor plans.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### 0.8.0 (2026-11-26)
+### **WORK IN PROGRESS**
 
 - (bluefox) Initial release
 
