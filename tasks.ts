@@ -6975,6 +6975,57 @@ function gasBottle(name: string, code: string): string {
 }
 
 /**
+ * The windsock and the flag as entries of their own in the library beside the wind indicator (a windex at the
+ * masthead): the same furniture "wind_vane" with its kind and its pole set, each with its own picture (the editor
+ * draws an entry with a preset by its `gear_kind`, see `gasBottle`).
+ */
+function vaneEntries(name: string, code: string): string {
+    if (name === 'library-index.ts') {
+        code = replaceRequired(
+            code,
+            '      preset: { gear_kind: "gas", w: 0.3, d: 0.3, h: 0.59 },\n    });\n  }\n',
+            [
+                '      preset: { gear_kind: "gas", w: 0.3, d: 0.3, h: 0.59 },',
+                '    });',
+                '  }',
+                '  // a windsock on its pole and a flag on its flagpole: the wind indicator of another kind',
+                '  const vane = out.find((e) => e.type === "wind_vane" && !e.mirror);',
+                '  if (vane) {',
+                '    const words = `${src.kindName(vane.kind)} ${KIND_WORDS[vane.kind]} wind`;',
+                '    const sock = src.basicName("wind_sock");',
+                '    const flag = src.basicName("wind_flag");',
+                '    out.push(',
+                '      {',
+                '        ...vane,',
+                '        key: "wind_vane#sock",',
+                '        label: sock,',
+                '        search: `${sock} ${src.basicNameEn("wind_sock")} windsack windsock luftsack windhose flugplatz ${words}`,',
+                '        family: "wind_sock",',
+                '        rooms: [...new Set([...vane.rooms, "garden"])],',
+                '        size: [0.8, 0.8, 0.3],',
+                '        preset: { gear_kind: "sock", gear_mast: true, w: 0.8, d: 0.8, h: 0.3 },',
+                '      },',
+                '      {',
+                '        ...vane,',
+                '        key: "wind_vane#flag",',
+                '        label: flag,',
+                '        search: `${flag} ${src.basicNameEn("wind_flag")} flagge fahne fahnenmast flaggenmast flagpole flag ${words}`,',
+                '        family: "wind_flag",',
+                '        rooms: [...new Set([...vane.rooms, "garden"])],',
+                '        size: [1.5, 1.5, 0.3],',
+                '        preset: { gear_kind: "flag", gear_mast: true, w: 1.5, d: 1.5, h: 0.3 },',
+                '      },',
+                '    );',
+                '  }',
+                '',
+            ].join('\n'),
+            'vane entries: library',
+        );
+    }
+    return code;
+}
+
+/**
  * One bar instead of two (frontend/shell.ts): the page's own bar (logo, status, projects, devices, kiosk, help) goes
  * into the slots "start" (instead of the title "3D Home") and "end" (before the version and ⚙) of the panel's header.
  * In the clean view, where the header is gone, a header with only those slots stays, as the page's bar did before.
@@ -8962,6 +9013,8 @@ function weatherMore(name: string, code: string): string {
     if (name === 'i18n.ts') {
         const de: Record<string, string> = {
             furn_wind_vane: 'Windanzeiger',
+            furn_wind_sock: 'Windsack',
+            furn_wind_flag: 'Flagge',
             vane_kind: 'Art',
             vane_windex: 'Verklicker (Masttopp)',
             vane_sock: 'Windsack',
@@ -8970,7 +9023,7 @@ function weatherMore(name: string, code: string): string {
             flag_plain: 'Blau-Weiß (ohne Land)',
             vane_mast: 'Mast bzw. Stange bis zur Etage zeichnen',
             vane_hint:
-                'Dreht sich mit dem Wind aus ⚙ → Haus (Wind-Sensoren) oder aus der Wetter-Entität: Der Verklicker zeigt in den Wind, Windsack und Flagge wehen mit ihm. Der Windsack steht ab 15 kn waagerecht, Böen lassen alle schwingen. Darüber stehen Wind, Richtung und Beaufort. Breite = Länge von Pfeil, Sack oder Flagge; die Höhe der Flagge folgt ihrem Land.',
+                'Dreht sich mit dem Wind aus ⚙ → Wetter & Warnungen (Wind-Sensoren) oder aus der Wetter-Entität: Der Verklicker zeigt in den Wind, Windsack und Flagge wehen mit ihm. Der Windsack steht ab 15 kn waagerecht, Böen lassen alle schwingen. Darüber stehen Wind, Richtung und Beaufort. Breite = Länge von Pfeil, Sack oder Flagge; die Höhe der Flagge folgt ihrem Land.',
             wind_speed: 'Wind (Sensor)',
             wind_dir: 'Windrichtung (Sensor, ° woher)',
             wind_gust: 'Böen (Sensor)',
@@ -8983,6 +9036,8 @@ function weatherMore(name: string, code: string): string {
         };
         const en: Record<string, string> = {
             furn_wind_vane: 'Wind indicator',
+            furn_wind_sock: 'Windsock',
+            furn_wind_flag: 'Flag',
             vane_kind: 'Kind',
             vane_windex: 'Windex (masthead)',
             vane_sock: 'Windsock',
@@ -8991,7 +9046,7 @@ function weatherMore(name: string, code: string): string {
             flag_plain: 'Blue and white (no country)',
             vane_mast: 'Draw a mast or pole down to the floor',
             vane_hint:
-                'Turns with the wind from ⚙ → House (wind sensors) or from the weather entity: the windex points into the wind, the windsock and the flag fly with it. The windsock stands out straight from 15 kn, gusts make them all swing. Above it: wind, direction and Beaufort. Width = length of the arrow, sock or flag; the height of the flag follows its country.',
+                'Turns with the wind from ⚙ → Weather & warnings (wind sensors) or from the weather entity: the windex points into the wind, the windsock and the flag fly with it. The windsock stands out straight from 15 kn, gusts make them all swing. Above it: wind, direction and Beaufort. Width = length of the arrow, sock or flag; the height of the flag follows its country.',
             wind_speed: 'Wind (sensor)',
             wind_dir: 'Wind direction (sensor, ° from)',
             wind_gust: 'Gusts (sensor)',
@@ -9900,6 +9955,7 @@ const patches: Plugin = {
         code = oneBar(name, code);
         code = boatPictures(name, code);
         code = gasBottle(name, code);
+        code = vaneEntries(name, code);
         code = parkingTimeTravel(name, code);
         code = fixedDialogHeads(name, code);
         code = noLocate(name, code);

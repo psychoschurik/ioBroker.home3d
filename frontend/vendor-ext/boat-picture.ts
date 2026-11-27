@@ -2,7 +2,8 @@
 // library picture (viewer/preview.ts, patched in `boatPictures` of tasks.ts) stayed empty, so it is built the same
 // way. A boat's anchor stowed in its roller, a tank half full of fresh water, the rudder straight, the propeller, a lit
 // bicolour light (red and green), a closed hatch (anchor.ts, boat-gear.ts); a robot mower on its charging station, a
-// sprinkler watering its circle, a wind indicator on its mast, a parking spot with a car in it. The awning is drawn by
+// sprinkler watering its circle, a wind indicator on its mast (the windex, a windsock or a flag in the wind), a parking
+// spot with a car in it. The awning is drawn by
 // preview.ts itself.
 import {
     BoxGeometry,
@@ -21,7 +22,7 @@ import { buildCar } from './cars';
 import { buildGear, disposeGear } from './boat-gear';
 import { isGear } from './boat-kinds';
 import { buildDock, buildMower } from './mower-model';
-import { buildVane, disposeVanes } from './wind-vane';
+import { animateVane, buildVane, disposeVanes } from './wind-vane';
 
 /** The items of the garden drawn here (not by boat-gear.ts). */
 const GARDEN = new Set(['robot_mower', 'sprinkler', 'wind_vane', 'parking']);
@@ -89,28 +90,29 @@ function sprinklerPicture(w: number): Group {
     return g;
 }
 
-/** A wind indicator: the arrow of a masthead on its mast, pointing into a wind from the right. */
-function vanePicture(w: number): Group {
+/**
+ * A wind indicator on its mast or pole in a fresh wind from the right: the arrow of a masthead points into it, a
+ * windsock (`kind` "sock") and a flag ("flag", the plain one) fly with it.
+ */
+function vanePicture(w: number, kind: string): Group {
     const g = buildVane(
         {
             id: 'picture',
             floor: '',
             x: 0,
             z: 0,
-            kind: 'windex',
+            kind,
             flag: '',
             size: Math.max(0.3, w),
-            base: Math.max(0.4, w * 0.8),
+            base: kind === 'windex' ? Math.max(0.4, w * 0.8) : Math.max(0.5, w * 1.2),
             mast: true,
             label: '',
             warn: false,
         },
         { floorY: 0, light: true },
     );
-    const head = g.getObjectByName('fp3dVaneHead');
-    if (head) {
-        head.rotation.y = -Math.PI / 3;
-    }
+    // 6 m/s: the sock almost straight out, the flag flying; at t = 0 the arrow stands as it always did (-60°)
+    animateVane(g, { to: (4 * Math.PI) / 3, speed: 6, gust: 0 }, 0);
     return g;
 }
 
@@ -143,7 +145,7 @@ export function boatPicture(type: string, w: number, d: number, h: number, varia
                   ? sprinklerPicture(w)
                   : type === 'parking'
                     ? parkingPicture(w, d)
-                    : vanePicture(w);
+                    : vanePicture(w, variant === 'sock' || variant === 'flag' ? variant : 'windex');
         g.userData.fp3dItemPicture = type;
         return g;
     }
