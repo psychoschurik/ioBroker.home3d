@@ -62,35 +62,12 @@ the states to switch them, and write permission on files to save floor plans.
 -->
 ### 0.8.0 (2026-11-26)
 
-- (bluefox) Neues Möbel „Eckbadewanne“ (Bad): für die Raumecke, mit schräger Front, abgerundeter Mulde und der Armatur auf der Ablage in der Ecke; auch im Grundriss und mit fließendem Wasser
-
-### 0.7.2 (2026-11-26)
-
-- (bluefox) Solarfelder auf dem Boden und auf Flachdächern lassen sich bis 90° aufständern (bisher 45°), z. B. als senkrechter Solarzaun: die hinteren Stützen stehen dann hinter den Modulen, Leistung und Leuchten liegen auf dem Glas, im Grundriss bleibt ein 30 cm breiter Streifen zum Anfassen, in der 3D-Ansicht daneben fasst man das Feld an seinen Modulen
-
-### 0.7.1 (2026-11-26)
-
-- (bluefox) Das Laden an der Wallbox aus 0.7.0 kommt mit dieser Version auf npm: 0.7.0 wurde wegen einer fehlerhaften package-lock.json nicht veröffentlicht
-
-### 0.7.0 (2026-11-26)
-
-- (bluefox) Laden an der Wallbox: Ein geparktes Auto bis 5 m neben einer Wallbox hängt an ihrem Kabel, solange die Wallbox ein angestecktes Auto meldet (Status und Leistung wie auf ihrer Karte); der Ring am Ladeanschluss leuchtet grün und pulsiert beim Laden (mit Lichtpunkten auf dem Kabel und ⚡ über dem Dach), gelb, solange es nur angesteckt ist
-
-### 0.6.0 (2026-11-25)
-
-- (bluefox) Mehrere Projekte wie in vis-2 (z. B. Haus und Boot), jedes mit eigenen Grundrissen, Bildern, 3D-Modellen, Geräten und Einstellungen: im Editor unter „Projekte“ öffnen, anlegen, umbenennen, duplizieren, löschen, als Datei exportieren und als neues Projekt importieren; geöffnet über `index.html?project=<id>` (auch mit `?kiosk` und `?view=card`); die Dateien jedes Projekts liegen in `home3d.0/<id>/`, die des Standardprojekts in `home3d.0/default/`
-
-### 0.5.0 (2026-11-25)
-
-- (bluefox) Leuchten: „Gerätetyp“ und „Datenpunkte des Geräts“ (Schalter, Dimmer, Farbe, Weißton) jetzt auch direkt bei der Leuchte unter „Licht oder Schalter“, nicht nur beim platzierten Gerät
-- (bluefox) Verlaufsdiagramm im Detail-Dialog: Der Tooltip bleibt am Rand innerhalb des Diagramms, es erscheint keine Scrollleiste mehr
-- (bluefox) Neues Möbel „Wandbild“ (Holzrahmen oder digitaler Bilderrahmen) unter Deko: ein bestimmtes Bild („Immer (ohne Gerät)“) oder ein Album des Adapters Screensaver als Diashow; Bildschirme (auch der Fernseher, Regel „off“) zeigen ebenfalls ein Album oder ein Bild aus einem Datenpunkt (URL, Pfad oder Base64)
+- (bluefox) Initial release
 
 ## License
 
 MIT License. The 3D frontend comes from an MIT-licensed project by Mastershort and was adapted for ioBroker, see
 [NOTICE](NOTICE) and [LICENSE](LICENSE).
 
-Copyright (c) 2026 Denis Haev <dogafox@gmail.com>
-
+Copyright (c) 2026 Denis Haev <dogafox@gmail.com>  
 Copyright (c) 2026 Mastershort

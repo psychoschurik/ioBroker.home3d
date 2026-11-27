@@ -10,3 +10,4 @@ tmp/
 # generated completely by `npm run build` (tasks.ts, Vite); the npm package is built in the CI, see common.nogit.
 # The sources of the page are in frontend/ (static files in frontend/public/).
 www/
+.commitinfo
