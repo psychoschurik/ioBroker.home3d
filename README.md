@@ -64,6 +64,8 @@ the states to switch them, and write permission on files to save floor plans.
 
 - (bluefox) Initial release
 
+Older changes are in [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
+
 ## License
 
 MIT License. The 3D frontend comes from an MIT-licensed project by Mastershort and was adapted for ioBroker, see
