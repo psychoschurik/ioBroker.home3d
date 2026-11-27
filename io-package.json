@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "home3d",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "titleLang": {
       "en": "3D Home",
       "de": "3D Home",
@@ -28,7 +28,21 @@
       "uk": "3D-редактор планування та візуалізація в реальному часі, працює в адаптері web",
       "zh-cn": "3D 平面图编辑器和实时可视化，运行于 web 适配器中"
     },
-    "news": {},
+    "news": {
+      "0.9.0": {
+        "en": "Initial release",
+        "de": "Erste Version",
+        "ru": "Первоначальный релиз",
+        "pt": "Versão inicial",
+        "nl": "Eerste uitgave",
+        "fr": "Première sortie",
+        "it": "Prima versione",
+        "es": "Versión inicial",
+        "pl": "Pierwsze wydanie",
+        "uk": "Початковий випуск",
+        "zh-cn": "初始版本"
+      }
+    },
     "authors": [
       "ioBroker.home3d contributors"
     ],
