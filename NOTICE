@@ -1,6 +1,7 @@
 The 3D frontend in src-www/src (and the bundles in www/vendor/ built from it) is derived from
 an MIT licensed project by Mastershort (upstream version 3.1.2, commit c11bd614d38a68d3aec251a940e31a1101b7429b).
-Copyright (c) 2026 Mastershort - see LICENSE. This copyright notice must be retained.
+Copyright (c) 2026 Mastershort, under the MIT License (the permission notice is the text in LICENSE).
+This copyright notice must be retained.
 
 Changes for ioBroker: src-www/src is the upstream source with only its names changed; tasks.ts patches it at build
 time (ioBroker theme, local help links, texts, own styles and furniture), and the code added to it is in

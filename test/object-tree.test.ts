@@ -86,7 +86,9 @@ test("distributed frontend contains no original developer web destinations", () 
       file,
     );
   }
-  assert.ok(fs.readFileSync("LICENSE", "utf8").includes("Mastershort"));
+  // the MIT copyright of the 3D frontend is kept in NOTICE, which ships with the package
+  assert.ok(fs.readFileSync("NOTICE", "utf8").includes("Copyright (c) 2026 Mastershort"));
+  assert.ok(JSON.parse(fs.readFileSync("package.json", "utf8")).files.includes("NOTICE"));
 });
 
 test("rebuilt locating bundle retains custom element registration", () => {

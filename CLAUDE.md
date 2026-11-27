@@ -97,7 +97,7 @@ default project's names at the top and the others' below `projects.<id>`; `show`
   `frontend/public/vendor/lang/*.json`); new upstream texts of that kind get the same treatment.
 - Locating ("Ortung", Bluetooth presence) is hidden (`noLocate` in `tasks.ts`): it needs a server that reads the
   receivers' signal strengths and learns the rooms, which ioBroker does not have.
-- Do not mention the former upstream project name anywhere; keep the MIT copyright in LICENSE/NOTICE.
+- Do not mention the former upstream project name anywhere; keep Mastershort's MIT copyright in NOTICE (shipped with the package) and src-www/LICENSE; README.md and LICENSE carry only copyright lines with a real e-mail address (the repochecker refuses lines without one and GitHub noreply addresses, E4050–E4052).
 - Texts of the frame only through `t()` of `frontend/lang.ts` (de, en and ru for every key); texts of the 3D view as
   keys of its i18n (de/en patched in `tasks.ts`, other languages in `frontend/public/vendor/lang/<code>.json`, Russian included).
 - Own 3D styles: `looks()` in `tasks.ts` patches `looks.ts`, `theme.ts`, `fold.ts`, `viewer3d.ts`, `panel.ts` and `i18n.ts`;
